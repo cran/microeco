@@ -52,7 +52,7 @@ t1$plot_spe_func_perc(use_group_list = TRUE)
 ## ------------------------------------------------
 
 \donttest{
-t1$cal_FAPROTAX()
+t1$cal_FAPROTAX(Ref_folder = "./FAPROTAX_1.2.1")
 }
 
 ## ------------------------------------------------
@@ -259,13 +259,15 @@ Predict functional potential of communities using FAPROTAX.
 please also cite the original FAPROTAX paper: 
 Louca, S., Parfrey, L. W., & Doebeli, M. (2016). Decoupling function and taxonomy in the global ocean microbiome. Science, 353(6305), 1272. <doi:10.1126/science.aaf4507>;
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_FAPROTAX(keep_tem = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_FAPROTAX(keep_tem = TRUE, Ref_folder = "./FAPROTAX_1.2.1")}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{keep_tem}}{default FALSE; whether keep the intermediate file, that is, the otu_table_for_FAPROTAX.txt in local place.}
+
+\item{\code{Ref_folder}}{default "./FAPROTAX_1.2.1"; see http://www.loucalab.com/archive/FAPROTAX}
 }
 \if{html}{\out{</div>}}
 }
@@ -275,7 +277,7 @@ res_FAPROTAX in object.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$cal_FAPROTAX()
+t1$cal_FAPROTAX(Ref_folder = "./FAPROTAX_1.2.1")
 }
 }
 \if{html}{\out{</div>}}

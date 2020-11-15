@@ -13,7 +13,6 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		#' @param taxa_number default NULL; how many taxa you want to use, if set, filter_thres parameter invalid.
 		#' @param group default NULL; which group column name in sample_table is selected.
 		#' @param select_group default NULL; the group name, used following the group to filter samples.
-		#' @param cpp default FALSE; invoke c++ to accelerate betaMPD calculation.
 		#' @param env_cols default NULL; number or name vector to select the environmental data in dataset$sample_table. 
 		#' @param add_data default NULL; provide environmental data table additionally.
 		#' @param complete_na default FALSE; whether fill the NA in environmental data.
@@ -21,14 +20,13 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		#' @examples
 		#' data(dataset)
 		#' data(env_data_16S)
-		#' t1 <- trans_nullmodel$new(dataset, taxa_number = 100, add_data = env_data_16S, cpp = TRUE)
+		#' t1 <- trans_nullmodel$new(dataset, taxa_number = 100, add_data = env_data_16S)
 		initialize = function(
 			dataset = NULL,
 			filter_thres = 0,
 			taxa_number = NULL,
 			group = NULL,
 			select_group = NULL,
-			cpp = FALSE,
 			env_cols = NULL,
 			add_data = NULL,
 			complete_na = FALSE
@@ -56,7 +54,6 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				dis <- NULL
 			}
 			self$comm <- comm
-			self$cpp <- cpp
 			self$dis <- dis
 			self$sample_table <- use_set$sample_table
 			if(!is.null(env_cols) | !is.null(add_data)){
@@ -152,7 +149,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			g
 		},
 		#' @description
-		#' Calculate betaMPD. Faster than \code{\link{comdist}} in picante package.
+		#' Calculate betaMPD. Faster than comdist in picante package.
 		#'
 		#' @param abundance.weighted default FALSE; whether use weighted abundance
 		#' @return res_betampd in object.
@@ -164,18 +161,17 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				stop("Phylogenetic tree is required!")
 			}
 			comm <- self$comm
-			cpp <- self$cpp
 			if (abundance.weighted == F) {
 				comm <- decostand(comm, method="pa")
 			}
 			comm <- decostand(comm, method="total", MARGIN=1)
-			self$res_betampd <- private$betampd(comm = comm, dis = dis, cpp = cpp)
+			self$res_betampd <- private$betampd(comm = comm, dis = dis)
 		},
 		#' @description
-		#' Calculate betaMNTD. Faster than \code{\link{comdistnt}} in picante package.
+		#' Calculate betaMNTD. Faster than comdistnt in picante package.
 		#'
 		#' @param abundance.weighted default FALSE; whether use weighted abundance
-		#' @param exclude.conspecifics default FALSE; see \code{\link{comdistnt}} in picante package.
+		#' @param exclude.conspecifics default FALSE; see comdistnt in picante package.
 		#' @return res_betamntd in object.
 		#' @examples
 		#' t1$cal_betamntd(abundance.weighted=FALSE)
@@ -199,7 +195,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		#' t1$cal_ses_betampd(runs = 100, abundance.weighted = FALSE)
 		#' }
 		cal_ses_betampd = function(runs=1000, abundance.weighted = FALSE, verbose = TRUE) {
-			cpp <- self$cpp
+
 			comm <- self$comm
 			dis <- self$dis
 			if(is.null(dis)){
@@ -212,7 +208,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			if(verbose){
 				cat("Calculate observed betaMPD.\n")
 			}
-			betaobs <- private$betampd(comm = comm, dis = dis, cpp = cpp) %>% as.dist
+			betaobs <- private$betampd(comm = comm, dis = dis) %>% as.dist
 			all_samples <- rownames(comm)
 			betaobs_vec <- as.vector(betaobs)
 			if(verbose){
@@ -222,7 +218,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				if(verbose){
 					private$show_run(x = x, runs = runs)
 				}
-				as.dist(private$betampd(comm = comm, dis = picante::taxaShuffle(dis), cpp = cpp))
+				as.dist(private$betampd(comm = comm, dis = picante::taxaShuffle(dis)))
 			}, simplify = "array")
 			beta_rand_mean <- apply(X = beta_rand, MARGIN = 1, FUN = mean, na.rm = TRUE)
 			beta_rand_sd <- apply(X = beta_rand, MARGIN = 1, FUN = sd, na.rm = TRUE)
@@ -234,7 +230,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		#'
 		#' @param runs default 1000; simulation runs.
 		#' @param abundance.weighted default FALSE; whether use weighted abundance
-		#' @param exclude.conspecifics default FALSE; see \code{\link{comdistnt}} in picante package.
+		#' @param exclude.conspecifics default FALSE; see comdistnt in picante package.
 		#' @param verbose default TRUE; whether show the calculation process message.
 		#' @return res_ses_betamntd in object.
 		#' @examples
@@ -336,14 +332,12 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				.[all_samples, all_samples] %>% as.matrix
 			res1
 		},
-		betampd = function(comm = NULL, dis = NULL, cpp = FALSE
-			){
+		betampd = function(comm = NULL, dis = NULL){
 			all_samples <- rownames(comm)
-			if(cpp == T){
-				matrix_multi <- function(comm_use, dis_use, ag_vector){eigenMapMatMult(eigenMapMatMult(comm_use, dis_use), ag_vector)}
-			}else{
-				matrix_multi <- function(comm_use, dis_use, ag_vector){(comm_use %*% dis_use) %*% ag_vector}
-			}
+			# use cpp instead of base
+			matrix_multi <- function(comm_use, dis_use, ag_vector){(comm_use %*% dis_use) %*% ag_vector}
+			# matrix_multi <- function(comm_use, dis_use, ag_vector){eigenMapMatMult(eigenMapMatMult(comm_use, dis_use), ag_vector)}
+			
 			res <- data.frame()
 			rm_samples <- c()
 			for(sample_name in all_samples[-length(all_samples)]){

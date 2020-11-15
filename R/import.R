@@ -14,5 +14,4 @@
 #' @importFrom rlang sym
 #' @importFrom stats fisher.test
 #' @importFrom stats median
-#' @useDynLib microeco
 NULL

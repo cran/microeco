@@ -18,7 +18,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' @param nresam default .6667; sample number ratio used in each bootstrap or LEfSe or random forest.
 		#' @param boots default 30; bootstrap test number for lefse or rf.
 		#' @param rf_taxa_level default "all"; use all taxonomic rank data, if want to test a specific rank, provide taxonomic rank name, such as "Genus".
-		#' @param rf_ntree default 1000; see ntree in \code{\link{randomForest}}.
+		#' @param rf_ntree default 1000; see ntree in randomForest function of randomForest package.
 		#' @param metastat_taxa_level default "Genus"; taxonomic rank level used in metastat test; White et al. (2009) <doi:10.1371/journal.pcbi.1000352>.
 		#' @param metastat_group_choose default NULL; a vector used for selecting the required groups for testing.
 		#' @return res_rf res_lefse res_abund or res_metastat in trans_diff object.

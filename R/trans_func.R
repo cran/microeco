@@ -278,12 +278,13 @@ trans_func <- R6Class(classname = "trans_func",
 		#' Louca, S., Parfrey, L. W., & Doebeli, M. (2016). Decoupling function and taxonomy in the global ocean microbiome. Science, 353(6305), 1272. <doi:10.1126/science.aaf4507>;
 		#'
 		#' @param keep_tem default FALSE; whether keep the intermediate file, that is, the otu_table_for_FAPROTAX.txt in local place.
+		#' @param Ref_folder default "./FAPROTAX_1.2.1"; see http://www.loucalab.com/archive/FAPROTAX
 		#' @return res_FAPROTAX in object.
 		#' @examples
 		#' \donttest{
-		#' t1$cal_FAPROTAX()
+		#' t1$cal_FAPROTAX(Ref_folder = "./FAPROTAX_1.2.1")
 		#' }
-		cal_FAPROTAX = function(keep_tem = TRUE) {
+		cal_FAPROTAX = function(keep_tem = TRUE, Ref_folder = "./FAPROTAX_1.2.1") {
 			message("This is FAPROTAX database 1.2.1 with python 2.7. The newer versions may exist in http://www.loucalab.com/archive/FAPROTAX ")
 			otu_file <- self$otu_table
 			tax_file <- self$tax_table
@@ -295,7 +296,7 @@ trans_func <- R6Class(classname = "trans_func",
 			pathfilename <- tempfile(pathfilename, fileext = ".txt")
 			message("writing the otu_table_for_FAPROTAX to temporary file ", pathfilename, " ...")
 			write.table(otu_file, pathfilename, sep = "\t", row.names = FALSE, quote = FALSE)
-			code_path <- system.file("extdata", "FAPROTAX_1.2.1", package="microeco")
+			code_path <- Ref_folder
 			use_command <- paste0("python ", code_path, "/collapse_table.py -i ", pathfilename, " -o ", "FAPROTAX_prediction.tsv -g ", 
 				code_path, "/FAPROTAX.txt -d taxonomy --omit_columns 0 --column_names_are_in last_comment_line -f")
 			message("run python to predict...")

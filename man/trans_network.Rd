@@ -4,7 +4,9 @@
 \alias{trans_network}
 \title{Create trans_network object for co-occurrence network analysis.}
 \description{
-This class is a wrapper for a series of network analysis related methods, including the correlation based <doi:10.1186/1471-2105-13-113> and Probabilistic Graphical Models based <doi:10.1016/j.cels.2019.08.002> network construction approaches, network and node attributes analysis and other network operations.
+This class is a wrapper for a series of network analysis related methods, 
+including the correlation based <doi:10.1186/1471-2105-13-113>, SpiecEasi <doi:10.1371/journal.pcbi.1004226>,
+and Probabilistic Graphical Models based <doi:10.1016/j.cels.2019.08.002> network construction approaches, network and node attributes analysis and other network operations.
 }
 \examples{
 
@@ -21,7 +23,7 @@ t1 <- trans_network$new(dataset = dataset, cal_cor = "SparCC",
   taxa_level = "OTU", filter_thres = 0.001)
 t1 <- trans_network$new(dataset = dataset, cal_cor = "WGCNA", 
   taxa_level = "OTU", filter_thres = 0.0001)
-# PGM network
+# SpiecEasi or PGM network
 t1 <- trans_network$new(dataset = dataset, cal_cor = NA, taxa_level = "OTU",
   filter_thres = 0.0001)
 }
@@ -40,6 +42,8 @@ t1$replace_name()
 
 \donttest{
 t1$cal_network(p_thres = 0.01, COR_cut = 0.6)
+t1$cal_network(network_method = "SpiecEasi", SpiecEasi_method = "mb")
+t1$cal_network(network_method = "PGM")
 }
 
 ## ------------------------------------------------
@@ -149,9 +153,9 @@ t1$subset_network(node = t1$res_node_type \%>\% .[.$module == "M1", ] \%>\%
 \describe{
 \item{\code{dataset}}{the object of \code{\link{microtable}} Class.}
 
-\item{\code{cor_method}}{default "pearson"; "pearson", "spearman" or "kendall"; correlation algorithm.}
+\item{\code{cor_method}}{default "pearson"; "pearson", "spearman" or "kendall"; correlation algorithm, only use for correlation based network.}
 
-\item{\code{cal_cor}}{default "base"; "base", "WGCNA", "SparCC" or NA; correlation method; NA represent do not calculate.}
+\item{\code{cal_cor}}{default "base"; "base", "WGCNA", "SparCC" or NA; correlation method; NA represent do not calculate correlations, used for non-correlation based network.}
 
 \item{\code{taxa_level}}{default "OTU"; taxonomic rank.}
 
@@ -181,7 +185,7 @@ t1 <- trans_network$new(dataset = dataset, cal_cor = "SparCC",
   taxa_level = "OTU", filter_thres = 0.001)
 t1 <- trans_network$new(dataset = dataset, cal_cor = "WGCNA", 
   taxa_level = "OTU", filter_thres = 0.0001)
-# PGM network
+# SpiecEasi or PGM network
 t1 <- trans_network$new(dataset = dataset, cal_cor = NA, taxa_level = "OTU",
   filter_thres = 0.0001)
 }
@@ -218,11 +222,13 @@ t1$replace_name()
 \if{html}{\out{<a id="method-cal_network"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_network}{}}}
 \subsection{Method \code{cal_network()}}{
-Calculate network either based on the correlation method or based on the Probabilistic Graphical Models (PGM) in julia FlashWeave; 
-see Deng et al. (2012) <10.1186/1471-2105-13-113> for correlation based method; see Tackmann et al. (2019) <doi:10.1016/j.cels.2019.08.002> for PGM based method.
+Calculate network either based on the correlation method or based on SpiecEasi or based on the Probabilistic Graphical Models (PGM) in julia FlashWeave; 
+see Deng et al. (2012) <doi:10.1186/1471-2105-13-113> for correlation based method; 
+see Kurtz et al. (2015) <doi:doi:10.1371/journal.pcbi.1004226> for SpiecEasi method; 
+see Tackmann et al. (2019) <doi:10.1016/j.cels.2019.08.002> for PGM based method.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_network(
-  network_method = c("COR", "PGM")[1],
+  network_method = c("COR", "SpiecEasi", "PGM")[1],
   p_thres = 0.01,
   COR_weight = TRUE,
   COR_p_adjust = "fdr",
@@ -232,16 +238,18 @@ see Deng et al. (2012) <10.1186/1471-2105-13-113> for correlation based method; 
   PGM_meta_data = FALSE,
   PGM_sensitive = "true",
   PGM_heterogeneous = "true",
+  SpiecEasi_method = "mb",
   with_module = TRUE,
   add_taxa_name = "Phylum",
-  usename_rawtaxa_when_taxalevel_notOTU = FALSE
+  usename_rawtaxa_when_taxalevel_notOTU = FALSE,
+  ...
 )}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{network_method}}{default "COR"; "COR" or "PGM"; COR: correlation based method; PGM: Probabilistic Graphical Models based method.}
+\item{\code{network_method}}{default "COR"; "COR", "SpiecEasi" or "PGM"; COR: correlation based method; PGM: Probabilistic Graphical Models based method.}
 
 \item{\code{p_thres}}{default .01; the p value threshold.}
 
@@ -261,11 +269,15 @@ see Deng et al. (2012) <10.1186/1471-2105-13-113> for correlation based method; 
 
 \item{\code{PGM_heterogeneous}}{default "true"; whether use heterogeneous type in the PGM model.}
 
+\item{\code{SpiecEasi_method}}{default "mb"; either 'glasso' or 'mb';see spiec.easi in package SpiecEasi and https://github.com/zdk123/SpiecEasi.}
+
 \item{\code{with_module}}{default TRUE; whether calculate modules.}
 
 \item{\code{add_taxa_name}}{default "Phylum"; add taxonomic rank name to the result.}
 
 \item{\code{usename_rawtaxa_when_taxalevel_notOTU}}{default FALSE; whether replace the name of nodes using the taxonomic information.}
+
+\item{\code{...}}{paremeters pass to spiec.easi in package SpiecEasi.}
 }
 \if{html}{\out{</div>}}
 }
@@ -276,6 +288,8 @@ res_network in object.
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
 t1$cal_network(p_thres = 0.01, COR_cut = 0.6)
+t1$cal_network(network_method = "SpiecEasi", SpiecEasi_method = "mb")
+t1$cal_network(network_method = "PGM")
 }
 }
 \if{html}{\out{</div>}}
@@ -448,7 +462,8 @@ t1$plot_taxa_roles()
 \if{html}{\out{<a id="method-cal_sum_links"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_sum_links}{}}}
 \subsection{Method \code{cal_sum_links()}}{
-Sum the linkages among taxa.
+This function is used to sum the links number from one taxa to another or in the same taxa, for example, at Phylum level.
+This is very useful to fast see how many nodes are connected between different taxa or within the taxa.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_sum_links(taxa_level = "Phylum")}\if{html}{\out{</div>}}
 }

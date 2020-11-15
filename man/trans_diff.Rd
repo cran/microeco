@@ -108,7 +108,7 @@ t1$plot_metastat(use_number = 1:10, qvalue = 0.05, choose_group = 1)
 
 \item{\code{rf_taxa_level}}{default "all"; use all taxonomic rank data, if want to test a specific rank, provide taxonomic rank name, such as "Genus".}
 
-\item{\code{rf_ntree}}{default 1000; see ntree in \code{\link{randomForest}}.}
+\item{\code{rf_ntree}}{default 1000; see ntree in randomForest function of randomForest package.}
 
 \item{\code{metastat_taxa_level}}{default "Genus"; taxonomic rank level used in metastat test; White et al. (2009) <doi:10.1371/journal.pcbi.1000352>.}
 

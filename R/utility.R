@@ -1,4 +1,62 @@
 
+
+
+#' Transform microtable object in microeco package to the phyloseq object in phyloseq package.
+#'
+#' @param dataset a microtable object.
+#' @return phyloseq object.
+#' @examples
+#' \donttest{
+#' data("dataset")
+#' meco2phyloseq(dataset)
+#' }
+#' @export
+meco2phyloseq <- function(dataset){
+	otu_table_trans <- dataset$otu_table
+	sample_table_trans <- dataset$sample_table
+	tax_table_trans <- dataset$tax_table
+	phylo_tree_trans <- dataset$phylo_tree
+	# OTU table for phyloseq
+	otu_table_trans <- phyloseq::otu_table(otu_table_trans, taxa_are_rows = TRUE)
+	sampledata <- phyloseq::sample_data(sample_table_trans)
+	rownames(sampledata) <- rownames(sample_table_trans)
+	# Taxonomic table for phyloseq
+	if(!is.null(tax_table_trans)){
+		tax_table_trans <- phyloseq::tax_table(as.matrix(tax_table_trans))
+	}
+	physeq <- phyloseq::phyloseq(otu_table_trans, tax_table_trans, sampledata, phylo_tree_trans)
+	physeq
+}
+
+
+#' Transform the phyloseq object in phyloseq package to microtable object in microeco package.
+#'
+#' @param physeq a phyloseq object.
+#' @return microtable object.
+#' @examples
+#' \donttest{
+#' library(phyloseq)
+#' data("GlobalPatterns")
+#' phyloseq2meco(GlobalPatterns)
+#' }
+#' @export
+phyloseq2meco <- function(physeq){
+	if(physeq@otu_table@taxa_are_rows){
+		otu_table_trans <- as.data.frame(physeq@otu_table@.Data, check.names = FALSE, stringsAsFactors = FALSE)
+	}else{
+		otu_table_trans <- as.data.frame(t(physeq@otu_table@.Data), check.names = FALSE, stringsAsFactors = FALSE)
+	}
+	sample_table_trans <- data.frame(phyloseq::sample_data(physeq), check.names = FALSE, stringsAsFactors = FALSE)
+	tax_table_trans <- as.data.frame(physeq@tax_table@.Data, check.names = FALSE, stringsAsFactors = FALSE)
+	tax_table_trans %<>% tidy_taxonomy
+	phylo_tree_trans <- physeq@phy_tree
+	
+	dataset <- microtable$new(sample_table = sample_table_trans, otu_table = otu_table_trans, tax_table = tax_table_trans, phylo_tree = phylo_tree_trans)
+	dataset
+}
+
+
+
 #' Copy an R6 class object completely
 #'
 #' @param x R6 class object
@@ -73,6 +131,8 @@ tidy_taxonomy_column <- function(taxonomy_table, i){
 }
 
 
+
+
 # inner function
 summarySE_inter = function(usedata=NULL, measurevar, groupvars=NULL, na.rm=TRUE) {
 	length2 <- function(x, na.rm=TRUE) ifelse(na.rm, sum(!is.na(x)), length(x))
@@ -82,246 +142,6 @@ summarySE_inter = function(usedata=NULL, measurevar, groupvars=NULL, na.rm=TRUE)
 			as.data.frame
 	datac$SE <- datac$SD / sqrt(datac$N)
 	datac
-}
-
-##################################################################################
-##################################################################################
-##################################################################################
-##################################################################################
-
-#' sparcc wrapper
-#'
-#' An implementation of SparCC R code modified from <https://github.com/zdk123/SpiecEasi> based on Friedman et al. (2012) <doi:10.1371/journal.pcbi.1002687>.
-#' @param data Community count data matrix
-#' @param iter Number of iterations in the outer loop
-#' @param inner_iter Number of iterations in the inner loop
-#' @param th absolute value of correlations below this threshold are considered zero by the inner SparCC loop.
-#' @seealso \code{\link{sparccboot}}
-#' @export
-sparcc <- function(data, iter = 20, inner_iter = 10, th = .1) {
-#  without all the 'frills'
-	sparccs <- lapply(1:iter, function(i) sparccinner(t(apply(data, 1, norm_diric)),
-		iter=inner_iter, th=th))
-    # collect
-    cors <- array(unlist(lapply(sparccs, function(x) x$Cor)),
-                 c(ncol(data),ncol(data),iter))
-    corMed <- apply(cors, 1:2, median)
-    covs <- array(unlist(lapply(sparccs, function(x) x$Cov)),
-                 c(ncol(data),ncol(data),iter))
-    covMed <- apply(covs, 1:2, median)
-    covMed <- cor2cov(corMed, sqrt(diag(covMed)))
-    list(Cov=covMed, Cor=corMed)
-}
-
-#' Bootstrap SparCC
-#'
-#' Get bootstrapped estimates of SparCC correlation coefficients. To get empirical p-values, pass this output to \code{pval.sparccboot}. 
-#'
-#' @param data Community count data
-#' @param sparcc.params named list of parameters to pass to \code{sparcc}
-#' @param statisticboot function which takes data and bootstrap sample indices and results the upper triangle of the bootstapped correlation matrix
-#' @param statisticperm function which takes data and permutated sample indices and results the upper triangle of the null correlation matrix
-#' @param R number of bootstraps
-#' @param ncpus number of cores to use for parallelization
-#' @param ... additional arguments that are passed to \code{boot::boot}
-#' @export
-sparccboot <- function(data, sparcc.params=list(),
-	statisticboot = function(data, indices) tril(do.call("sparcc", c(list(data[indices, ,drop=FALSE]), sparcc.params))$Cor),
-	statisticperm = function(data, indices) tril(do.call("sparcc",  c(list(apply(data[indices,], 2, sample)), sparcc.params))$Cor),
-	R, ncpus=1, ...) {
-
-    if (!requireNamespace('boot', quietly=TRUE))
-      stop('\'boot\' package is not installed')
-
-    res     <- boot::boot(data, statisticboot, R=R, parallel="multicore", ncpus=ncpus, ...)
-    null_av <- boot::boot(data, statisticperm, sim='permutation', R=R, parallel="multicore", ncpus=ncpus)
-    class(res) <- 'list'
-    structure(c(res, list(null_av=null_av)), class='sparccboot')
-}
-
-#' SparCC p-vals
-#'
-#' Get empirical p-values from bootstrap SparCC output, modified based on https://github.com/zdk123/SpiecEasi
-#'
-#' @param x output from \code{sparccboot}
-#' @param sided type of p-value to compute. Only two sided (sided="both") is implemented.
-#' @export
-pval.sparccboot <- function(x, sided='both') {
-# calculate 1 or 2 way pseudo p-val from boot object
-# Args: a boot object
-    if (sided != "both") stop("only two-sided currently supported")
-    nparams  <- ncol(x$t)
-    tmeans   <- colMeans(x$null_av$t)
-#    check to see whether correlations are unstable -- confirm
-#    that sample correlations are in 95% confidence interval of
-#    bootstrapped samples
-    niters   <- nrow(x$t)
-    ind95    <- max(1, round(.025*niters)):round(.975*niters)
-    boot_ord <- apply(x$t, 2, sort)
-    boot_ord95 <- boot_ord[ind95,]
-    outofrange <- unlist(lapply(1:length(x$t0), function(i) {
-            aitvar <- x$t0[i]
-            range  <- range(boot_ord95[,i])
-            range[1] > aitvar || range[2] < aitvar
-        }))
-    # calc whether center of mass is above or below the mean
-    bs_above <- unlist(lapply(1:nparams, function(i)
-                    length(which(x$t[, i] > tmeans[i]))))
-    is_above <- bs_above > x$R/2
-    cors <- x$t0
-#    signedAV[is_above] <- -signedAV[is_above]
-    pvals    <- ifelse(is_above, 2*(1-bs_above/x$R), 2*bs_above/x$R)
-    pvals[pvals > 1]  <- 1
-    pvals[outofrange] <- NaN
-	# reshape
-	use_names <- colnames(x$data)
-	com_res <- t(utils::combn(use_names, 2))
-	res <- cbind.data.frame(com_res, cors, pvals, stringsAsFactors = FALSE)
-	colnames(res) <- c("t1", "t2", "cor", "p")
-	res <- rbind.data.frame(res, data.frame(t1 = res$t2, t2 = res$t1, cor = res$cor, p = res$p), 
-		data.frame(t1 = use_names, t2 = use_names, cor = rep(1, length(use_names)), p = rep(0, length(use_names))))
-	res$cor <- as.numeric(res$cor)
-	res$p <- as.numeric(res$p)
-	res_cor <- reshape2::dcast(res, t1~t2, value.var = "cor")
-	row.names(res_cor) <- res_cor[, 1]
-	res_cor <- res_cor[, -1]
-	res_cor <- as.matrix(res_cor[use_names, use_names])
-	res_p <- reshape2::dcast(res, t1~t2, value.var = "p")
-	row.names(res_p) <- res_p[, 1]
-	res_p <- res_p[, -1]
-	res_p <- as.matrix(res_p[use_names, use_names])
-	res <- list(cor = res_cor, p = res_p)
-	res
-}
-
-
-
-#' @keywords internal
-sparccinner <- function(data.f, T=NULL, iter=10, th=0.1) {
-    if (is.null(T))   T  <- av(data.f)
-    res.bv <- basis_var(T)
-    Vbase  <- res.bv$Vbase
-    M      <- res.bv$M
-    cbase  <- C_from_V(T, Vbase)
-    Cov    <- cbase$Cov
-    Cor    <- cbase$Cor
-
-    ## do iterations here
-    excluded <- NULL
-    for (i in 1:iter) {
-        res.excl <- exclude_pairs(Cor, M, th, excluded)
-        M <- res.excl$M
-        excluded <- res.excl$excluded
-        if (res.excl$break_flag) break
-        res.bv <- basis_var(T, M=M, excluded=excluded)
-        Vbase  <- res.bv$Vbase
-        M      <- res.bv$M
-        K <- M
-        diag(K) <- 1
-        cbase  <- C_from_V(T, Vbase)
-        Cov    <- cbase$Cov
-        Cor    <- cbase$Cor
-    }
-    list(Cov=Cov, Cor=Cor, i=i, M=M, excluded=excluded)
-}
-
-#' @keywords internal
-exclude_pairs <- function(Cor, M, th=0.1, excluded=NULL) {
-# exclude pairs with high correlations
-    break_flag <- FALSE
-    C_temp <- abs(Cor - diag(diag(Cor)) )  # abs value / remove diagonal
-    if (!is.null(excluded)) C_temp[excluded] <- 0 # set previously excluded correlations to 0
-    exclude <- which(abs(C_temp - max(C_temp)) < .Machine$double.eps*100)[1:2]
-    if (max(C_temp) > th)  {
-        i <- stats::na.exclude(arrayInd(exclude, c(nrow(M), ncol(M)))[,1])
-        M[i,i] <- M[i,i] - 1
-        excluded_new <- c(excluded, exclude)
-    } else {
-        excluded_new <- excluded
-        break_flag   <- TRUE
-    }
-    list(M=M, excluded=excluded_new, break_flag=break_flag)
-}
-
-#' @keywords internal
-basis_var <- function(T, CovMat = matrix(0, nrow(T), ncol(T)),
-                      M = matrix(1, nrow(T), ncol(T)) + (diag(ncol(T))*(ncol(T)-2)),
-                      excluded = NULL, Vmin=1e-4) {
-
-    if (!is.null(excluded)) {
-        T[excluded] <- 0
-     #   CovMat[excluded] <- 0
-    }
-    Ti     <- matrix(rowSums(T))
-    CovVec <- matrix(rowSums(CovMat - diag(diag(CovMat)))) # row sum of off diagonals
-    M.I <- tryCatch(solve(M), error=function(e) MASS::ginv(M))
-    Vbase <- M.I %*% (Ti + 2*CovVec)
-    Vbase[Vbase < Vmin] <- Vmin
-    list(Vbase=Vbase, M=M)
-}
-
-#' @keywords internal
-C_from_V <- function(T, Vbase) {
-    J      <- matrix(1, nrow(T), ncol(T))
-    Vdiag  <- diag(c(Vbase))
-    CovMat <- .5*((J %*% Vdiag) + (Vdiag %*% J) - T)
-    CovMat <- (CovMat + t(CovMat))/2  # enforce symmetry
-    # check that correlations are within -1,1
-    CorMat <- stats::cov2cor(CovMat)
-    CorMat[abs(CorMat) > 1] <- sign(CorMat[abs(CorMat) > 1])
-    CovMat <- cor2cov(CorMat, sqrt(as.vector(Vbase)))
-    list(Cov=CovMat, Cor=CorMat)
-}
-
-#' @keywords internal
-av <- function(data) {
-    cov.clr <- stats::cov(clr_matrix(data))
-    J <- matrix(1, ncol(data), ncol(data))
-    (J %*% diag(diag(cov.clr))) + (diag(diag(cov.clr)) %*% J) - (2*cov.clr)
-}
-
-#' @keywords internal
-norm_diric   <- function(x, rep=1) {
-    dmat <- VGAM::rdiric(rep, x+1)
-    norm_to_total(colMeans(dmat))
-}
-
-#' @keywords internal
-clr_default <- function(x.f, base=exp(1), tol=.Machine$double.eps) {
-  nzero <- (x.f >= tol)
-  LOG <- log(ifelse(nzero, x.f, 1), base)
-  ifelse(nzero, LOG - mean(LOG)/mean(nzero), 0.0)
-}
-
-
-#' Centered log ratio tranformation for the matrix
-#'
-#' @param data a matrix
-#' @param mar Margin, default 2, 1 = rows and 2 = columns of data.
-#' @param base logarithmic base, default exp(1)
-#' @param tol smallest representation of a residual of unity subtraction, default .Machine$double.eps
-#' @return transformed matrix
-#' @export
-clr_matrix <- function(data, mar = 2, base = exp(1), tol = .Machine$double.eps) {
-  apply(data, mar, clr_default, base = base, tol = tol)
-}
-
-# Total sum normalization of a (presumably positive) data vector
-#' @keywords internal
-norm_to_total <- function(x) x/sum(x)
-
-#' @keywords internal
-tril <- function(x) x[lower.tri(x)]
-
-#' Convert a symmetric correlation matrix to a covariance matrix
-#' given the standard deviation
-#'
-#' @param cor a symmetric correlation matrix
-#' @param sds standard deviations of the resulting covariance.
-#' @return Covariance matrix of sample dimension as cor
-cor2cov <- function(cor, sds) {
-  if (length(sds) != length(diag(cor))) stop("inputs are of mismatched dimension")
-  cor * sds * rep(sds, each=nrow(cor))
 }
 
 

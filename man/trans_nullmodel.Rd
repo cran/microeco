@@ -15,7 +15,7 @@ see Stegen et al. (2013) <10.1038/ismej.2013.93> and Liu et al. (2017) <doi:10.1
 
 data(dataset)
 data(env_data_16S)
-t1 <- trans_nullmodel$new(dataset, taxa_number = 100, add_data = env_data_16S, cpp = TRUE)
+t1 <- trans_nullmodel$new(dataset, taxa_number = 100, add_data = env_data_16S)
 
 ## ------------------------------------------------
 ## Method `trans_nullmodel$cal_mantel_corr`
@@ -103,7 +103,6 @@ t1$cal_process(use_betamntd = TRUE)
   taxa_number = NULL,
   group = NULL,
   select_group = NULL,
-  cpp = FALSE,
   env_cols = NULL,
   add_data = NULL,
   complete_na = FALSE
@@ -123,8 +122,6 @@ t1$cal_process(use_betamntd = TRUE)
 
 \item{\code{select_group}}{default NULL; the group name, used following the group to filter samples.}
 
-\item{\code{cpp}}{default FALSE; invoke c++ to accelerate betaMPD calculation.}
-
 \item{\code{env_cols}}{default NULL; number or name vector to select the environmental data in dataset$sample_table.}
 
 \item{\code{add_data}}{default NULL; provide environmental data table additionally.}
@@ -140,7 +137,7 @@ intermediate files in object.
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{data(dataset)
 data(env_data_16S)
-t1 <- trans_nullmodel$new(dataset, taxa_number = 100, add_data = env_data_16S, cpp = TRUE)
+t1 <- trans_nullmodel$new(dataset, taxa_number = 100, add_data = env_data_16S)
 }
 \if{html}{\out{</div>}}
 
@@ -215,7 +212,7 @@ t1$plot_mantel_corr()
 \if{html}{\out{<a id="method-cal_betampd"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_betampd}{}}}
 \subsection{Method \code{cal_betampd()}}{
-Calculate betaMPD. Faster than \code{\link{comdist}} in picante package.
+Calculate betaMPD. Faster than comdist in picante package.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_nullmodel$cal_betampd(abundance.weighted = FALSE)}\if{html}{\out{</div>}}
 }
@@ -243,7 +240,7 @@ res_betampd in object.
 \if{html}{\out{<a id="method-cal_betamntd"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_betamntd}{}}}
 \subsection{Method \code{cal_betamntd()}}{
-Calculate betaMNTD. Faster than \code{\link{comdistnt}} in picante package.
+Calculate betaMNTD. Faster than comdistnt in picante package.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_nullmodel$cal_betamntd(
   abundance.weighted = FALSE,
@@ -256,7 +253,7 @@ Calculate betaMNTD. Faster than \code{\link{comdistnt}} in picante package.
 \describe{
 \item{\code{abundance.weighted}}{default FALSE; whether use weighted abundance}
 
-\item{\code{exclude.conspecifics}}{default FALSE; see \code{\link{comdistnt}} in picante package.}
+\item{\code{exclude.conspecifics}}{default FALSE; see comdistnt in picante package.}
 }
 \if{html}{\out{</div>}}
 }
@@ -331,7 +328,7 @@ Calculate ses.betaMNTD (betaNTI).
 
 \item{\code{abundance.weighted}}{default FALSE; whether use weighted abundance}
 
-\item{\code{exclude.conspecifics}}{default FALSE; see \code{\link{comdistnt}} in picante package.}
+\item{\code{exclude.conspecifics}}{default FALSE; see comdistnt in picante package.}
 
 \item{\code{verbose}}{default TRUE; whether show the calculation process message.}
 }
