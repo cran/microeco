@@ -28,7 +28,11 @@ trans_abund <- R6Class(classname = "trans_abund",
 			self$sample_table <- dataset$sample_table
 			self$taxrank <- taxrank
 			self$use_percentage <- use_percentage
-
+			
+			if(is.null(dataset$taxa_abund)){
+				stop("The taxonomic abundance has not been calculated in dataset! Please first calculate it using cal_abund() function in microtable class!")
+			}
+			
 			abund_data <- dataset$taxa_abund[[self$taxrank]] %>% 
 				cbind.data.frame(Taxonomy = rownames(.), ., stringsAsFactors = FALSE)
 			abund_data <- reshape2::melt(abund_data, id.vars = "Taxonomy")
@@ -50,7 +54,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 				colnames(abund_data)[colnames(abund_data) == groupmean] <- "Sample"
 			}
 			if(!is.null(order_x)){
-				if(length(order_x == 1)){
+				if(length(order_x) == 1){
 					abund_data$Sample %<>% factor(., levels = unique(self$sample_table[, order_x]))
 				} else {
 					abund_data$Sample %<>% factor(., levels = order_x)

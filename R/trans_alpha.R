@@ -17,6 +17,10 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' }
 		initialize = function(dataset = NULL, group = NULL, order_x = NULL) {
 			self$group <- group
+			
+			if(is.null(dataset$alpha_diversity)){
+				stop("The alpha diversity has not been calculated in dataset! Please first calculate it using cal_alphadiv() function in microtable class!")
+			}
 			alpha_data <- dataset$alpha_diversity %>% cbind.data.frame(Sample = rownames(.), ., stringsAsFactors = FALSE)
 			alpha_data %<>% .[, !grepl("^se", colnames(.))]
 			alpha_data <- reshape2::melt(alpha_data, id.vars = "Sample")
@@ -116,7 +120,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @param xtext_type default NULL; number used to make x axis text generate angle.
 		#' @param xtext_size default 10, x axis text size.
 		#' @param ytitle_size default 17, y axis title size.
-		#' @param base_font default NULL, font in the plot.
+		#' @param base_font default "sans", font in the plot.
 		#' @param ... parameters pass to ggpubr::ggboxplot.
 		#' @return ggplot.
 		#' @examples
@@ -134,7 +138,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			xtext_type = NULL,
 			xtext_size = 10,
 			ytitle_size = 17,
-			base_font =NULL,
+			base_font = "sans",
 			...
 			){
 			if(is.null(group)){
@@ -155,21 +159,15 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					stat_summary(fun.data=mean_se, fun.args = list(mult=1), geom="errorbar", width=0.2) +
 					stat_summary(fun.y=mean, geom="point", size = rel(3)) +
 					geom_text(aes(x = x, y = y, label = add), data = textdata, size = 7) +
-					ylab(measure) +
-					theme(legend.position = "none",
+					theme(
 					axis.title = element_text(face = "bold",size = rel(1.8)),
-					axis.text.x = element_text(size = rel(1.8)),
-					axis.text.y = element_text(size = rel(1.1)),
-					axis.title.y = element_text(angle=90,vjust =2),
-					axis.title.x = element_blank(),
 					axis.line.x = element_line(colour="black"),
 					axis.line.y = element_line(colour="black"),
 					axis.ticks = element_line(),
 					panel.grid.major = element_line(colour="#f0f0f0"),
 					panel.grid.minor = element_blank(),
-					plot.margin=unit(c(10,5,5,5),"mm"),			   
-					text=element_text(family="sans"))
-				p
+					plot.margin=unit(c(10,5,5,5),"mm")
+					)
 			}else{
 				p <- ggpubr::ggboxplot(use_data, x = group, y= "Value", color = group, shape = group, palette = color_values, add = "jitter", 
 					outlier.colour = "white", ...)
@@ -180,21 +178,25 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 						{.[, unlist(lapply(as.data.frame(.), function(x) any(grepl(pair_compare_filter, x)))), drop = FALSE]} %>% 
 						{lapply(seq_len(ncol(.)), function(x) .[, x])}
 #					p <- p + stat_compare_signif(comparisons = comparisons_list, method = pair_compare_method, map_signif_level = map_signif_level)
-					p <- p + ggpubr::stat_compare_means(comparisons = comparisons_list, paired = TRUE, method = pair_compare_method, 
+					p <- p + ggpubr::stat_compare_means(comparisons = comparisons_list, method = pair_compare_method, 
 						tip.length=0.01, label = "p.signif", symnum.args = list(cutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, 1), 
 						symbols = c("****", "***", "**", "*", "ns")))
 				}
-				p <- p + ylab(measure) + xlab("")
-				p <- p + theme(legend.position="none", axis.title.y= element_text(size=ytitle_size), axis.text.x = element_text(colour = "black", size = xtext_size))
-				if(!is.null(xtext_type)){
-					p <- p + theme(axis.text.x = element_text(angle = xtext_type, colour = "black", vjust = 1, hjust = 1, size = xtext_size))
-				}
-				if(!is.null(base_font)){
-					p <- p + theme(text=element_text(family=base_font))
-				}
-				p			
 			}
-
+			p <- p + ylab(measure) + xlab("") + theme(legend.position="none")
+			p <- p + theme(
+					axis.text.x = element_text(colour = "black", size = xtext_size),
+					axis.title.y= element_text(size=ytitle_size),
+					axis.text.y = element_text(size = rel(1.1)),
+					axis.title.x = element_blank()
+					)
+			if(!is.null(xtext_type)){
+				p <- p + theme(axis.text.x = element_text(angle = xtext_type, colour = "black", vjust = 1, hjust = 1, size = xtext_size))
+			}
+			if(!is.null(base_font)){
+				p <- p + theme(text=element_text(family=base_font))
+			}
+			p
 		},
 		#' @description
 		#' Print the trans_alpha object.
