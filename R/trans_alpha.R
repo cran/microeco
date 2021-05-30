@@ -25,6 +25,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			alpha_data %<>% .[, !grepl("^se", colnames(.))]
 			alpha_data <- reshape2::melt(alpha_data, id.vars = "Sample")
 			colnames(alpha_data) <- c("Sample", "Measure", "Value")
+			alpha_data <- dplyr::left_join(alpha_data, rownames_to_column(dataset$sample_table), by = c("Sample" = "rowname"))
 			if(!is.null(order_x)){
 				if(length(order_x == 1)){
 					alpha_data$Sample %<>% factor(., levels = unique(dataset$sample_table[, order_x]))
@@ -32,13 +33,14 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					alpha_data$Sample %<>% factor(., levels = order_x)
 				}
 			}
-			alpha_data <- dplyr::left_join(alpha_data, rownames_to_column(dataset$sample_table), by = c("Sample" = "rowname"))
 			if(!is.null(group)){
 				self$alpha_stat <- microeco:::summarySE_inter(alpha_data, measurevar = "Value", groupvars = c(self$group, "Measure"))
+				message('The group statistics are stored in object$alpha_stat !')
 			}else{
 				self$alpha_stat <- NULL
 			}			
 			self$alpha_data <- alpha_data
+			message('The transformed diversity data is stored in object$alpha_data !')
 		},
 		#' @description
 		#' Test the difference of alpha diveristy across groups. If use anova, require agricolae package.
@@ -106,6 +108,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				compare_result %<>% `row.names<-`(.[,1]) %>% .[,-1]
 			}
 			self$res_alpha_diff <- compare_result
+			message('The result is stored in object$res_alpha_diff !')
 		},
 		#' @description
 		#' Plotting the alpha diveristy.
@@ -114,14 +117,18 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @param measure default Shannon; alpha diveristy measurement; see names of alpha_diversity of dataset, e.g. Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage, PD.
 		#' @param group default NULL; group name used for the plot.
 		#' @param add_letter default FALSE; If TRUE, the letters of duncan test will be added in the plot.
+		#' @param use_boxplot default TRUE; TRUE: boxplot, FALSE: mean_se plot.
+		#' @param boxplot_color default TRUE; TRUE: use color_values, FALSE: use "black".
+		#' @param boxplot_add default "jitter"; points type, see the add parameter in ggpubr::ggboxplot.
+		#' @param order_x_mean default FALSE; whether order x axis by the means of groups from large to small.
 		#' @param pair_compare default FALSE; whether perform paired comparisons.
-		#' @param pair_compare_filter default ""; groups that will be removed.
+		#' @param pair_compare_filter default ""; groups that need to be removed in the comparisons.
 		#' @param pair_compare_method default wilcox.test; wilcox.test, kruskal.test, t.test or anova.
 		#' @param xtext_type default NULL; number used to make x axis text generate angle.
 		#' @param xtext_size default 10, x axis text size.
 		#' @param ytitle_size default 17, y axis title size.
 		#' @param base_font default "sans", font in the plot.
-		#' @param ... parameters pass to ggpubr::ggboxplot.
+		#' @param ... parameters pass to ggpubr::ggboxplot function.
 		#' @return ggplot.
 		#' @examples
 		#' \donttest{
@@ -132,6 +139,10 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			measure = "Shannon",
 			group = NULL,
 			add_letter = FALSE,
+			use_boxplot = TRUE,
+			boxplot_color = TRUE,
+			boxplot_add = "jitter",
+			order_x_mean = TRUE,
 			pair_compare = FALSE,
 			pair_compare_filter = "",
 			pair_compare_method = "wilcox.test",
@@ -146,20 +157,50 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			}
 			use_data <- self$alpha_data[self$alpha_data$Measure == measure, ]
 			
-			if(add_letter == T){
-				filter_data <- use_data[, c(group, "Measure", "Value")]
-				colnames(filter_data)[1] = "Group"
-				filter_data$Group <- factor(filter_data$Group, levels = names(sort(tapply(filter_data$Value, filter_data$Group, mean), decreasing = TRUE)))
-				textdata <- data.frame(x = names(tapply(filter_data$Value, filter_data$Group, max)), 
-							y = tapply(filter_data$Value, filter_data$Group, function(x) {res <- mean_se(x)$ymax; ifelse(is.na(res), x, res)}) %>% 
-							{. + max(.)/50}, add = self$res_alpha_diff[levels(filter_data$Group), measure], stringsAsFactors = FALSE)
-
-				p <- ggplot(filter_data, aes(x=Group, y=Value)) + 
+			if(order_x_mean){
+				use_data[, group] <- factor(use_data[, group], levels = names(sort(tapply(use_data$Value, use_data[, group], mean), decreasing = TRUE)))
+			}
+			
+			if(use_boxplot){
+				if(boxplot_color){
+					color_use <- group
+				}else{
+					color_use <- "black"
+				}
+				p <- ggpubr::ggboxplot(use_data, x = group, y= "Value", color = color_use, palette = color_values, add = boxplot_add, outlier.colour = "white", ...)
+				if(add_letter){
+					order_groups <- names(tapply(use_data$Value, use_data[, group], max))
+					group_position <- tapply(use_data$Value, use_data[, group], function(x) {res <- max(x); ifelse(is.na(res), x, res)}) %>% {. + max(.)/30}
+					textdata <- data.frame(x = order_groups, y = group_position[order_groups], add = self$res_alpha_diff[order_groups, measure], stringsAsFactors = FALSE)
+					p <- p + geom_text(aes(x = x, y = y, label = add), data = textdata, size = 7)
+				}
+				if(pair_compare){
+					# construct and filter the paired comparisons list
+					comparisons_list <- unique(as.character(self$alpha_data[, group])) %>% 
+						combn(., 2) %>% 
+						{.[, unlist(lapply(as.data.frame(.), function(x) any(grepl(pair_compare_filter, x)))), drop = FALSE]} %>% 
+						{lapply(seq_len(ncol(.)), function(x) .[, x])}
+					# 
+					p <- p + ggpubr::stat_compare_means(
+							comparisons = comparisons_list,
+							method = pair_compare_method, 
+							tip.length=0.01,
+							label = "p.signif",
+							symnum.args = list(cutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, 1), symbols = c("****", "***", "**", "*", "ns")))
+				}
+			}else{
+				p <- ggplot(use_data, aes_string(x = group, y = "Value")) + 
 					theme_minimal() +
 					stat_summary(fun.data=mean_se, fun.args = list(mult=1), geom="errorbar", width=0.2) +
-					stat_summary(fun.y=mean, geom="point", size = rel(3)) +
-					geom_text(aes(x = x, y = y, label = add), data = textdata, size = 7) +
-					theme(
+					stat_summary(fun.y=mean, geom="point", size = rel(3))
+
+				if(add_letter){
+					order_groups <- names(tapply(use_data$Value, use_data[, group], max))
+					group_position <- tapply(use_data$Value, use_data[, group], function(x) {res <- mean_se(x)$ymax; ifelse(is.na(res), x, res)}) %>% {. + max(.)/50}
+					textdata <- data.frame(x = order_groups, y = group_position[order_groups], add = self$res_alpha_diff[order_groups, measure], stringsAsFactors = FALSE)
+					p <- p + geom_text(aes(x = x, y = y, label = add), data = textdata, size = 7)
+				}
+				p <- p + theme(
 					axis.title = element_text(face = "bold",size = rel(1.8)),
 					axis.line.x = element_line(colour="black"),
 					axis.line.y = element_line(colour="black"),
@@ -167,22 +208,9 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					panel.grid.major = element_line(colour="#f0f0f0"),
 					panel.grid.minor = element_blank(),
 					plot.margin=unit(c(10,5,5,5),"mm")
-					)
-			}else{
-				p <- ggpubr::ggboxplot(use_data, x = group, y= "Value", color = group, shape = group, palette = color_values, add = "jitter", 
-					outlier.colour = "white", ...)
-				if(pair_compare == T){
-					# construct and filter the paired comparisons list
-					comparisons_list <- unique(as.character(self$alpha_data[, group])) %>% 
-						combn(., 2) %>% 
-						{.[, unlist(lapply(as.data.frame(.), function(x) any(grepl(pair_compare_filter, x)))), drop = FALSE]} %>% 
-						{lapply(seq_len(ncol(.)), function(x) .[, x])}
-#					p <- p + stat_compare_signif(comparisons = comparisons_list, method = pair_compare_method, map_signif_level = map_signif_level)
-					p <- p + ggpubr::stat_compare_means(comparisons = comparisons_list, method = pair_compare_method, 
-						tip.length=0.01, label = "p.signif", symnum.args = list(cutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, 1), 
-						symbols = c("****", "***", "**", "*", "ns")))
-				}
+				)
 			}
+			
 			p <- p + ylab(measure) + xlab("") + theme(legend.position="none")
 			p <- p + theme(
 					axis.text.x = element_text(colour = "black", size = xtext_size),
@@ -210,4 +238,3 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 	lock_objects = FALSE,
 	lock_class = FALSE
 )
-

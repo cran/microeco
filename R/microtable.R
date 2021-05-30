@@ -10,19 +10,21 @@
 #' @export
 microtable <- R6Class(classname = "microtable",
 	public = list(
-		#' @param otu_table data.frame; default NULL; necessary; The species or OTU table, rows are species, cols are samples.
+		#' @param otu_table data.frame; necessary; The species or OTU table, rows are species, cols are samples.
 		#' @param sample_table data.frame; default NULL; The sample information table, rows are samples, cols are sample metadata.
 		#' @param tax_table data.frame; default NULL; The taxonomic information table, rows are species, cols are taxonomic classes.
-		#' @param phylo_tree phylo; default NULL; If provided, the phylogenetic tree can be used for some analysis, for example, phylogenetic diversity.
+		#' @param phylo_tree phylo; default NULL; The phylogenetic tree; read with read.tree function in ape package.
+		#' @param rep_fasta list; default NULL; The representative sequences; read with read.fasta function in seqinr package.
 		#' @return an object of class "microtable" with the following components:
 		#' \describe{
 		#'   \item{\code{sample_table}}{The sample information table.}
 		#'   \item{\code{otu_table}}{The OTU table.}
 		#'   \item{\code{tax_table}}{The taxonomic table.}
-		#'   \item{\code{phylo_tree}}{The phylogenetic tree}
-		#'   \item{\code{taxa_abund}}{default NULL; use cal_abund function to calculate}
-		#'   \item{\code{alpha_diversity}}{default NULL; use cal_alphadiv function to calculate}
-		#'   \item{\code{beta_diversity}}{default NULL; use cal_betadiv function to calculate}
+		#'   \item{\code{phylo_tree}}{The phylogenetic tree.}
+		#'   \item{\code{rep_fasta}}{The representative sequence.}
+		#'   \item{\code{taxa_abund}}{default NULL; use cal_abund function to calculate.}
+		#'   \item{\code{alpha_diversity}}{default NULL; use cal_alphadiv function to calculate.}
+		#'   \item{\code{beta_diversity}}{default NULL; use cal_betadiv function to calculate.}
 		#' }
 		#' @format microtable.
 		#' @examples
@@ -34,21 +36,30 @@ microtable <- R6Class(classname = "microtable",
 		#'   tax_table = taxonomy_table_16S, phylo_tree = phylo_tree_16S)
 		#' # trim the dataset
 		#' dataset$tidy_dataset()
-		initialize = function(otu_table = NULL, sample_table = NULL, tax_table = NULL, phylo_tree = NULL)
+		initialize = function(otu_table, sample_table = NULL, tax_table = NULL, phylo_tree = NULL, rep_fasta = NULL)
 			{
 			if(!all(sapply(otu_table, is.numeric))){
 				stop("Some columns in otu_table are not numeric vector! Please check the otu_table and try again.")
 			}else{
-				self$otu_table <- otu_table			
+				otu_table <- otu_table[apply(otu_table, 1, sum) > 0, ]
+				otu_table <- otu_table[, apply(otu_table, 2, sum) > 0, drop = FALSE]
+				self$otu_table <- otu_table
 			}
 			if(is.null(sample_table)){
-				message("No sample_table provided, automatically use colnames of otu_table to create it.")
+				message("No sample_table provided, automatically use colnames of otu_table to create it!")
 				self$sample_table <- data.frame(SampleID = colnames(otu_table), Group = colnames(otu_table)) %>% `row.names<-`(.$SampleID)
 			}else{
 				self$sample_table <- sample_table
 			}
+			# check whether phylogenetic tree is rooted
+			if(!is.null(phylo_tree)){
+				if(!ape::is.rooted(phylo_tree)){
+					phylo_tree <- ape::multi2di(phylo_tree)
+				}
+			}
 			self$tax_table <- tax_table
 			self$phylo_tree <- phylo_tree
+			self$rep_fasta <- rep_fasta
 			self$taxa_abund <- NULL
 			self$alpha_diversity <- NULL
 			self$beta_diversity <- NULL
@@ -61,6 +72,7 @@ microtable <- R6Class(classname = "microtable",
 			cat(paste("otu_table have", nrow(self$otu_table), "rows and", ncol(self$otu_table), "columns\n"))
 			if(!is.null(self$tax_table)) cat(paste("tax_table have", nrow(self$tax_table), "rows and", ncol(self$tax_table), "columns\n"))
 			if(!is.null(self$phylo_tree)) cat(paste("phylo_tree have", length(self$phylo_tree$tip.label), "tips\n"))
+			if(!is.null(self$rep_fasta)) cat(paste("rep_fasta have", length(self$rep_fasta), "sequences\n"))
 			if(!is.null(self$taxa_abund)) cat(paste("Taxa abundance: calculated for", paste0(names(self$taxa_abund), collapse = ","), "\n"))
 			if(!is.null(self$alpha_diversity)) cat(paste("Alpha diversity: calculated for", paste0(colnames(self$alpha_diversity), collapse = ","), "\n"))
 			if(!is.null(self$beta_diversity)) cat(paste("Beta diversity: calculated for", paste0(names(self$beta_diversity), collapse = ","), "\n"))
@@ -75,10 +87,18 @@ microtable <- R6Class(classname = "microtable",
 		#' @examples 
 		#' dataset$filter_pollution(taxa = c("mitochondria", "chloroplast"))
 		filter_pollution = function(taxa = c("mitochondria", "chloroplast")){
+			if(is.null(self$tax_table)){
+				stop("The tax_table in the microtable object is NULL ! Please check it!")
+			}else{
+				tax_table_use <- self$tax_table
+			}
 			if(length(taxa) > 1){
 				taxa <- paste0(taxa, collapse = "|")
 			}
-			self$tax_table %<>% base::subset(unlist(lapply(data.frame(t(.)), function(x) !any(grepl(taxa, x, ignore.case=TRUE)))))
+			tax_table_use %<>% base::subset(unlist(lapply(data.frame(t(.)), function(x) !any(grepl(taxa, x, ignore.case=TRUE)))))
+			filter_num <- nrow(self$tax_table) - nrow(tax_table_use)
+			message(paste("Total", filter_num, "taxa are removed!"))
+			self$tax_table <- tax_table_use
 		},
 		#' @description
 		#' Rarefy communities to make all samples have same species number, modified from the rarefy_even_depth() in phyloseq package, 
@@ -155,6 +175,9 @@ microtable <- R6Class(classname = "microtable",
 			if(!is.null(self$phylo_tree)){
 				self$phylo_tree %<>% ape::drop.tip(., base::setdiff(.$tip.label, taxa_names))
 			}
+			if(!is.null(self$rep_fasta)){
+				self$rep_fasta %<>% .[taxa_names]
+			}
 			# other files will also be changed if main_data FALSE
 			if(main_data == F){
 				if(!is.null(self$taxa_abund)){
@@ -171,18 +194,57 @@ microtable <- R6Class(classname = "microtable",
 		#' @description
 		#' Calculate the taxonomic abundance at each taxonomic ranks.
 		#'
+		#' @param select_cols default NULL; numeric vector or character vector of colnames of tax_table; used to select columns to merge and calculate abundances.
+		#'   This is very useful if there are commented columns or some columns with multiple structure that cannot be used directly.
+		#' @param rel default TRUE; if TRUE, relative abundance is used; if FALSE, absolute abundance will be summed.
+		#' @param split_group default FALSE; if TRUE, split the rows to multiple rows according to one or more columns in tax_table. Very useful when multiple mapping info exist.
+		#' @param split_by default "&&"; Separator delimiting collapsed values; only used when split_group == TRUE; see sep in separate_rows function.
+		#' @param split_column default NULL; character vector or list; only used when split_group == TRUE; character vector: 
+		#'     fixed column or columns used for the splitting in tax_table in each abundance calculation; 
+		#'     list: containing more character vectors to assign the column names to each calculation, such as list(c("Phylum"), c("Phylum", "Class")).
 		#' @return taxa_abund in object.
 		#' @examples
 		#' \donttest{
 		#' dataset$cal_abund()
 		#' }
-		cal_abund = function(){
+		cal_abund = function(select_cols = NULL, rel = TRUE, split_group = FALSE, split_by = "&&", split_column = NULL){
 			taxa_abund = list()
-			for(i in 1:ncol(self$tax_table)) {
-				taxrank <- colnames(self$tax_table)[i]
-				taxa_abund[[taxrank]] <- private$transform_data_proportion(self, i)
+			if(is.null(select_cols)){
+				select_cols <- 1:ncol(self$tax_table)
+			}else{
+				if(!is.numeric(select_cols)){
+					if(any(! select_cols %in% colnames(self$tax_table))){
+						stop("Part of the input names are not in the tax_table!")
+					}else{
+						select_cols <- match(select_cols, colnames(self$tax_table))
+					}
+				}
+			}
+			if(split_group){
+				if(is.null(split_column)){
+					stop("Spliting rows by one or more columns require split_column parameter! Please set split_column and try again!")
+				}
+			}
+			for(i in seq_along(select_cols)) {
+				taxrank <- colnames(self$tax_table)[select_cols[i]]
+				# assign the columns used for the splitting.
+				if(!is.null(split_column)){
+					if(is.list(split_column)){
+						use_split_column <- split_column[[i]]
+					}else{
+						use_split_column <- split_column
+					}
+				}
+				taxa_abund[[taxrank]] <- private$transform_data_proportion(
+											self, 
+											columns = select_cols[1:i], 
+											rel = rel, 
+											split_group = split_group, 
+											split_by = split_by, 
+											split_column = use_split_column)
 			}
 			self$taxa_abund <- taxa_abund
+			message('The result is stored in object$taxa_abund.')
 		},
 		#' @description
 		#' Save taxonomic abundance to the computer local place.
@@ -262,10 +324,15 @@ microtable <- R6Class(classname = "microtable",
 			}else{
 				phylo_tree <- NULL
 			}
+			if(!is.null(self$rep_fasta)){
+				rep_fasta <- self$rep_fasta
+			}else{
+				rep_fasta <- NULL
+			}
 			otu_table_new <- rowsum(t(otu_table), as.factor(as.character(sample_table[, use_group]))) %>% t %>% as.data.frame
 			sample_table_new <- data.frame(SampleID = unique(as.character(sample_table[, use_group]))) %>% `row.names<-`(.[,1])
 			# return a new microtable object
-			microtable$new(sample_table = sample_table_new, otu_table = otu_table_new, tax_table = tax_table, phylo_tree = phylo_tree)
+			microtable$new(sample_table = sample_table_new, otu_table = otu_table_new, tax_table = tax_table, phylo_tree = phylo_tree, rep_fasta = rep_fasta)
 		},
 		#' @description
 		#' Merge taxa according to specific taxonomic rank to generate a new microtable.
@@ -378,6 +445,7 @@ microtable <- R6Class(classname = "microtable",
 			namechange <- base::intersect(colnames(out), names(renamevec))
 			colnames(out)[colnames(out) %in% namechange] <- renamevec[namechange]
 			self$alpha_diversity <- as.data.frame(out)
+			message('The result is stored in object$alpha_diversity.')
 		},
 		#' @description
 		#' Save alpha diversity table to the computer.
@@ -422,6 +490,7 @@ microtable <- R6Class(classname = "microtable",
 				res$unwei_unifrac <- unwei_unifrac
 			}
 			self$beta_diversity <- res
+			message('The result is stored in object$beta_diversity.')
 		},
 		#' @description
 		#' Save beta diversity matrix to the computer.
@@ -437,27 +506,42 @@ microtable <- R6Class(classname = "microtable",
 		}
 		),
 	private = list(
-		transform_data_proportion = function(input, ranknumber){
+		transform_data_proportion = function(input, columns, rel, split_group = FALSE, split_by = "&&", split_column){
 			sampleinfo <- input$sample_table
 			abund <- input$otu_table
 			tax <- input$tax_table
-			tax <- tax[, 1:ranknumber, drop=FALSE]
-			# transform to long format
-			abund1 <- cbind.data.frame(Display = apply(tax, 1, paste, collapse="|"), abund) %>% 
-				reshape2::melt(id.var = "Display", value.name= "Abundance", variable.name = "Sample")
-			# sum abundance by sample and taxonomy
-			abund1 <- data.table(abund1)[, sum_abund:=sum(Abundance), by=list(Display, Sample)] %>% 
+			tax <- tax[, columns, drop=FALSE]
+			# split rows to multiple rows if multiple correspondence
+			if(split_group){
+				merge_abund <- cbind.data.frame(tax, abund)
+				split_merge_abund <- tidyr::separate_rows(merge_abund, all_of(split_column), sep = split_by)
+				new_tax <- split_merge_abund[, columns, drop = FALSE]
+				new_abund <- split_merge_abund[, (ncol(tax) + 1):(ncol(merge_abund)), drop = FALSE]
+				abund1 <- cbind.data.frame(Display = apply(new_tax, 1, paste, collapse="|"), new_abund)
+			}else{
+				abund1 <- cbind.data.frame(Display = apply(tax, 1, paste, collapse="|"), abund)
+			}
+			# first transform table to long format
+			# then sum abundance by sample and taxonomy
+			abund1 <- abund1 %>% 
+				data.table() %>% 
+				data.table::melt(id.vars = "Display", value.name= "Abundance", variable.name = "Sample") %>%
+				.[, sum_abund:=sum(Abundance), by=list(Display, Sample)] %>% 
 				.[, c("Abundance"):=NULL] %>% 
 				setkey(Display, Sample) %>% 
-				unique() %>% 
-				as.data.frame()
-			abund1 <- data.table(abund1)[, rel_abund:=sum_abund/sum(sum_abund), by=list(Sample)] %>% 
-				.[, c("sum_abund"):=NULL] %>% as.data.frame()
-			abund2 <- as.data.frame(data.table::dcast(data.table(abund1), Display~Sample, value.var= list("rel_abund"))) %>%
+				unique()
+			if(rel == T){
+				abund1 <- abund1[, res_abund:=sum_abund/sum(sum_abund), by=list(Sample)] %>% 
+					.[, c("sum_abund"):=NULL]
+			}else{
+				colnames(abund1)[colnames(abund1) == "sum_abund"] <- "res_abund"
+			}
+			# dcast the table
+			abund2 <- as.data.frame(data.table::dcast(abund1, Display~Sample, value.var= list("res_abund"))) %>%
 				`row.names<-`(.[,1]) %>% 
 				.[,-1, drop = FALSE]
 			abund2 <- abund2[order(apply(abund2, 1, mean), decreasing = TRUE), rownames(sampleinfo), drop = FALSE]
-			return(abund2)
+			abund2
 		},
 		rarefaction_subsample = function(x, sample.size, replace=FALSE){
 			# Create replacement species vector

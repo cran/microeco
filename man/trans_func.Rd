@@ -4,7 +4,9 @@
 \alias{trans_func}
 \title{Create trans_func object for functional analysis.}
 \description{
-This class is a wrapper for a series of functional analysis on species and communities, including the prokaryotes function identification based on Louca et al. (2016) <doi:10.1126/science.aaf4507> or fungi function identification based on Nguyen et al. (2016) <10.1016/j.funeco.2015.06.006>, functional redundancy calculation and metabolic pathway abundance prediction Abhauer et al. (2015) <10.1093/bioinformatics/btv287>.
+This class is a wrapper for a series of functional analysis on species and communities, including the prokaryotes function identification based on Louca et al. (2016) 
+<doi:10.1126/science.aaf4507> or fungi function identification based on Nguyen et al. (2016) <10.1016/j.funeco.2015.06.006>, 
+functional redundancy calculation and metabolic pathway abundance prediction Abhauer et al. (2015) <10.1093/bioinformatics/btv287>.
 }
 \examples{
 
@@ -46,6 +48,23 @@ t1$show_prok_func(use_func = "methanotrophy")
 \donttest{
 t1$plot_spe_func_perc(use_group_list = TRUE)
 }
+
+## ------------------------------------------------
+## Method `trans_func$cal_tax4fun2`
+## ------------------------------------------------
+
+\dontrun{
+t1$cal_tax4fun2(blast_tool_path = "ncbi-blast-2.11.0+/bin", 
+    path_to_reference_data = "Tax4Fun2_ReferenceData_v2")
+}
+
+## ------------------------------------------------
+## Method `trans_func$cal_tax4fun2_FRI`
+## ------------------------------------------------
+
+\dontrun{
+t1$cal_tax4fun2_FRI()
+}
 }
 \section{Active bindings}{
 \if{html}{\out{<div class="r6-active-bindings">}}
@@ -62,8 +81,9 @@ t1$plot_spe_func_perc(use_group_list = TRUE)
 \item \href{#method-cal_spe_func_perc}{\code{trans_func$cal_spe_func_perc()}}
 \item \href{#method-show_prok_func}{\code{trans_func$show_prok_func()}}
 \item \href{#method-plot_spe_func_perc}{\code{trans_func$plot_spe_func_perc()}}
-\item \href{#method-cal_FAPROTAX}{\code{trans_func$cal_FAPROTAX()}}
 \item \href{#method-cal_tax4fun}{\code{trans_func$cal_tax4fun()}}
+\item \href{#method-cal_tax4fun2}{\code{trans_func$cal_tax4fun2()}}
+\item \href{#method-cal_tax4fun2_FRI}{\code{trans_func$cal_tax4fun2_FRI()}}
 \item \href{#method-print}{\code{trans_func$print()}}
 \item \href{#method-clone}{\code{trans_func$clone()}}
 }
@@ -105,9 +125,9 @@ Confirm traits of each OTU by matching the taxonomic assignments to the function
 Prokaryotes: based on the FAPROTAX database, please also cite the original FAPROTAX paper: 
 Louca, S., Parfrey, L. W., & Doebeli, M. (2016). Decoupling function and taxonomy in the global ocean microbiome. Science, 353(6305), 1272. <doi:10.1126/science.aaf4507>;
 Fungi, based on the FUNGuild database or FungalTraits database, please also cite:
-FUNGuild: Nguyen, N. H. et al. (2016). 
-FUNGuild: An open annotation tool for parsing fungal community datasets by ecological guild. Fungal Ecology, 20(1), 241-248. <doi:10.1016/j.funeco.2015.06.006>
-FungalTraits: a user-friendly traits database of fungi and fungus-like stramenopiles. 
+FUNGuild: Nguyen et al. (2016). 
+FUNGuild: An open annotation tool for parsing fungal community datasets by ecological guild. Fungal Ecology, 20(1), 241-248, <doi:10.1016/j.funeco.2015.06.006>
+FungalTraits: Polme et al. FungalTraits: a user-friendly traits database of fungi and fungus-like stramenopiles. 
 Fungal Diversity 105, 1-16 (2020). <doi:10.1007/s13225-020-00466-2>
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_spe_func(fungi_database = c("FUNGuild", "FungalTraits")[1])}\if{html}{\out{</div>}}
@@ -143,8 +163,8 @@ The percentages of the OTUs with specific trait can reflect the potential of the
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_spe_func_perc(
   use_community = TRUE,
-  node_type_table = NULL,
-  abundance_weighted = FALSE
+  abundance_weighted = FALSE,
+  node_type_table = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -153,9 +173,9 @@ The percentages of the OTUs with specific trait can reflect the potential of the
 \describe{
 \item{\code{use_community}}{default TRUE; whether calculate community; if FALSE, use module.}
 
-\item{\code{node_type_table}}{default NULL; If use_community FALSE; provide the node_type_table with the module information, such as the result of cal_node_type.}
-
 \item{\code{abundance_weighted}}{default FALSE; whether use abundance. If FALSE, calculate the functional population percentage. If TRUE, calculate the functional individual percentage.}
+
+\item{\code{node_type_table}}{default NULL; If use_community FALSE; provide the node_type_table with the module information, such as the result of cal_node_type.}
 }
 \if{html}{\out{</div>}}
 }
@@ -246,36 +266,11 @@ t1$plot_spe_func_perc(use_group_list = TRUE)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-cal_FAPROTAX"></a>}}
-\if{latex}{\out{\hypertarget{method-cal_FAPROTAX}{}}}
-\subsection{Method \code{cal_FAPROTAX()}}{
-Predict functional potential of communities using FAPROTAX.
-please also cite the original FAPROTAX paper: 
-Louca, S., Parfrey, L. W., & Doebeli, M. (2016). Decoupling function and taxonomy in the global ocean microbiome. Science, 353(6305), 1272. <doi:10.1126/science.aaf4507>;
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_FAPROTAX(keep_tem = TRUE, Ref_folder = "./FAPROTAX_1.2.1")}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{keep_tem}}{default FALSE; whether keep the intermediate file, that is, the otu_table_for_FAPROTAX.txt in local place.}
-
-\item{\code{Ref_folder}}{default "./FAPROTAX_1.2.1"; see http://www.loucalab.com/archive/FAPROTAX}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-res_FAPROTAX in object.
-}
-}
-\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-cal_tax4fun"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_tax4fun}{}}}
 \subsection{Method \code{cal_tax4fun()}}{
 Predict functional potential of communities using tax4fun.
-please also cite: Abhauer, K. P., Wemheuer, B., Daniel, R., & Meinicke, P. (2015). 
-Tax4Fun: Predicting functional profiles from metagenomic 16S rRNA data. Bioinformatics, 31(17), 2882-2884. <doi:10.1093/bioinformatics/btv287>
+please also cite: Tax4Fun: Predicting functional profiles from metagenomic 16S rRNA data. Bioinformatics, 31(17), 2882-2884, <doi:10.1093/bioinformatics/btv287>
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_tax4fun(keep_tem = FALSE, folderReferenceData = NULL)}\if{html}{\out{</div>}}
 }
@@ -292,6 +287,97 @@ Tax4Fun: Predicting functional profiles from metagenomic 16S rRNA data. Bioinfor
 \subsection{Returns}{
 tax4fun_KO and tax4fun_path in object.
 }
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-cal_tax4fun2"></a>}}
+\if{latex}{\out{\hypertarget{method-cal_tax4fun2}{}}}
+\subsection{Method \code{cal_tax4fun2()}}{
+Predict functional potential of communities with Tax4Fun2 method.
+please also cite: 
+Tax4Fun2: prediction of habitat-specific functional profiles and functional redundancy based on 16S rRNA gene sequences. Environmental Microbiome 15, 11 (2020). <doi:10.1186/s40793-020-00358-7>
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_tax4fun2(
+  blast_tool_path = NULL,
+  path_to_reference_data = "Tax4Fun2_ReferenceData_v2",
+  path_to_temp_folder = NULL,
+  database_mode = "Ref99NR",
+  normalize_by_copy_number = T,
+  min_identity_to_reference = 97,
+  use_uproc = T,
+  num_threads = 1,
+  normalize_pathways = F
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{blast_tool_path}}{default NULL; the folder path, e.g. ncbi-blast-2.11.0+/bin ; blast tools folder downloaded from 
+"ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+"  ; e.g. ncbi-blast-2.11.0+-x64-win64.tar.gz  for windows system; 
+if blast_tool_path is NULL, search the tools in the environmental path variable.}
+
+\item{\code{path_to_reference_data}}{default "Tax4Fun2_ReferenceData_v2"; the path that points to files used in the prediction; 
+The directory must contain the Ref99NR/Ref100NR folder; 
+download Ref99NR.zip from "https://cloudstor.aarnet.edu.au/plus/s/DkoZIyZpMNbrzSw/download"  or Ref100NR.zip from "https://cloudstor.aarnet.edu.au/plus/s/jIByczak9ZAFUB4/download" .}
+
+\item{\code{path_to_temp_folder}}{default NULL; The temporary folder to store the logfile, intermediate file and result files; if NULL, use the default temporary in the computer.}
+
+\item{\code{database_mode}}{default 'Ref99NR'; "Ref99NR" or "Ref100NR" .}
+
+\item{\code{normalize_by_copy_number}}{default TRUE; whether normalize the result by the 16S rRNA copy number in the genomes.}
+
+\item{\code{min_identity_to_reference}}{default 97; the idenity threshold used for finding the nearest species.}
+
+\item{\code{use_uproc}}{default TRUE; UProC was used to functionally anotate the genomes in the reference data.}
+
+\item{\code{num_threads}}{default 1; the threads used in the blastn calculation.}
+
+\item{\code{normalize_pathways}}{default FALSE; Different to Tax4Fun, when converting from KEGG functions to KEGG pathways, 
+   Tax4Fun2 does not equally split KO gene abundances between pathways a functions is affiliated to. The full predicted abundance is affiliated to each pathway. 
+Use TRUE to split the abundances (default is FALSE).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+res_tax4fun2_KO and res_tax4fun2_pathway in object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$cal_tax4fun2(blast_tool_path = "ncbi-blast-2.11.0+/bin", 
+    path_to_reference_data = "Tax4Fun2_ReferenceData_v2")
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-cal_tax4fun2_FRI"></a>}}
+\if{latex}{\out{\hypertarget{method-cal_tax4fun2_FRI}{}}}
+\subsection{Method \code{cal_tax4fun2_FRI()}}{
+Calculate (multi-) functional redundancy index (FRI) of prokaryotic community with Tax4Fun2 method.
+This function is used to calculating aFRI and rFRI use the intermediate files generated by the function cal_tax4fun2().
+please also cite: 
+Tax4Fun2: prediction of habitat-specific functional profiles and functional redundancy based on 16S rRNA gene sequences. Environmental Microbiome 15, 11 (2020). <doi:10.1186/s40793-020-00358-7>
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_tax4fun2_FRI()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+res_tax4fun2_aFRI and res_tax4fun2_rFRI in object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$cal_tax4fun2_FRI()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-print"></a>}}

@@ -54,9 +54,11 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param feature_sel default FALSE; whether perform the feature selection.
 		#' @param taxa_level default NULL; If use RDA, provide the taxonomic rank.
 		#' @param taxa_filter_thres default NULL; If want to filter taxa, provide the relative abundance threshold.
-		#' @return res_rda in object.
+		#' @return res_rda, res_rda_R2, res_rda_terms and res_rda_axis in object.
 		#' @examples
+		#' \donttest{
 		#' t1$cal_rda(use_dbrda = TRUE, use_measure = "bray")
+		#' }
 		cal_rda = function(use_dbrda = TRUE, add_matrix = NULL, use_measure = NULL, feature_sel = FALSE, taxa_level = NULL, taxa_filter_thres = NULL){
 			env_data <- self$env_data
 			if(use_dbrda == T){
@@ -89,6 +91,7 @@ trans_env <- R6Class(classname = "trans_env",
 				use_data <- as.data.frame(t(use_abund))
 			}
 			if(feature_sel == T){
+				message('Start forward selection.')
 				if(use_dbrda == T){
 					mod0 <- dbrda(use_data ~ 1, env_data)
 					mod1 <- dbrda(use_data ~ ., env_data)
@@ -107,10 +110,19 @@ trans_env <- R6Class(classname = "trans_env",
 			self$use_dbrda <- use_dbrda
 			self$taxa_level <- taxa_level
 			if(use_dbrda == T){
-				self$res_rda <- dbrda(use_data ~ ., env_data)
+				res_rda <- dbrda(use_data ~ ., env_data)
 			}else{
-				self$res_rda <- rda(use_data ~ ., env_data)
+				res_rda <- rda(use_data ~ ., env_data)
 			}
+			self$res_rda <- res_rda
+			message('The rda total result is stored in object$res_rda !')
+			self$res_rda_R2 <- unlist(RsquareAdj(res_rda))
+			message('The R2 is stored in object$res_rda_R2 !')
+			# test for sig.environ.variables
+			self$res_rda_terms <- anova(res_rda, by = "terms", permu = 1000)
+			message('The terms anova result is stored in object$res_rda_terms !')
+			self$res_rda_axis <- anova(res_rda, by = "axis", perm.max = 1000)
+			message('The axis anova result is stored in object$res_rda_axis !')
 		},
 		#' @description
 		#' transform RDA result for the following plotting.
@@ -169,6 +181,7 @@ trans_env <- R6Class(classname = "trans_env",
 			}
 			
 			self$res_rda_trans = list(df_sites = df_sites, df_arrows = df_arrows, eigval = eigval, df_species = df_species, df_arrows_spe = df_arrows_spe)
+			message('The result list is stored in object$res_rda_trans !')
 		},
 		#' @description
 		#' plot RDA result.
@@ -282,6 +295,7 @@ trans_env <- R6Class(classname = "trans_env",
 			}else{
 				self$res_mantel <- res_mantel
 			}
+			message('The result is stored in object$res_mantel or object$res_mantel_partial !')
 		},
 		#' @description
 		#' Calculating the correlations between taxa abundance and environmental variables.
@@ -390,6 +404,7 @@ trans_env <- R6Class(classname = "trans_env",
 				res$Taxa %<>% gsub(".*__(.*?)$", "\\1", .)
 			}
 			self$res_cor <- res
+			message('The correlation result is stored in object$res_cor !')
 			self$cor_method <- cor_method
 		},
 		#' @description

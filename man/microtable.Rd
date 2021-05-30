@@ -150,23 +150,26 @@ class(dataset$beta_diversity)
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{microtable$new(
-  otu_table = NULL,
+  otu_table,
   sample_table = NULL,
   tax_table = NULL,
-  phylo_tree = NULL
+  phylo_tree = NULL,
+  rep_fasta = NULL
 )}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{otu_table}}{data.frame; default NULL; necessary; The species or OTU table, rows are species, cols are samples.}
+\item{\code{otu_table}}{data.frame; necessary; The species or OTU table, rows are species, cols are samples.}
 
 \item{\code{sample_table}}{data.frame; default NULL; The sample information table, rows are samples, cols are sample metadata.}
 
 \item{\code{tax_table}}{data.frame; default NULL; The taxonomic information table, rows are species, cols are taxonomic classes.}
 
-\item{\code{phylo_tree}}{phylo; default NULL; If provided, the phylogenetic tree can be used for some analysis, for example, phylogenetic diversity.}
+\item{\code{phylo_tree}}{phylo; default NULL; The phylogenetic tree; read with read.tree function in ape package.}
+
+\item{\code{rep_fasta}}{list; default NULL; The representative sequences; read with read.fasta function in seqinr package.}
 }
 \if{html}{\out{</div>}}
 }
@@ -176,10 +179,11 @@ an object of class "microtable" with the following components:
   \item{\code{sample_table}}{The sample information table.}
   \item{\code{otu_table}}{The OTU table.}
   \item{\code{tax_table}}{The taxonomic table.}
-  \item{\code{phylo_tree}}{The phylogenetic tree}
-  \item{\code{taxa_abund}}{default NULL; use cal_abund function to calculate}
-  \item{\code{alpha_diversity}}{default NULL; use cal_alphadiv function to calculate}
-  \item{\code{beta_diversity}}{default NULL; use cal_betadiv function to calculate}
+  \item{\code{phylo_tree}}{The phylogenetic tree.}
+  \item{\code{rep_fasta}}{The representative sequence.}
+  \item{\code{taxa_abund}}{default NULL; use cal_abund function to calculate.}
+  \item{\code{alpha_diversity}}{default NULL; use cal_alphadiv function to calculate.}
+  \item{\code{beta_diversity}}{default NULL; use cal_betadiv function to calculate.}
 }
 }
 \subsection{Examples}{
@@ -307,9 +311,33 @@ None, Object of microtable itself cleaned up.
 \subsection{Method \code{cal_abund()}}{
 Calculate the taxonomic abundance at each taxonomic ranks.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{microtable$cal_abund()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{microtable$cal_abund(
+  select_cols = NULL,
+  rel = TRUE,
+  split_group = FALSE,
+  split_by = "&&",
+  split_column = NULL
+)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{select_cols}}{default NULL; numeric vector or character vector of colnames of tax_table; used to select columns to merge and calculate abundances.
+This is very useful if there are commented columns or some columns with multiple structure that cannot be used directly.}
+
+\item{\code{rel}}{default TRUE; if TRUE, relative abundance is used; if FALSE, absolute abundance will be summed.}
+
+\item{\code{split_group}}{default FALSE; if TRUE, split the rows to multiple rows according to one or more columns in tax_table. Very useful when multiple mapping info exist.}
+
+\item{\code{split_by}}{default "&&"; Separator delimiting collapsed values; only used when split_group == TRUE; see sep in separate_rows function.}
+
+\item{\code{split_column}}{default NULL; character vector or list; only used when split_group == TRUE; character vector: 
+fixed column or columns used for the splitting in tax_table in each abundance calculation; 
+list: containing more character vectors to assign the column names to each calculation, such as list(c("Phylum"), c("Phylum", "Class")).}
+}
+\if{html}{\out{</div>}}
+}
 \subsection{Returns}{
 taxa_abund in object.
 }

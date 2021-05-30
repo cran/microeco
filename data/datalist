@@ -1,3 +1,4 @@
+Tax4Fun2_KEGG
 dataset
 env_data_16S
 fungi_func_FUNGuild
@@ -7,6 +8,7 @@ otu_table_16S
 otu_table_ITS
 phylo_tree_16S
 prok_func
+rep_fasta_16S
 sample_info_16S
 sample_info_ITS
 taxonomy_table_16S
