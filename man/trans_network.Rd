@@ -6,7 +6,8 @@
 \description{
 This class is a wrapper for a series of network analysis related methods, 
 including the correlation based <doi:10.1186/1471-2105-13-113>, SpiecEasi <doi:10.1371/journal.pcbi.1004226>,
-and Probabilistic Graphical Models based <doi:10.1016/j.cels.2019.08.002> network construction approaches, network and node attributes analysis and other network operations.
+and Probabilistic Graphical Models based <doi:10.1016/j.cels.2019.08.002> network construction approaches, network and node attributes analysis
+eigengene analysis, network subsetting and other network operations.
 }
 \examples{
 
@@ -17,8 +18,11 @@ and Probabilistic Graphical Models based <doi:10.1016/j.cels.2019.08.002> networ
 \donttest{
 data(dataset)
 # correlation network
-t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
-  taxa_level = "OTU", filter_thres = 0.001)
+t1 <- trans_network$new(
+		dataset = dataset, 
+		cal_cor = "base", 
+		taxa_level = "OTU", 
+		filter_thres = 0.001)
 }
 
 ## ------------------------------------------------
@@ -70,14 +74,6 @@ t1$plot_taxa_roles()
 }
 
 ## ------------------------------------------------
-## Method `trans_network$cal_sum_links`
-## ------------------------------------------------
-
-\donttest{
-t1$cal_sum_links(taxa_level = "Phylum")
-}
-
-## ------------------------------------------------
 ## Method `trans_network$subset_network`
 ## ------------------------------------------------
 
@@ -98,8 +94,6 @@ t1$subset_network(node = t1$res_node_type \%>\% .[.$module == "M1", ] \%>\%
 \item \href{#method-cal_node_type}{\code{trans_network$cal_node_type()}}
 \item \href{#method-cal_eigen}{\code{trans_network$cal_eigen()}}
 \item \href{#method-plot_taxa_roles}{\code{trans_network$plot_taxa_roles()}}
-\item \href{#method-cal_sum_links}{\code{trans_network$cal_sum_links()}}
-\item \href{#method-plot_sum_links}{\code{trans_network$plot_sum_links()}}
 \item \href{#method-subset_network}{\code{trans_network$subset_network()}}
 \item \href{#method-print}{\code{trans_network$print()}}
 \item \href{#method-clone}{\code{trans_network$clone()}}
@@ -109,6 +103,8 @@ t1$subset_network(node = t1$res_node_type \%>\% .[.$module == "M1", ] \%>\%
 \if{html}{\out{<a id="method-new"></a>}}
 \if{latex}{\out{\hypertarget{method-new}{}}}
 \subsection{Method \code{new()}}{
+This function is used to create the trans_network object, store the important intermediate data 
+  and calculate correlations if cal_cor parameter is selected.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$new(
   dataset = NULL,
@@ -154,8 +150,11 @@ res_cor_p list.
 \preformatted{\donttest{
 data(dataset)
 # correlation network
-t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
-  taxa_level = "OTU", filter_thres = 0.001)
+t1 <- trans_network$new(
+		dataset = dataset, 
+		cal_cor = "base", 
+		taxa_level = "OTU", 
+		filter_thres = 0.001)
 }
 }
 \if{html}{\out{</div>}}
@@ -168,9 +167,9 @@ t1 <- trans_network$new(dataset = dataset, cal_cor = "base",
 \if{latex}{\out{\hypertarget{method-cal_network}{}}}
 \subsection{Method \code{cal_network()}}{
 Calculate network either based on the correlation method or based on SpiecEasi or based on the Probabilistic Graphical Models (PGM) in julia FlashWeave; 
-see Deng et al. (2012) <doi:10.1186/1471-2105-13-113> for correlation based method; 
-see Kurtz et al. (2015) <doi:doi:10.1371/journal.pcbi.1004226> for SpiecEasi method; 
-see Tackmann et al. (2019) <doi:10.1016/j.cels.2019.08.002> for PGM based method.
+See Deng et al. (2012) <doi:10.1186/1471-2105-13-113> for correlation based method, 
+Kurtz et al. (2015) <doi:doi:10.1371/journal.pcbi.1004226> for SpiecEasi method, 
+Tackmann et al. (2019) <doi:10.1016/j.cels.2019.08.002> for PGM based method.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_network(
   network_method = c("COR", "SpiecEasi", "PGM")[1],
@@ -215,11 +214,11 @@ see Tackmann et al. (2019) <doi:10.1016/j.cels.2019.08.002> for PGM based method
 
 \item{\code{SpiecEasi_method}}{default "mb"; either 'glasso' or 'mb';see spiec.easi in package SpiecEasi and https://github.com/zdk123/SpiecEasi.}
 
-\item{\code{add_taxa_name}}{default "Phylum"; add taxonomic rank name to the result.}
+\item{\code{add_taxa_name}}{default "Phylum"; NULL or a taxonomic rank name; used to add taxonomic rank name to network.}
 
 \item{\code{usename_rawtaxa_when_taxalevel_notOTU}}{default FALSE; whether replace the name of nodes using the taxonomic information.}
 
-\item{\code{...}}{paremeters pass to spiec.easi in package SpiecEasi.}
+\item{\code{...}}{paremeters pass to spiec.easi in package SpiecEasi for network_method = "SpiecEasi".}
 }
 \if{html}{\out{</div>}}
 }
@@ -241,7 +240,7 @@ t1$cal_network(p_thres = 0.01, COR_cut = 0.6)
 \if{html}{\out{<a id="method-cal_module"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_module}{}}}
 \subsection{Method \code{cal_module()}}{
-Calculate and add network modules.
+Add network modules to the network.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_module(module_name_prefix = "M")}\if{html}{\out{</div>}}
 }
@@ -361,7 +360,7 @@ t1$cal_eigen()
 \if{html}{\out{<a id="method-plot_taxa_roles"></a>}}
 \if{latex}{\out{\hypertarget{method-plot_taxa_roles}{}}}
 \subsection{Method \code{plot_taxa_roles()}}{
-Plot the classification and importance of nodes.
+Plot the classification and importance of nodes, see object$res_node_type for the variable names used in the parameters.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$plot_taxa_roles(
   use_type = c(1, 2)[1],
@@ -372,7 +371,7 @@ Plot the classification and importance of nodes.
   show_number = 1:10,
   plot_color = "Phylum",
   plot_shape = "taxa_roles",
-  plot_size = NULL,
+  plot_size = "Abundance",
   color_values = RColorBrewer::brewer.pal(12, "Paired"),
   shape_values = c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14)
 )}\if{html}{\out{</div>}}
@@ -381,7 +380,7 @@ Plot the classification and importance of nodes.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{use_type}}{default 1; 1 or 2; 1 represent the traditional taxa roles plot; 2 represent the plot with taxa names as x axis.}
+\item{\code{use_type}}{default 1; 1 or 2; 1 represents taxa roles area plot; 2 represents the layered plot with taxa as x axis.}
 
 \item{\code{roles_colors}}{default NULL; for use_type 1; colors for each group.}
 
@@ -397,7 +396,7 @@ Plot the classification and importance of nodes.
 
 \item{\code{plot_shape}}{default "taxa_roles"; for use_type 2; used variable for shape.}
 
-\item{\code{plot_size}}{default NULL; for use_type 2; used variable for shape.}
+\item{\code{plot_size}}{default "Abundance"; for use_type 2; used for point size; a fixed number (e.g. 5) is also available.}
 
 \item{\code{color_values}}{default RColorBrewer::brewer.pal(12, "Paired"); for use_type 2; color vector}
 
@@ -418,65 +417,6 @@ t1$plot_taxa_roles()
 
 }
 
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-cal_sum_links"></a>}}
-\if{latex}{\out{\hypertarget{method-cal_sum_links}{}}}
-\subsection{Method \code{cal_sum_links()}}{
-This function is used to sum the links number from one taxa to another or in the same taxa, for example, at Phylum level.
-This is very useful to fast see how many nodes are connected between different taxa or within the taxa.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_sum_links(taxa_level = "Phylum")}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{taxa_level}}{default "Phylum"; taxonomic rank.}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-res_sum_links_pos and res_sum_links_neg in object.
-}
-\subsection{Examples}{
-\if{html}{\out{<div class="r example copy">}}
-\preformatted{\donttest{
-t1$cal_sum_links(taxa_level = "Phylum")
-}
-}
-\if{html}{\out{</div>}}
-
-}
-
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_sum_links"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_sum_links}{}}}
-\subsection{Method \code{plot_sum_links()}}{
-Plot the summed linkages among taxa using chorddiag package <https://github.com/mattflor/chorddiag>.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_network$plot_sum_links(
-  plot_pos = TRUE,
-  plot_num = NULL,
-  color_values = NULL
-)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{plot_pos}}{default TRUE; plot the summed positive or negative linkages.}
-
-\item{\code{plot_num}}{default NULL; number of taxa presented in the plot.}
-
-\item{\code{color_values}}{default NULL; If not provided, use default.}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-chorddiag plot
-}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-subset_network"></a>}}

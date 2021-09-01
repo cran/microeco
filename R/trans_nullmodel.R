@@ -2,7 +2,8 @@
 #' Create trans_nullmodel object.
 #'
 #' @description
-#' This class is a wrapper for a series of null model and phylogeny related approaches, including the mantel correlogram analysis of phylogenetic signal, betaNTI, betaNRI and RCbray calculations;
+#' This class is a wrapper for a series of null model and phylogeny related approaches, 
+#' including the mantel correlogram analysis of phylogenetic signal, betaNTI, betaNRI and RCbray calculations;
 #' see Stegen et al. (2013) <10.1038/ismej.2013.93> and Liu et al. (2017) <doi:10.1038/s41598-017-17736-w>. 
 #'
 #' @export
@@ -85,7 +86,12 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		#' \donttest{
 		#' t1$cal_mantel_corr(use_env = "pH")
 		#' }
-		cal_mantel_corr = function(use_env = NULL, break.pts = seq(0, 1, 0.02), cutoff=FALSE, ...){
+		cal_mantel_corr = function(
+			use_env = NULL, 
+			break.pts = seq(0, 1, 0.02), 
+			cutoff=FALSE, 
+			...
+			){
 			dis <- self$dis
 			comm <- self$comm
 			env_data <- self$env_data
@@ -105,13 +111,23 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 					value_use <- as.matrix(env_data[, use_env, drop = FALSE])
 				}
 			}
+			
+			message("---------------- ", Sys.time()," : Start ----------------")
 			value_use <- decostand(value_use, method = "range", MARGIN = 2)
 			niche_matrix <- t(comm) %*% value_use
 			niche_matrix <- as.matrix(dist(niche_matrix))
 			trenic_matrix <- as.matrix(dis)[rownames(niche_matrix), rownames(niche_matrix)]
-			res_mantel_corr <- mantel.correlog(niche_matrix, trenic_matrix, break.pts = break.pts, cutoff = cutoff, ...)
+			res_mantel_corr <- mantel.correlog(
+				niche_matrix, 
+				trenic_matrix, 
+				break.pts = break.pts, 
+				cutoff = cutoff, 
+				...
+				)
+			message("---------------- ", Sys.time()," : Finish ----------------")
+
 			self$res_mantel_corr <- res_mantel_corr
-			message('The result is stored in object$res_mantel_corr !')
+			message('The result is stored in object$res_mantel_corr ...')
 		},
 		#' @description
 		#' Plot mantel correlogram.
@@ -122,6 +138,9 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		#' t1$plot_mantel_corr()
 		#' }
 		plot_mantel_corr = function(){
+			if(is.null(self$res_mantel_corr)){
+				stop("Please first use cal_mantel_corr function to get plot data!")
+			}
 			plot_data <- self$res_mantel_corr$mantel.res %>% as.data.frame
 			plot_data <- plot_data[, -4]
 			colnames(plot_data) <- c("index", "n.dist", "correlation", "Pr")
@@ -147,6 +166,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				theme(legend.position="right", legend.text=element_text(size=rel(1))) +
 				theme(legend.background=element_rect(fill="white", colour="grey60")) +
 				guides(fill=guide_legend(title = NULL, reverse=FALSE))
+			
 			g
 		},
 		#' @description
@@ -169,7 +189,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			}
 			comm <- decostand(comm, method="total", MARGIN=1)
 			self$res_betampd <- private$betampd(comm = comm, dis = dis)
-			message('The result is stored in object$res_betampd !')
+			message('The result is stored in object$res_betampd ...')
 		},
 		#' @description
 		#' Calculate betaMNTD. Faster than comdistnt in picante package.
@@ -187,8 +207,13 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				stop("Phylogenetic tree is required!")
 			}
 			comm <- self$comm
-			self$res_betamntd <- private$betamntd(comm = comm, dis = dis, abundance.weighted=abundance.weighted, exclude.conspecifics = exclude.conspecifics)
-			message('The result is stored in object$res_betamntd !')
+			self$res_betamntd <- private$betamntd(
+				comm = comm, 
+				dis = dis, 
+				abundance.weighted = abundance.weighted, 
+				exclude.conspecifics = exclude.conspecifics
+				)
+			message('The result is stored in object$res_betamntd ...')
 		},
 		#' @description
 		#' Calculate ses.betaMPD (betaNRI).
@@ -201,7 +226,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		#' \donttest{
 		#' t1$cal_ses_betampd(runs = 100, abundance.weighted = FALSE)
 		#' }
-		cal_ses_betampd = function(runs=1000, abundance.weighted = FALSE, verbose = TRUE) {
+		cal_ses_betampd = function(runs = 1000, abundance.weighted = FALSE, verbose = TRUE) {
 
 			comm <- self$comm
 			dis <- self$dis
@@ -212,6 +237,8 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				comm <- decostand(comm, method="pa")
 			}
 			comm <- decostand(comm, method="total", MARGIN=1)
+			
+			message("---------------- ", Sys.time()," : Start ----------------")
 			if(verbose){
 				cat("Calculate observed betaMPD.\n")
 			}
@@ -227,11 +254,13 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				}
 				as.dist(private$betampd(comm = comm, dis = picante::taxaShuffle(dis)))
 			}, simplify = "array")
+			message("---------------- ", Sys.time()," : Finish ----------------")
+			
 			beta_rand_mean <- apply(X = beta_rand, MARGIN = 1, FUN = mean, na.rm = TRUE)
 			beta_rand_sd <- apply(X = beta_rand, MARGIN = 1, FUN = sd, na.rm = TRUE)
 			beta_obs_z <- (betaobs_vec - beta_rand_mean)/beta_rand_sd
 			self$res_ses_betampd <- private$fin_matrix(all_samples = all_samples, beta_obs_z = beta_obs_z)
-			message('The result is stored in object$res_ses_betampd !')
+			message('The result is stored in object$res_ses_betampd ...')
 		},
 		#' @description
 		#' Calculate ses.betaMNTD (betaNTI).
@@ -245,17 +274,29 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		#' \donttest{
 		#' t1$cal_ses_betamntd(runs = 100, abundance.weighted = FALSE, exclude.conspecifics = FALSE)
 		#' }
-		cal_ses_betamntd = function(runs=1000, abundance.weighted = FALSE, exclude.conspecifics = FALSE, verbose = TRUE) {
+		cal_ses_betamntd = function(
+			runs=1000, 
+			abundance.weighted = FALSE, 
+			exclude.conspecifics = FALSE, 
+			verbose = TRUE
+			){
 			comm <- self$comm
 			dis <- self$dis
 			if(is.null(dis)){
 				stop("Phylogenetic tree is required!")
 			}
 			all_samples <- rownames(comm)
+
+			message("---------------- ", Sys.time()," : Start ----------------")
 			if(verbose){
-				cat("Calculate observed betaMNTD.\n")
+				cat("Calculate observed betaMNTD ...\n")
 			}
-			betaobs <- private$betamntd(comm = comm, dis = dis, abundance.weighted = abundance.weighted, exclude.conspecifics = exclude.conspecifics) %>% as.dist
+			betaobs <- private$betamntd(
+				comm = comm, 
+				dis = dis, 
+				abundance.weighted = abundance.weighted, 
+				exclude.conspecifics = exclude.conspecifics
+				) %>% as.dist
 			betaobs_vec <- as.vector(betaobs)
 			if(verbose){
 				cat("Simulate betaMNTD.\n")
@@ -264,14 +305,21 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				if(verbose){
 					private$show_run(x = x, runs = runs)
 				}
-				as.dist(private$betamntd(comm = comm, dis = picante::taxaShuffle(dis), abundance.weighted = abundance.weighted, 
-					exclude.conspecifics = exclude.conspecifics))
+				as.dist(private$betamntd(
+					comm = comm, 
+					dis = picante::taxaShuffle(dis), 
+					abundance.weighted = abundance.weighted, 
+					exclude.conspecifics = exclude.conspecifics
+					)
+				)
 			}, simplify = "array")
+			message("---------------- ", Sys.time()," : Finish ----------------")
+
 			beta_rand_mean <- apply(X = beta_rand, MARGIN = 1, FUN = mean, na.rm = TRUE)
 			beta_rand_sd <- apply(X = beta_rand, MARGIN = 1, FUN = sd, na.rm = TRUE)
 			beta_obs_z <- (betaobs_vec - beta_rand_mean)/beta_rand_sd
 			self$res_ses_betamntd <- private$fin_matrix(all_samples = all_samples, beta_obs_z = beta_obs_z)
-			message('The result is stored in object$res_ses_betamntd !')
+			message('The result is stored in object$res_ses_betamntd ...')
 		},
 		#' @description
 		#' Calculate rcbray.
@@ -297,7 +345,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			beta_obs_z <- apply(X = beta_rand, MARGIN = 1, FUN = function(x){sum(x > x[length(x)])/length(x)})
 			beta_obs_z <- (beta_obs_z - 0.5) * 2
 			self$res_rcbray <- private$fin_matrix(all_samples = all_samples, beta_obs_z = beta_obs_z)
-			message('The result is stored in object$res_rcbray !')
+			message('The result is stored in object$res_rcbray ...')
 		},
 		#' @description
 		#' Infer the processes according to ses.betaMNTD ses.betaMPD and rcbray.
@@ -325,7 +373,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				stop("RCbray not calculated!")
 			}
 			self$res_process <- private$percen_proc(ses_phylo_beta = ses_phylo_beta, ses_comm = ses_comm)
-			message('The result is stored in object$res_process !')
+			message('The result is stored in object$res_process ...')
 		}
 	),
 	private = list(
@@ -337,17 +385,26 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		fin_matrix = function(all_samples, beta_obs_z){
 			res <- data.frame(t(combn(all_samples, 2)), beta_obs_z)
 			colnames(res) <- c("S1", "S2", "distance")
-			res1 <- rbind.data.frame(res, data.frame(S1 = res$S2, S2 = res$S1, distance = res$distance), 
-				data.frame(S1 = all_samples, S2 = all_samples, distance = 0))
-			res1 <- reshape2::dcast(res1, S1~S2, value.var = "distance") %>% `row.names<-`(.[,1]) %>% .[, -1, drop = FALSE] %>%
-				.[all_samples, all_samples] %>% as.matrix
+			res1 <- rbind.data.frame(
+				res, 
+				data.frame(S1 = res$S2, S2 = res$S1, distance = res$distance), 
+				data.frame(S1 = all_samples, S2 = all_samples, distance = 0)
+				)
+			res1 <- reshape2::dcast(res1, S1~S2, value.var = "distance") %>% 
+				`row.names<-`(.[,1]) %>% 
+				.[, -1, drop = FALSE] %>%
+				.[all_samples, all_samples] %>% 
+				as.matrix
+			
 			res1
 		},
 		betampd = function(comm = NULL, dis = NULL){
 			all_samples <- rownames(comm)
 			# use cpp instead of base
-			matrix_multi <- function(comm_use, dis_use, ag_vector){(comm_use %*% dis_use) %*% ag_vector}
 			# matrix_multi <- function(comm_use, dis_use, ag_vector){eigenMapMatMult(eigenMapMatMult(comm_use, dis_use), ag_vector)}
+			matrix_multi <- function(comm_use, dis_use, ag_vector){
+				(comm_use %*% dis_use) %*% ag_vector
+			}
 			
 			res <- data.frame()
 			rm_samples <- c()
@@ -355,23 +412,33 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				rm_samples <- c(rm_samples, sample_name)
 				ag_vector <- comm[sample_name, , drop = FALSE] %>% t
 				rownames(ag_vector) <- colnames(comm)
-				ag_vector %<>% .[.[,1] != 0, , drop = FALSE]
+				ag_vector %<>% .[.[, 1] != 0, , drop = FALSE]
 				dis_use <- dis[, rownames(ag_vector), drop = FALSE]
 				comm_use <- comm[!rownames(comm) %in% rm_samples, , drop = FALSE]
 				wd <- matrix_multi(comm_use = comm_use, dis_use = dis_use, ag_vector = ag_vector)
 				inter_res <- data.frame(S1 = rownames(comm_use), S2 = sample_name, distance = wd[, 1])
 				res <- rbind.data.frame(res, inter_res)
 			}
-			res1 <- rbind.data.frame(res, data.frame(S1 = res$S2, S2 = res$S1, distance = res$distance), 
-				data.frame(S1 = all_samples, S2 = all_samples, distance = 0))
-			res1 <- reshape2::dcast(res1, S1~S2, value.var = "distance") %>% `row.names<-`(.[,1]) %>% .[, -1, drop = FALSE]
+			res1 <- rbind.data.frame(
+				res, 
+				data.frame(S1 = res$S2, S2 = res$S1, distance = res$distance), 
+				data.frame(S1 = all_samples, S2 = all_samples, distance = 0)
+				)
+			res1 <- reshape2::dcast(res1, S1~S2, value.var = "distance") %>% 
+				`row.names<-`(.[,1]) %>% 
+				.[, -1, drop = FALSE]
 			as.matrix(res1[all_samples, all_samples])
 		},
-		betamntd = function(comm = NULL, dis = NULL, abundance.weighted = FALSE, exclude.conspecifics = FALSE
+		betamntd = function(
+			comm = NULL, 
+			dis = NULL, 
+			abundance.weighted = FALSE, 
+			exclude.conspecifics = FALSE
 			){
 			all_samples <- rownames(comm)
 			comm <- decostand(comm, method="total", MARGIN=1)
-			comm <- rownames_to_column(as.data.frame(comm, stringsAsFactors = FALSE)) %>% reshape2::melt(id.vars = "rowname")
+			comm <- rownames_to_column(as.data.frame(comm, stringsAsFactors = FALSE)) %>% 
+				reshape2::melt(id.vars = "rowname")
 			colnames(comm) <- c("Sample", "Taxa", "Abund")
 			comm %<>% .[.$Abund != 0, ]
 			com_group <- combn(all_samples, 2)
@@ -386,9 +453,15 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				each_taxa <- apply(dis_use, 1, min, na.rm=TRUE)
 				comm_use$mindis <- each_taxa[as.character(comm_use$Taxa)]
 				if(abundance.weighted == T){
-					inter_res <- comm_use %>% dplyr::group_by(Sample) %>% dplyr::summarise(sum_dis = weighted.mean(mindis, Abund)) %>% as.data.frame		
+					inter_res <- comm_use %>% 
+						dplyr::group_by(Sample) %>% 
+						dplyr::summarise(sum_dis = weighted.mean(mindis, Abund)) %>% 
+						as.data.frame		
 				}else{
-					inter_res <- comm_use %>% dplyr::group_by(Sample) %>% dplyr::summarise(sum_dis = sum(mindis), num = dplyr::n()) %>% as.data.frame		
+					inter_res <- comm_use %>% 
+						dplyr::group_by(Sample) %>% 
+						dplyr::summarise(sum_dis = sum(mindis), num = dplyr::n()) %>% 
+						as.data.frame		
 				}
 				inter_res$ag <- sample_name
 				res <- rbind.data.frame(res, inter_res)
@@ -397,15 +470,26 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				paste0(sort(unlist(res[x, c("Sample", "ag")])), collapse = "_betamntd_")
 			}))
 			if(abundance.weighted == T){
-				res1 <- res %>% dplyr::group_by(com_name) %>% dplyr::summarise(distance = mean(sum_dis)) %>% as.data.frame
+				res1 <- res %>% 
+					dplyr::group_by(com_name) %>% 
+					dplyr::summarise(distance = mean(sum_dis)) %>% 
+					as.data.frame
 			}else{
-				res1 <- res %>% dplyr::group_by(com_name) %>% dplyr::summarise(distance = sum(sum_dis)/sum(num)) %>% as.data.frame
+				res1 <- res %>% 
+					dplyr::group_by(com_name) %>% 
+					dplyr::summarise(distance = sum(sum_dis)/sum(num)) %>% 
+					as.data.frame
 			}
 			res1 <- data.frame(t(com_group[, res1$com_name]), res1$distance)
 			colnames(res1) <- c("S1", "S2", "distance")
-			res1 <- rbind.data.frame(res1, data.frame(S1 = res1$S2, S2 = res1$S1, distance = res1$distance), 
-				data.frame(S1 = all_samples, S2 = all_samples, distance = 0))
-			res1 <- reshape2::dcast(res1, S1~S2, value.var = "distance") %>% `row.names<-`(.[,1]) %>% .[, -1, drop = FALSE]
+			res1 <- rbind.data.frame(
+				res1, 
+				data.frame(S1 = res1$S2, S2 = res1$S1, distance = res1$distance), 
+				data.frame(S1 = all_samples, S2 = all_samples, distance = 0)
+				)
+			res1 <- reshape2::dcast(res1, S1~S2, value.var = "distance") %>% 
+				`row.names<-`(.[,1]) %>% 
+				.[, -1, drop = FALSE]
 			as.matrix(res1[all_samples, all_samples])
 		},
 		percen_proc = function(ses_phylo_beta, ses_comm){
@@ -425,5 +509,3 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 	lock_class = FALSE,
 	lock_objects = FALSE
 )
-
-

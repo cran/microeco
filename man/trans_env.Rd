@@ -4,7 +4,8 @@
 \alias{trans_env}
 \title{Create trans_env object for the analysis of the effects of environmental factors on communities.}
 \description{
-This class is a wrapper for a series of operations associated with environmental measurements, including redundancy analysis, mantel test and correlation analysis based on An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035>.
+This class is a wrapper for a series of operations associated with environmental measurements, including redundancy analysis, 
+mantel test and correlation analysis based on An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035>.
 }
 \examples{
 
@@ -22,6 +23,14 @@ t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S)
 
 \donttest{
 t1$cal_rda(use_dbrda = TRUE, use_measure = "bray")
+}
+
+## ------------------------------------------------
+## Method `trans_env$cal_rda_envsquare`
+## ------------------------------------------------
+
+\donttest{
+t1$cal_rda_envsquare()
 }
 
 ## ------------------------------------------------
@@ -59,11 +68,19 @@ t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_rf$T
 }
 
 ## ------------------------------------------------
-## Method `trans_env$plot_corr`
+## Method `trans_env$plot_cor`
 ## ------------------------------------------------
 
 \donttest{
-t1$plot_corr(pheatmap = FALSE)
+t1$plot_cor(pheatmap = FALSE)
+}
+
+## ------------------------------------------------
+## Method `trans_env$plot_scatterfit`
+## ------------------------------------------------
+
+\donttest{
+t1$plot_scatterfit(x = 1, y = 2, alpha = .5)
 }
 }
 \section{Methods}{
@@ -71,11 +88,13 @@ t1$plot_corr(pheatmap = FALSE)
 \itemize{
 \item \href{#method-new}{\code{trans_env$new()}}
 \item \href{#method-cal_rda}{\code{trans_env$cal_rda()}}
+\item \href{#method-cal_rda_envsquare}{\code{trans_env$cal_rda_envsquare()}}
 \item \href{#method-trans_rda}{\code{trans_env$trans_rda()}}
 \item \href{#method-plot_rda}{\code{trans_env$plot_rda()}}
 \item \href{#method-cal_mantel}{\code{trans_env$cal_mantel()}}
 \item \href{#method-cal_cor}{\code{trans_env$cal_cor()}}
-\item \href{#method-plot_corr}{\code{trans_env$plot_corr()}}
+\item \href{#method-plot_cor}{\code{trans_env$plot_cor()}}
+\item \href{#method-plot_scatterfit}{\code{trans_env$plot_scatterfit()}}
 \item \href{#method-print}{\code{trans_env$print()}}
 \item \href{#method-clone}{\code{trans_env$clone()}}
 }
@@ -89,6 +108,7 @@ t1$plot_corr(pheatmap = FALSE)
   dataset = NULL,
   env_cols = NULL,
   add_data = NULL,
+  character2numeric = TRUE,
   complete_na = FALSE
 )}\if{html}{\out{</div>}}
 }
@@ -98,16 +118,19 @@ t1$plot_corr(pheatmap = FALSE)
 \describe{
 \item{\code{dataset}}{the object of \code{\link{microtable}} Class.}
 
-\item{\code{env_cols}}{default NULL; a vector to select columns in sample_table, when the environmental data is in sample_table. Either numeric vector or character vector of colnames.}
+\item{\code{env_cols}}{default NULL; a vector to select columns in sample_table, when the environmental data is in sample_table. 
+Either numeric vector or character vector of colnames.}
 
-\item{\code{add_data}}{default NULL; provide the environmental data frame individually.}
+\item{\code{add_data}}{default NULL; data.frame format; provide the environmental data frame individually.}
+
+\item{\code{character2numeric}}{default TRUE; whether transform the characters or factors to numeric attributes.}
 
 \item{\code{complete_na}}{default FALSE; Whether fill the NA in the environmental data.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-env_data and dataset in trans_env object.
+env_data in trans_env object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -160,6 +183,36 @@ res_rda, res_rda_R2, res_rda_terms and res_rda_axis in object.
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
 t1$cal_rda(use_dbrda = TRUE, use_measure = "bray")
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-cal_rda_envsquare"></a>}}
+\if{latex}{\out{\hypertarget{method-cal_rda_envsquare}{}}}
+\subsection{Method \code{cal_rda_envsquare()}}{
+Fits each environmental vector onto the RDA ordination to obtain the contribution of each variable.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_rda_envsquare(...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{the parameters passing to vegan::envfit function.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+res_rda_envsquare in object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+t1$cal_rda_envsquare()
 }
 }
 \if{html}{\out{</div>}}
@@ -288,7 +341,7 @@ Mantel test between beta diversity matrix and environmental data.
 
 \item{\code{use_measure}}{default NULL; name of beta diversity matrix. If necessary and not provided, use the first beta diversity matrix.}
 
-\item{\code{method}}{default "pearson"; one of c("pearson", "spearman", "kendall"); correlation method.}
+\item{\code{method}}{default "pearson"; one of "pearson", "spearman" and "kendall"; correlation method.}
 
 \item{\code{...}}{paremeters pass to \code{\link{mantel}}.}
 }
@@ -334,7 +387,8 @@ Indeed, it can also be used for calculating other correlation between any two va
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{use_data}}{default "Genus"; "Genus", "all" or "other"; Genus: genus abundance, all: all taxa, other: provide additional taxa name with other_taxa parameter.}
+\item{\code{use_data}}{default "Genus"; "Genus", "all" or "other"; "Genus" or other taxonomic name: use genus or other taxonomic abundance table in taxa_abund; 
+"all": use all merged taxa abundance table; "other": provide additional taxa name with other_taxa parameter which is necessary.}
 
 \item{\code{select_env_data}}{default NULL; numeric or character vector to select columns in env_data; if not provided, automatically select the columns with numeric attributes.}
 
@@ -377,12 +431,12 @@ t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_rf$T
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_corr"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_corr}{}}}
-\subsection{Method \code{plot_corr()}}{
+\if{html}{\out{<a id="method-plot_cor"></a>}}
+\if{latex}{\out{\hypertarget{method-plot_cor}{}}}
+\subsection{Method \code{plot_cor()}}{
 Plot correlation heatmap.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_env$plot_corr(
+\if{html}{\out{<div class="r">}}\preformatted{trans_env$plot_cor(
   color_vector = c("#00008B", "#102D9B", "#215AAC", "#3288BD", "#66C2A5", "#E6F598",
     "#FFFFBF", "#FED690", "#FDAE61", "#F46D43", "#D53E4F"),
   pheatmap = FALSE,
@@ -391,7 +445,8 @@ Plot correlation heatmap.
   keep_prefix = TRUE,
   plot_x_size = 9,
   mylabels_x = NULL,
-  font_family = NULL
+  font_family = NULL,
+  ...
 )}\if{html}{\out{</div>}}
 }
 
@@ -413,6 +468,8 @@ Plot correlation heatmap.
 \item{\code{mylabels_x}}{default NULL; provide x axis text labels additionally; only available when pheatmap = TRUE.}
 
 \item{\code{font_family}}{default NULL; font family used in ggplot2; only available when pheatmap = FALSE.}
+
+\item{\code{...}}{paremeters pass to ggplot2::geom_tile or pheatmap, depending on the pheatmap = FALSE or TRUE.}
 }
 \if{html}{\out{</div>}}
 }
@@ -422,7 +479,91 @@ plot.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$plot_corr(pheatmap = FALSE)
+t1$plot_cor(pheatmap = FALSE)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-plot_scatterfit"></a>}}
+\if{latex}{\out{\hypertarget{method-plot_scatterfit}{}}}
+\subsection{Method \code{plot_scatterfit()}}{
+Scatter plot and add fitted line. The most important thing is to make sure that the input x and y
+ have correponding sample orders. If one of x and y is a matrix, the other will be also transformed to matrix with Euclidean distance.
+ Then, both of them are transformed to be vectors. If x or y is a vector with a single value, x or y will be
+ assigned according to the column selection of the env_data inside.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_env$plot_scatterfit(
+  x = NULL,
+  y = NULL,
+  use_cor = TRUE,
+  cor_method = "pearson",
+  add_line = TRUE,
+  use_se = TRUE,
+  text_x_pos = NULL,
+  text_y_pos = NULL,
+  x_axis_title = "",
+  y_axis_title = "",
+  pvalue_trim = 4,
+  cor_coef_trim = 3,
+  lm_fir_trim = 2,
+  lm_sec_trim = 2,
+  lm_squ_trim = 2,
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{x}}{default NULL; a single numeric or character value or a vector or a distance matrix used for the x axis.
+If x is a single value, it will be used to select the column of env_data inside.
+If x is a distance matrix, it will be transformed to be a vector.}
+
+\item{\code{y}}{default NULL; a single numeric or character value or a vector or a distance matrix used for the y axis.
+If y is a single value, it will be used to select the column of env_data inside.
+If y is a distance matrix, it will be transformed to be a vector.}
+
+\item{\code{use_cor}}{default TRUE; TRUE for correlation; FALSE for regression.}
+
+\item{\code{cor_method}}{default "pearson"; one of "pearson", "kendall" and "spearman".}
+
+\item{\code{add_line}}{default TRUE; whether add the fitted line in the plot.}
+
+\item{\code{use_se}}{default TRUE; Whether show the confidence interval for the fitting.}
+
+\item{\code{text_x_pos}}{default NULL; the central x axis position of the fitting text.}
+
+\item{\code{text_y_pos}}{default NULL; the central y axis position of the fitting text.}
+
+\item{\code{x_axis_title}}{default ""; the title of x axis.}
+
+\item{\code{y_axis_title}}{default ""; the title of y axis.}
+
+\item{\code{pvalue_trim}}{default 4; trim the decimal places of p value.}
+
+\item{\code{cor_coef_trim}}{default 3; trim the decimal places of correlation coefficient.}
+
+\item{\code{lm_fir_trim}}{default 2; trim the decimal places of regression first coefficient.}
+
+\item{\code{lm_sec_trim}}{default 2; trim the decimal places of regression second coefficient.}
+
+\item{\code{lm_squ_trim}}{default 2; trim the decimal places of regression R square.}
+
+\item{\code{...}}{the parameters passing to ggplot2::geom_point function.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+plot.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+t1$plot_scatterfit(x = 1, y = 2, alpha = .5)
 }
 }
 \if{html}{\out{</div>}}

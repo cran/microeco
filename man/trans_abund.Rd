@@ -87,31 +87,32 @@ t1$plot_pie(facet_nrow = 1)
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{dataset}}{The microtable class.}
+\item{\code{dataset}}{default NULL; microtable object.}
 
 \item{\code{taxrank}}{default "Phylum"; taxonomic rank.}
 
-\item{\code{show}}{default 0; the relative abundance threshold.}
+\item{\code{show}}{default 0; the relative abundance threshold used for filtering.}
 
-\item{\code{ntaxa}}{default 10; how many taxa will be used, ordered by abundance from high to low.}
+\item{\code{ntaxa}}{default 10; how many taxa will be used, ordered by abundance from high to low; 
+this parameter does not conflict with the parameter show; both can be used.}
 
-\item{\code{groupmean}}{default NULL; for calculating mean abundance, select a group column name in sample_table.}
+\item{\code{groupmean}}{default NULL; calculating mean abundance for each group, select a group column name in sample_table.}
 
-\item{\code{delete_full_prefix}}{default TRUE; whether delete the prefix and the character in front of them.}
+\item{\code{delete_full_prefix}}{default TRUE; whether delete both the prefix and the character in front of them.}
 
-\item{\code{delete_part_prefix}}{default TRUE; whether only delete the prefix.}
+\item{\code{delete_part_prefix}}{default FALSE; whether only delete the prefix.}
 
-\item{\code{prefix}}{default NULL; character string; used when delete_full_prefix = T or delete_part_prefix = T; 
-default reprensents using the "letter+__", e.g. "k__" for Phylum level.}
+\item{\code{prefix}}{default NULL; character string; can be used when delete_full_prefix = T or delete_part_prefix = T; 
+default NULL reprensents using the "letter+__", e.g. "k__" for Phylum level.}
 
-\item{\code{use_percentage}}{default TRUE; showing the abundance percentage.}
+\item{\code{use_percentage}}{default TRUE; show the abundance percentage.}
 
-\item{\code{input_taxaname}}{default NULL; if some taxa are selected, input taxa names.}
+\item{\code{input_taxaname}}{default NULL; character vector; if some taxa are selected, input taxa names.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-abund_data and other file for plotting.
+abund_data for plotting.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -129,7 +130,7 @@ t1 <- trans_abund$new(dataset = dataset, taxrank = "Phylum", ntaxa = 10)
 \if{html}{\out{<a id="method-plot_bar"></a>}}
 \if{latex}{\out{\hypertarget{method-plot_bar}{}}}
 \subsection{Method \code{plot_bar()}}{
-Plot the bar plot with the object of trans_abund Class.
+Bar plot in trans_abund object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_bar(
   use_colors = RColorBrewer::brewer.pal(12, "Paired"),
@@ -218,7 +219,7 @@ t1$plot_bar(facet = "Group", xtext_keep = FALSE)
 \if{html}{\out{<a id="method-plot_heatmap"></a>}}
 \if{latex}{\out{\hypertarget{method-plot_heatmap}{}}}
 \subsection{Method \code{plot_heatmap()}}{
-Plot the heatmap with the object of trans_abund Class.
+Plot the heatmap in trans_abund object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_heatmap(
   use_colors = c("#00008B", "#102D9B", "#215AAC", "#3288BD", "#66C2A5", "#E6F598",
@@ -312,7 +313,7 @@ t1$plot_heatmap(facet = "Group", xtext_keep = FALSE, withmargin = FALSE)
 \if{html}{\out{<a id="method-plot_box"></a>}}
 \if{latex}{\out{\hypertarget{method-plot_box}{}}}
 \subsection{Method \code{plot_box()}}{
-Plot the box plot with the object of trans_abund Class.
+Box plot in trans_abund object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_box(
   use_colors = RColorBrewer::brewer.pal(8, "Dark2"),
@@ -392,7 +393,7 @@ t1$plot_box(group = "Group")
 \if{html}{\out{<a id="method-plot_pie"></a>}}
 \if{latex}{\out{\hypertarget{method-plot_pie}{}}}
 \subsection{Method \code{plot_pie()}}{
-Plot pie chart with the object of trans_abund Class.
+Plot pie chart in trans_abund class.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_pie(
   use_colors = RColorBrewer::brewer.pal(8, "Dark2"),

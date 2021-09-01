@@ -52,13 +52,13 @@ trans_diff <- R6Class(classname = "trans_diff",
 			if(is.null(dataset)){
 				stop("No dataset provided!")
 			}
-			if(is.null(dataset$taxa_abund)){
-				stop("Please first calculate taxa_abund! see cal_abund function in microtable class!")
-			}
 			sampleinfo <- dataset$sample_table
 			sampleinfo[, group] %<>% as.character
 #			self$method <- method
 			if(grepl("lefse|rf", method, ignore.case = TRUE)){
+				if(is.null(dataset$taxa_abund)){
+					stop("Please first calculate taxa_abund! see cal_abund function in microtable class!")
+				}
 				if(grepl("lefse", method, ignore.case = TRUE)){
 					abund_table <- do.call(rbind, unname(lapply(dataset$taxa_abund, function(x) x * lefse_norm)))
 					self$lefse_norm <- lefse_norm
@@ -73,7 +73,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				# differential test
 				group_vec <- sampleinfo[, group] %>% as.factor
 				message("Start differential test for ", group, " ...")
-				res_class <- lapply(seq_len(nrow(abund_table)), function(x) private$test_mark(abund_table[x,], group_vec))
+				res_class <- lapply(seq_len(nrow(abund_table)), function(x) private$test_mark(abund_table[x, ], group_vec))
 				pvalue <- unlist(lapply(res_class, function(x) x$p_value))
 				pvalue[is.nan(pvalue)] <- 1
 				# select significant taxa
@@ -82,7 +82,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				if(sum(sel_taxa) == 0){
 					stop("No significant biomarkers found! stop running!")
 				}
-				# save abund_table in self for the cladogram
+				# save abund_table for the cladogram
 				self$abund_table <- abund_table
 				abund_table_sub <- abund_table[sel_taxa, ]
 				pvalue_sub <- pvalue[sel_taxa]
@@ -128,7 +128,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				rownames(imp_sort) <- imp_sort$Taxa
 				imp_sort$pvalue <- pvalue_sub[as.character(imp_sort$Taxa)]
 				self$res_rf <- imp_sort
-				message('The result is stored in object$res_rf !')
+				message('The result is stored in object$res_rf ...')
 			}
 			if(grepl("lefse", method, ignore.case = TRUE)){
 				class_taxa_median_sub <- lapply(res_class, function(x) x$med) %>% do.call(cbind, .) %>% .[, sel_taxa]
@@ -142,10 +142,13 @@ trans_diff <- R6Class(classname = "trans_diff",
 					}
 					remove_list_total <- list()
 					# for each group paires
-					for(i in 1:ncol(all_class_pairs)){
+					for(i in seq_len(ncol(all_class_pairs))){
 						y1 <- all_class_pairs[, i]
-						y1_sub_pairs <- expand.grid(unique(sampleinfo[sampleinfo[, group] == y1[1], lefse_subgroup]), 
-							unique(sampleinfo[sampleinfo[, group] == y1[2], lefse_subgroup]), stringsAsFactors = FALSE) %>% t
+						y1_sub_pairs <- expand.grid(
+							unique(sampleinfo[sampleinfo[, group] == y1[1], lefse_subgroup]), 
+							unique(sampleinfo[sampleinfo[, group] == y1[2], lefse_subgroup]), 
+							stringsAsFactors = FALSE
+							) %>% t
 						y1_sub_pairs <- y1_sub_pairs[, unlist(lapply(1:ncol(y1_sub_pairs), function(x){
 							ifelse(any(c(sum(sampleinfo[, group] == y1[1] & sampleinfo[, lefse_subgroup] == y1_sub_pairs[1, x]) < lefse_min_subsam, 
 								sum(sampleinfo[, group] == y1[2] & sampleinfo[, lefse_subgroup] == y1_sub_pairs[2, x]) < lefse_min_subsam)), FALSE, TRUE)
@@ -155,14 +158,18 @@ trans_diff <- R6Class(classname = "trans_diff",
 						# check each subgroup pairs under fixed group pair condition
 						for(j in 1:ncol(y1_sub_pairs)){
 							y2 <- y1_sub_pairs[, j]
-							abund_table_sub_y2 <- abund_table_sub[, c(rownames(sampleinfo[sampleinfo[, group] == y1[1] & sampleinfo[, lefse_subgroup] == y2[1], ]), 
-								rownames(sampleinfo[sampleinfo[, group] == y1[2] & sampleinfo[, lefse_subgroup] == y2[2], ]))]
+							abund_table_sub_y2 <- abund_table_sub[, c(
+								rownames(sampleinfo[sampleinfo[, group] == y1[1] & sampleinfo[, lefse_subgroup] == y2[1], ]), 
+								rownames(sampleinfo[sampleinfo[, group] == y1[2] & sampleinfo[, lefse_subgroup] == y2[2], ])
+								)]
 							group_vec_sub2 <- c(sampleinfo[sampleinfo[, group] == y1[1] & sampleinfo[, lefse_subgroup] == y2[1], group], 
 								sampleinfo[sampleinfo[, group] == y1[2] & sampleinfo[, lefse_subgroup] == y2[2], group])
 							res_sub <- lapply(seq_len(nrow(abund_table_sub_y2)), function(x) private$test_mark(abund_table_sub_y2[x,], group_vec_sub2))
 							res_sub_total[[j]] <- res_sub
 						}
-						raw_median <- class_taxa_median_sub[y1, ] %>% {.[1, ] > .[2, ]} %>% as.vector
+						raw_median <- class_taxa_median_sub[y1, ] %>% 
+							{.[1, ] > .[2, ]} %>% 
+							as.vector
 						check_median_sub <- sapply(res_sub_total, function(x) unlist(lapply(x, function(y) {y$med[y1, 1] %>% {.[1] > .[2]}}))) %>% as.data.frame
 						check_median_sub[] <- lapply(check_median_sub, function(x) x == raw_median)
 						check_p_sub <- sapply(res_sub_total, function(x) unlist(lapply(x, function(y) y$p_value))) %>% as.data.frame
@@ -255,7 +262,10 @@ trans_diff <- R6Class(classname = "trans_diff",
 				res <- sapply(rownames(abund_table_sub), function(k){
 					unlist(lapply(seq_len(ncol(all_class_pairs)), function(p){
 						unlist(lapply(res_lda, function(x){ x[[p]][k]})) %>% .[!is.na(.)] %>% mean
-					})) %>% .[!is.na(.)] %>% .[!is.nan(.)] %>% max
+					})) %>% 
+					.[!is.na(.)] %>% 
+					.[!is.nan(.)] %>% 
+					max
 				})
 				res <- sapply(res, function(x) {log10(1 + abs(x)) * ifelse(x > 0, 1, -1)})
 				res1 <- cbind.data.frame(Group = apply(class_taxa_median_sub, 2, function(x) rownames(class_taxa_median_sub)[which.max(x)]), 
@@ -264,7 +274,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				res1 <- cbind.data.frame(Taxa = rownames(res1), res1)
 				message("Finished, minimum LDA score: ", range(res1$LDA)[1], " maximum LDA score: ", range(res1$LDA)[2])
 				self$res_lefse <- res1
-				message('The lefse result is stored in object$res_lefse !')
+				message('The lefse result is stored in object$res_lefse ...')
 			}
 			if(grepl("lefse|rf", method, ignore.case = TRUE)){
 				if(grepl("lefse", method, ignore.case = TRUE)){
@@ -277,7 +287,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				res_abund <- microeco:::summarySE_inter(res_abund, measurevar = "Abund", groupvars = c("Taxa", group))
 				colnames(res_abund)[colnames(res_abund) == group] <- "Group"
 				self$res_abund <- res_abund
-				message('The abundance is stored in object$res_abund !')
+				message('The abundance is stored in object$res_abund ...')
 			}
 			if(grepl("metastat|mseq", method, ignore.case = TRUE)){
 				if(is.null(group_choose_paired)){
@@ -297,9 +307,13 @@ trans_diff <- R6Class(classname = "trans_diff",
 				abund1 <- cbind.data.frame(Display = merged_taxonomy, abund) %>% 
 					reshape2::melt(id.var = "Display", value.name= "Abundance", variable.name = "Sample")
 				abund1 <- data.table(abund1)[, sum_abund:=sum(Abundance), by=list(Display, Sample)] %>% 
-					.[, c("Abundance"):=NULL] %>% setkey(Display, Sample) %>% unique() %>% as.data.frame()
+					.[, c("Abundance"):=NULL] %>% 
+					setkey(Display, Sample) %>% 
+					unique() %>% 
+					as.data.frame()
 				new_abund <- as.data.frame(data.table::dcast(data.table(abund1), Display~Sample, value.var= list("sum_abund"))) %>% 
-					`row.names<-`(.[,1]) %>% .[,-1, drop = FALSE]
+					`row.names<-`(.[,1]) %>% 
+					.[,-1, drop = FALSE]
 				new_abund <- new_abund[order(apply(new_abund, 1, mean), decreasing = TRUE), rownames(sampleinfo), drop = FALSE]
 
 				message("Total ", ncol(all_name), " paired group for calculation ...")
@@ -311,16 +325,16 @@ trans_diff <- R6Class(classname = "trans_diff",
 
 					g <- sum(as.character(sampleinfo[, group]) == as.character(all_name[1, i])) + 1
 					# calculate metastat
-					res <- calculate_metastat(inputdata = use_data, g = g)
+					res <- private$calculate_metastat(inputdata = use_data, g = g)
 					add_name <- paste0(as.character(all_name[, i]), collapse = " vs ") %>% rep(., nrow(res))
 					res <- cbind.data.frame(compare = add_name, res)
 					output <- rbind.data.frame(output, res)
 				}
 				output %<>% dropallfactors(unfac2num = TRUE)
 				self$res_metastat <- output
-				message('The metastat result is stored in object$res_metastat !')
+				message('The metastat result is stored in object$res_metastat ...')
 				self$res_metastat_group_matrix <- all_name
-				message('The metastat group information is stored in object$res_metastat_group_matrix !')
+				message('The metastat group information is stored in object$res_metastat_group_matrix ...')
 			}
 			if(grepl("mseq", method, ignore.case = TRUE)){
 				if(!require(metagenomeSeq)){
@@ -332,7 +346,11 @@ trans_diff <- R6Class(classname = "trans_diff",
 					use_dataset <- clone(dataset)
 					use_dataset$sample_table %<>% .[.[, group] %in% as.character(all_name[,i]), ]
 					use_dataset$tidy_dataset()
-					obj <- newMRexperiment(use_dataset$otu_table, phenoData= AnnotatedDataFrame(use_dataset$sample_table), featureData = AnnotatedDataFrame(use_dataset$tax_table))
+					obj <- newMRexperiment(
+						use_dataset$otu_table, 
+						phenoData= AnnotatedDataFrame(use_dataset$sample_table), 
+						featureData = AnnotatedDataFrame(use_dataset$tax_table)
+						)
 					## Normalization and Statistical testing
 					obj_1 <- cumNorm(obj)
 					pd <- pData(obj)
@@ -344,15 +362,15 @@ trans_diff <- R6Class(classname = "trans_diff",
 					tb <- data.frame(logFC = objres1@fitZeroLogNormal$logFC, se = objres1@fitZeroLogNormal$se)
 					p <- objres1@pvalues
 					if (mseq_adjustMethod == "ihw-ubiquity" | mseq_adjustMethod == "ihw-abundance") {
-						padj = MRihw(objres1, p, mseq_adjustMethod, 0.1)
+						padj <- MRihw(objres1, p, mseq_adjustMethod, 0.1)
 					} else {
-						padj = p.adjust(p, method = mseq_adjustMethod)
+						padj <- p.adjust(p, method = mseq_adjustMethod)
 					}
 					srt <- order(p, decreasing = FALSE)
 					valid <- 1:length(padj)
 					if (mseq_count > 0) {
-						np = rowSums(objres1@counts)
-						valid = intersect(valid, which(np >= mseq_count))
+						np <- rowSums(objres1@counts)
+						valid <- intersect(valid, which(np >= mseq_count))
 					}
 					srt <- srt[which(srt %in% valid)]
 					res <- cbind(tb[, 1:2], p)
@@ -367,9 +385,9 @@ trans_diff <- R6Class(classname = "trans_diff",
 				}
 				output %<>% dropallfactors(unfac2num = TRUE)
 				self$res_mseq <- output
-				message('The result is stored in object$res_mseq !')
+				message('The result is stored in object$res_mseq ...')
 				self$res_mseq_group_matrix <- all_name
-				message('The group information is stored in object$res_mseq_group_matrix !')
+				message('The group information is stored in object$res_mseq_group_matrix ...')
 			}
 		},
 		#' @description
@@ -467,7 +485,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 				xlab("") +
 				ylab(p1_xtile) +
 				theme(panel.border = element_blank(), panel.background=element_rect(fill="white")) +
-				theme(panel.grid.minor.y = element_blank(), panel.grid.major.y = element_blank()) + #, panel.grid.minor.x = element_blank())
+				theme(panel.grid.minor.y = element_blank(), panel.grid.major.y = element_blank()) + 
+				#, panel.grid.minor.x = element_blank())
 				theme(axis.title = element_text(size = 17), axis.text.y = element_text(size = axis_text_y, color = "black")) +
 				theme(plot.margin = unit(c(.1, 0, .1, 0), "cm"))
 
@@ -650,6 +669,9 @@ trans_diff <- R6Class(classname = "trans_diff",
 			# filter the taxa with unidentified classification or with space, in case of the unexpected error in the following operations
 			abund_table %<>% {.[!grepl("\\|.__\\|", rownames(.)), ]}
 			abund_table %<>% {.[!grepl("\\s", rownames(.)), ]}
+			# also filter uncleared classification to make it in line with the lefse above
+			abund_table %<>% {.[!grepl("Incertae_sedis", rownames(.)), ]}
+			abund_table %<>% {.[!grepl("unculture", rownames(.)), ]}
 
 			if(!is.null(use_taxa_num)){
 				abund_table %<>% .[names(sort(apply(., 1, mean), decreasing = TRUE)[1:use_taxa_num]), ]
@@ -678,7 +700,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 			nodes <- c("r__Root", nodes)
 			# levels used for extend of clade label
 			label_levels <- purrr::map_chr(nodes, ~ gsub("__.*$", "", .x)) %>%
-				factor(levels = rev(unlist(lapply(taxa_split, function(x) gsub("(.)__.*", "\\1", x))) %>% .[!duplicated(.)]))
+				factor(levels = rev(unlist(lapply(taxa_split, function(x) gsub("(.)__.*", "\\1", x))) %>% 
+				.[!duplicated(.)]))
 
 			nodes_parent <- purrr::map_chr(taxa_split, ~ .x[length(.x) - 1])
 			# root must be a parent node
@@ -694,12 +717,22 @@ trans_diff <- R6Class(classname = "trans_diff",
 			edges <- edges[!is.na(edges[, 1]), ]
 			# not label the tips
 			node_label <- nodes[!is_tip]
-			phylo <- structure(list(edge = edges, node.label = node_label, tip.label = nodes[is_tip], edge.length = rep(1, nrow(edges)), Nnode = length(node_label)),
-				class = "phylo")
-			mapping <- data.frame(node = index, abd = c(100, tree_table$abd), node_label = nodes, stringsAsFactors = FALSE)
+			phylo <- structure(list(
+				edge = edges, 
+				node.label = node_label, 
+				tip.label = nodes[is_tip], 
+				edge.length = rep(1, nrow(edges)), 
+				Nnode = length(node_label)
+				), class = "phylo")
+			mapping <- data.frame(
+				node = index, 
+				abd = c(100, tree_table$abd),
+				node_label = nodes, 
+				stringsAsFactors = FALSE)
 			mapping$node_class <- label_levels
 			tree <- tidytree::treedata(phylo = phylo, data = tibble::as_tibble(mapping))
 			tree <- ggtree::ggtree(tree, size = 0.2, layout = 'circular')
+			
 			# color legend order settings
 			if(is.null(group_order)){
 				color_groups <- marker_table$Group %>% as.character %>% as.factor %>% levels
@@ -731,7 +764,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 			hilights_df$enrich_group %<>% factor(., levels = color_groups)
 
 			# add legend
-			tree <- tree + geom_rect(aes_(xmin = ~x, xmax = ~x, ymax = ~y, ymin = ~y, fill = ~enrich_group), data = hilights_df, inherit.aes = FALSE) +
+			tree <- tree + 
+				geom_rect(aes_(xmin = ~x, xmax = ~x, ymax = ~y, ymin = ~y, fill = ~enrich_group), data = hilights_df, inherit.aes = FALSE) +
 				guides(fill = guide_legend(title = NULL, order = 1, override.aes = list(fill = hilights_df$color)))
 
 			# set nodes color and size
@@ -793,9 +827,18 @@ trans_diff <- R6Class(classname = "trans_diff",
 			if(ind_num > 0){
 				guide_label <- clade_label_new[ind, ] %>%
 					dplyr::mutate(color = annotation_info$color[match(.data$label_raw, annotation_info$label)])
-				p <- p + geom_point(data = guide_label, inherit.aes = FALSE, aes_(x = 0, y = 0, shape = ~label_legend), size = 0, stroke = 0) +
+				p <- p + 
+					geom_point(data = guide_label, 
+						inherit.aes = FALSE, 
+						aes_(x = 0, y = 0, shape = ~label_legend), 
+						size = 0, 
+						stroke = 0) +
 					scale_shape_manual(values = rep(annotation_shape, nrow(guide_label))) +
-					guides(shape = guide_legend(override.aes = list(size = annotation_shape_size, shape = annotation_shape, fill = guide_label$color)))
+					guides(shape = guide_legend(override.aes = list(
+						size = annotation_shape_size, 
+						shape = annotation_shape, 
+						fill = guide_label$color
+						)))
 			}
 			p <- p + theme(legend.position = "right", legend.title = element_blank())
 			p
@@ -817,16 +860,23 @@ trans_diff <- R6Class(classname = "trans_diff",
 			){
 			use_data <- self$res_metastat
 			group_char <- self$res_metastat_group_matrix[, choose_group]
-			use_group <- use_data[,1] %>% unique %>% .[1]
+			# updated, collapsed use_group
+			use_group <- paste0(as.character(group_char), collapse = " vs ")
 			use_data %<>% .[.$qvalue < qvalue & .[,1] == use_group, ]
 			use_data[,2] %<>% gsub(paste0(".*", tolower(substr(self$metastat_taxa_level, 1, 1)), "__(.*)$"), "\\1", .)
 			use_data %<>% .[.[,2] != "", ]
+			
 			if(nrow(use_data) > length(use_number)){
 				use_data %<>% .[use_number, ]
 			}
-			plot_data <- data.frame(taxa = rep(use_data[,2], 2), Mean = c(use_data[,3], use_data[,6]), SE = c(use_data[,5], use_data[,8]), 
-				Group = rep(group_char, times = 1, each = nrow(use_data)))
+			plot_data <- data.frame(
+				taxa = rep(use_data[,2], 2), 
+				Mean = c(use_data[,3], use_data[,6]), 
+				SE = c(use_data[,5], use_data[,8]), 
+				Group = rep(group_char, times = 1, each = nrow(use_data))
+				)
 			plot_data$taxa %<>% factor(., levels = unique(.))
+			
 			p <- ggplot(plot_data, aes(x=taxa, y=Mean, color = Group, fill = Group, group = Group)) +
 				geom_bar(stat="identity", position = position_dodge()) +
 				geom_errorbar(aes(ymin=Mean-SE, ymax=Mean+SE), width=.45, position=position_dodge(.9), color = "black") +
@@ -837,6 +887,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				theme(axis.text.x = element_text(angle = 40, colour = "black", vjust = 1, hjust = 1, size = 9), legend.position = "top") +
 				theme(axis.title = element_text(size = 15)) +
 				xlab(self$metastat_taxa_level)
+			
 			p
 		},
 		#' @description
@@ -851,8 +902,21 @@ trans_diff <- R6Class(classname = "trans_diff",
 		),
 	private = list(
 		# group test in lefse or rf
-		test_mark = function(dataset, group, nonpara = TRUE, para = "anova", min_num_nonpara = 1){
-			d1 <- as.data.frame(t(dataset))
+		test_mark = function(dataframe, group, nonpara = TRUE, para = "anova", min_num_nonpara = 1){
+			d1 <- as.data.frame(t(dataframe))
+			# check normality for parametric test
+			if(nonpara == F){
+				num_vals <- as.numeric(d1[,1])
+				#shapiro test function
+				if(length(unique((num_vals[!is.na(num_vals)]))) > 3 & length(unique((num_vals[!is.na(num_vals)]))) < 5000 ){
+					d1.shapiro <- shapiro.test(num_vals)$p.value
+					if(d1.shapiro > 0.05){
+						nonpara = F
+					}
+				}else{
+					message("It was impossible to verify the normality of the taxa ", colnames(d1)[1], " !")
+				}
+			}
 			if(nonpara == T){
 				if(any(table(as.character(group))) < min_num_nonpara){
 					list(p_value = NA, med = NA)
@@ -867,15 +931,16 @@ trans_diff <- R6Class(classname = "trans_diff",
 					}
 					med <- tapply(d1[,1], group, median) %>% as.data.frame
 					colnames(med) <- colnames(d1)
-					list(p_value = res1$p.value, med = med)		
+					list(p_value = res1$p.value, med = med)
 				}
 			}else{
+				# Currently, anova is not used in the whole class
 				if(para == "anova"){
-					rownames(d1)[1] <- "Abundance"
+					colnames(d1)[1] <- "Abundance"
 					d2 <- cbind.data.frame(d1, Group = group)
 					res1 <- aov(Abundance ~ Group, d2)
 					pvalue <- as.numeric(unlist(summary(res1))[9])
-					pvalue
+					list(p_value = pvalue)
 				}
 			}
 		},
@@ -883,8 +948,10 @@ trans_diff <- R6Class(classname = "trans_diff",
 		generate_cladogram_annotation = function(marker_table, tree, color, color_groups, sep = "|") {
 			use_marker_table <- marker_table
 			feature <- use_marker_table$Taxa
-			label <- strsplit(feature, split = sep, fixed = TRUE) %>% purrr::map_chr(utils::tail, n =1)
-			plot_color <- use_marker_table$Group %>% as.character
+			label <- strsplit(feature, split = sep, fixed = TRUE) %>% 
+				purrr::map_chr(utils::tail, n =1)
+			plot_color <- use_marker_table$Group %>% 
+				as.character
 			for(i in seq_along(color_groups)){
 				plot_color[plot_color == color_groups[i]] <- color[i]
 			}
@@ -908,9 +975,395 @@ trans_diff <- R6Class(classname = "trans_diff",
 			sp.df <- tree_data[match(sp2, tree_data$node),]
 			mean(range(sp.df$angle))
 		},
-		get_offset = function(x) {(x*0.2+0.2)^2}
+		get_offset = function(x) {(x*0.2+0.2)^2},
+		# metastat input
+		calculate_metastat = function(inputdata, g, pflag = FALSE, threshold = NULL, B = NULL){
+			trans_data <- private$load_frequency_matrix(input = inputdata)
+			res <- private$detect_differentially_abundant_features(jobj = trans_data, g = g, pflag = pflag, threshold = threshold, B = B)
+			res
+		},
+		#*****************************************************************************************************
+		#Modified from raw metastat code
+		#load up the frequency matrix from a file
+		#*****************************************************************************************************
+		# Note sep
+		load_frequency_matrix = function(input){
+			# load names 
+			subjects <- array(0,dim=c(ncol(input)));
+			for(i in 1:length(subjects)) {
+				subjects[i] <- as.character(colnames(input)[i]);
+			}
+			# load taxa
+			taxa <- array(0,dim=c(nrow(input)));
+			for(i in 1:length(taxa)) {
+				taxa[i] <- as.character(rownames(input)[i]);
+			}
+			# load remaining counts
+			matrix <- array(0, dim=c(length(taxa),length(subjects)));
+			for(i in 1:length(taxa)){
+				for(j in 1:length(subjects)){ 
+					matrix[i,j] <- as.numeric(input[i,j]);
+				}
+			}
+			jobj <- list(matrix=matrix, taxa=taxa)
+			return(jobj)
+		},
+		#  Modified from metastat raw codes
+		# http://metastats.cbcb.umd.edu/detect_DA_features.r
+		#*****************************************************************************************************
+		#  Author: james robert white, whitej@umd.edu, Center for Bioinformatics and Computational Biology.
+		#  University of Maryland - College Park, MD 20740
+		#
+		#  This software is designed to identify differentially abundant features between two groups
+		#  Input is a matrix of frequency data. Several thresholding options are available.
+		#  See documentation for details.
+		#*****************************************************************************************************
+		#*****************************************************************************************************
+		#  detect_differentially_abundant_features:
+		#  the major function - inputs an R object "jobj" containing a list of feature names and the 
+		#  corresponding frequency matrix, the argument g is the first column of the second group. 
+		#  
+		#  -> set the pflag to be TRUE or FALSE to threshold by p or q values, respectively
+		#  -> threshold is the significance level to reject hypotheses by.
+		#  -> B is the number of bootstrapping permutations to use in estimating the null t-stat distribution.
+		#*****************************************************************************************************
+		#*****************************************************************************************************
+		detect_differentially_abundant_features = function(jobj, g, pflag = NULL, threshold = NULL, B = NULL){
+			#**********************************************************************************
+			# ************************ INITIALIZE COMMAND-LINE ********************************
+			# ************************        PARAMETERS       ********************************
+			#**********************************************************************************
+			qflag = FALSE;
+			if (is.null(B)){
+				B = 1000;
+			}
+			if (is.null(threshold)){
+				threshold = 0.05;
+			}
+			if (is.null(pflag)){
+				pflag = TRUE;
+				qflag = FALSE;
+			}
+			if (pflag == TRUE){
+				qflag = FALSE;
+			}
+			if (pflag == FALSE){
+				qflag = TRUE;
+			}
+			#********************************************************************************
+			# ************************ INITIALIZE PARAMETERS ********************************
+			#********************************************************************************
+			Fmatrix <- jobj$matrix;                   # the feature abundance matrix
+			taxa <- jobj$taxa;                        # the taxa/(feature) labels of the TAM
+			nrows = nrow(Fmatrix);                   
+			ncols = ncol(Fmatrix);
+			Pmatrix <- array(0, dim=c(nrows,ncols));  # the relative proportion matrix
+			C1 <- array(0, dim=c(nrows,3));           # statistic profiles for class1 and class 2
+			C2 <- array(0, dim=c(nrows,3));           # mean[1], variance[2], standard error[3]   
+			T_statistics <- array(0, dim=c(nrows,1)); # a place to store the true t-statistics 
+			pvalues <- array(0, dim=c(nrows,1));      # place to store pvalues
+			qvalues <- array(0, dim=c(nrows,1));      # stores qvalues
+			#*************************************
+			#  convert to proportions
+			#  generate Pmatrix
+			#*************************************
+			totals <- array(0, dim=c(ncol(Fmatrix)));
+			for (i in 1:ncol(Fmatrix)) {
+				# sum the ith column 
+				totals[i] = sum(Fmatrix[,i]);
+			}
+			for (i in 1:ncols) {   # for each subject
+				for (j in 1:nrows) { # for each row
+					Pmatrix[j,i] = Fmatrix[j,i]/totals[i];
+				}
+			}
+			#********************************************************************************
+			# ************************** STATISTICAL TESTING ********************************
+			#********************************************************************************
+			if (ncols == 2){  # then we have a two sample comparison
+				#************************************************************
+				#  generate p values using chisquared or fisher's exact test
+				#************************************************************
+				for (i in 1:nrows){           # for each feature
+					f11 = sum(Fmatrix[i,1]);
+					f12 = sum(Fmatrix[i,2]);
+					f21 = totals[1] - f11;
+					f22 = totals[2] - f12;
+					C1[i,1] = f11/totals[1];                       # proportion estimate
+					C1[i,2] = (C1[i,1]*(1-C1[i,1]))/(totals[1]-1); # sample variance
+					C1[i,3] = sqrt(C1[i,2]);                       # sample standard error
+					C2[i,1] = f12/totals[2];
+					C2[i,2] = (C2[i,1]*(1-C2[i,1]))/(totals[2]-1);
+					C2[i,3] = sqrt(C2[i,2]);
+					
+					#  f11  f12
+					#  f21  f22  <- contigency table format
+					contingencytable <- array(0, dim=c(2,2));
+					contingencytable[1,1] = f11;
+					contingencytable[1,2] = f12;
+					contingencytable[2,1] = f21;
+					contingencytable[2,2] = f22;
+					if (f11 > 20 && f22 > 20){
+						csqt <- stats::chisq.test(contingencytable);
+						pvalues[i] = csqt$p.value;
+					}else{
+						ft <- stats::fisher.test(contingencytable, workspace = 8e6, alternative = "two.sided", conf.int = FALSE);
+						pvalues[i] = ft$p.value;
+					}
+				}
+				#*************************************
+				#  calculate q values from p values
+				#*************************************
+				qvalues <- private$calc_qvalues(pvalues);
+			}else{ # we have multiple subjects per population
+				#*************************************
+				#  generate statistics mean, var, stderr    
+				#*************************************
+				for (i in 1:nrows){ # for each taxa
+					# find the mean of each group
+					C1[i,1] = mean(Pmatrix[i, 1:g-1]);  
+					C1[i,2] = stats::var(Pmatrix[i, 1:g-1]); # variance
+					C1[i,3] = C1[i,2]/(g-1);    # std err^2 (will change to std err at end)
+
+					C2[i,1] = mean(Pmatrix[i, g:ncols]);  
+					C2[i,2] = stats::var(Pmatrix[i, g:ncols]);  # variance
+					C2[i,3] = C2[i,2]/(ncols-g+1); # std err^2 (will change to std err at end)
+				}
+				#*************************************
+				#  two sample t-statistics
+				#*************************************
+				for (i in 1:nrows){                   # for each taxa
+					xbar_diff = C1[i,1] - C2[i,1]; 
+					denom = sqrt(C1[i,3] + C2[i,3]);
+					T_statistics[i] = xbar_diff/denom;  # calculate two sample t-statistic
+				}
+				#*************************************
+				# generate initial permuted p-values
+				#*************************************
+				pvalues <- private$permuted_pvalues(Pmatrix, T_statistics, B, g, Fmatrix);
+				#*************************************
+				#  generate p values for sparse data 
+				#  using fisher's exact test
+				#*************************************
+				for (i in 1:nrows){                   # for each taxa
+					if (sum(Fmatrix[i,1:(g-1)]) < (g-1) && sum(Fmatrix[i,g:ncols]) < (ncols-g+1)){
+						# then this is a candidate for fisher's exact test
+						f11 = sum(Fmatrix[i,1:(g-1)]);
+						f12 = sum(Fmatrix[i,g:ncols]);
+						f21 = sum(totals[1:(g-1)]) - f11;
+						f22 = sum(totals[g:ncols]) - f12;
+						#  f11  f12
+						#  f21  f22  <- contigency table format
+						contingencytable <- array(0, dim=c(2,2));
+						contingencytable[1,1] = f11;
+						contingencytable[1,2] = f12;
+						contingencytable[2,1] = f21;
+						contingencytable[2,2] = f22;
+						ft <- fisher.test(contingencytable, workspace = 8e6, alternative = "two.sided", conf.int = FALSE);
+						pvalues[i] = ft$p.value; 
+					}  
+				}
+
+				#*************************************
+				#  calculate q values from p values
+				#*************************************
+				qvalues <- private$calc_qvalues(pvalues);
+				#*************************************
+				#  convert stderr^2 to std error
+				#*************************************
+				for (i in 1:nrows){
+					C1[i,3] = sqrt(C1[i,3]);
+					C2[i,3] = sqrt(C2[i,3]);
+				}
+			}
+			#*************************************
+			#  threshold sigvalues and print
+			#*************************************
+			sigvalues <- array(0, dim=c(nrows,1));
+			if (pflag == TRUE){  # which are you thresholding by?
+				sigvalues <- pvalues;
+			}else{
+				sigvalues <- qvalues;
+			}
+			s = sum(sigvalues <= threshold);
+			Differential_matrix <- array(0, dim=c(s,9));
+			dex = 1;
+			for (i in 1:nrows){
+				if (sigvalues[i] <= threshold){
+					Differential_matrix[dex,1]   = jobj$taxa[i];
+					Differential_matrix[dex,2:4] = C1[i,];
+					Differential_matrix[dex,5:7] = C2[i,];
+					Differential_matrix[dex,8]   = pvalues[i];  
+					Differential_matrix[dex,9]   = qvalues[i];
+					dex = dex+1;  
+				}
+			}
+			# show(Differential_matrix);
+			Total_matrix <- array(0, dim=c(nrows,9));
+			for (i in 1:nrows){
+				Total_matrix[i,1]   = jobj$taxa[i];
+				Total_matrix[i,2:4] = C1[i,];
+				Total_matrix[i,5:7] = C2[i,];
+				Total_matrix[i,8]   = pvalues[i];
+				Total_matrix[i,9]   = qvalues[i];
+			}
+			colnames(Total_matrix) <- c("taxa", "mean(group1)", "variance(group1)", "std.err(group1)", "mean(group2)", "variance(group2)", "std.err(group2)", "pvalue", "qvalue")
+			Total_matrix <- Total_matrix[order(Total_matrix[, "pvalue"], decreasing = FALSE), ]
+			Total_matrix
+		},
+		#*****************************************************************************************************
+		# takes a matrix, a permutation vector, and a group division g.
+		# returns a set of ts based on the permutation.
+		#*****************************************************************************************************
+		permute_and_calc_ts = function(Imatrix, y, g){
+			nr = nrow(Imatrix);
+			nc = ncol(Imatrix);
+			# first permute the rows in the matrix
+			Pmatrix <- Imatrix[,y[1:length(y)]];
+			Ts <- private$calc_twosample_ts(Pmatrix, g, nr, nc);
+			return (Ts)
+		},
+		#*****************************************************************************************************
+		#  function to calculate qvalues.
+		#  takes an unordered set of pvalues corresponding the rows of the matrix
+		#*****************************************************************************************************
+		calc_qvalues = function(pvalues){
+			nrows = length(pvalues);
+			# create lambda vector
+			lambdas <- seq(0,0.95,0.01);
+			pi0_hat <- array(0, dim=c(length(lambdas)));
+			# calculate pi0_hat
+			for (l in 1:length(lambdas)){ # for each lambda value
+				count = 0;
+				for (i in 1:nrows){ # for each p-value in order
+					if (pvalues[i] > lambdas[l]){
+						count = count + 1; 	
+					}
+					pi0_hat[l] = count/(nrows*(1-lambdas[l]));
+				}
+			}
+			f <- unclass(stats::smooth.spline(lambdas,pi0_hat,df=3));
+			f_spline <- f$y;
+			pi0 = f_spline[length(lambdas)];   # this is the essential pi0_hat value
+			# order p-values
+			ordered_ps <- order(pvalues);
+			pvalues <- pvalues;
+			qvalues <- array(0, dim=c(nrows));
+			ordered_qs <- array(0, dim=c(nrows));
+			ordered_qs[nrows] <- min(pvalues[ordered_ps[nrows]]*pi0, 1);
+			for(i in (nrows-1):1) {
+				p = pvalues[ordered_ps[i]];
+				new = p*nrows*pi0/i;
+
+				ordered_qs[i] <- min(new,ordered_qs[i+1],1);
+			}
+			# re-distribute calculated qvalues to appropriate rows
+			for (i in 1:nrows){
+				qvalues[ordered_ps[i]] = ordered_qs[i];
+			}
+			################################
+			# plotting pi_hat vs. lambda
+			################################
+			# plot(lambdas,pi0_hat,xlab=expression(lambda),ylab=expression(hat(pi)[0](lambda)),type="p");
+			# lines(f);
+			return (qvalues);
+		},
+		##################################################################################
+		# metastat code from White et al. (2009) <doi:10.1371/journal.pcbi.1000352>.
+		#************************************************************************
+		# ************************** SUBROUTINES ********************************
+		#*****************************************************************************************************
+		#  calc two sample two statistics
+		#  g is the first column in the matrix representing the second condition
+		#*****************************************************************************************************
+		calc_twosample_ts = function(Pmatrix, g, nrows, ncols)
+		{
+			C1 <- array(0, dim=c(nrows,3));  # statistic profiles
+			C2 <- array(0, dim=c(nrows,3)); 
+			Ts <- array(0, dim=c(nrows,1));
+			if (nrows == 1){
+				C1[1,1] = mean(Pmatrix[1:g-1]);
+				C1[1,2] = stats::var(Pmatrix[1:g-1]); # variance
+				C1[1,3] = C1[1,2]/(g-1);    # std err^2
+
+				C2[1,1] = mean(Pmatrix[g:ncols]);
+				C2[1,2] = stats::var(Pmatrix[g:ncols]);  # variance
+				C2[1,3] = C2[1,2]/(ncols-g+1); # std err^2
+			}else{
+				# generate statistic profiles for both groups
+				# mean, var, stderr
+				for (i in 1:nrows){ # for each taxa
+					# find the mean of each group
+					C1[i,1] = mean(Pmatrix[i, 1:g-1]);  
+					C1[i,2] = stats::var(Pmatrix[i, 1:g-1]); # variance
+					C1[i,3] = C1[i,2]/(g-1);    # std err^2
+
+					C2[i,1] = mean(Pmatrix[i, g:ncols]);  
+					C2[i,2] = stats::var(Pmatrix[i, g:ncols]);  # variance
+					C2[i,3] = C2[i,2]/(ncols-g+1); # std err^2
+				}
+			}
+			# permutation based t-statistics
+			for (i in 1:nrows){ # for each taxa
+				xbar_diff = C1[i,1] - C2[i,1]; 
+				denom = sqrt(C1[i,3] + C2[i,3]);
+				Ts[i] = xbar_diff/denom;  # calculate two sample t-statistic 
+			}
+			return (Ts)
+		},
+		#*****************************************************************************************************
+		#  function to calculate permuted pvalues from Storey and Tibshirani(2003)
+		#  B is the number of permutation cycles
+		#  g is the first column in the matrix of the second condition 
+		#*****************************************************************************************************
+		permuted_pvalues = function(Imatrix, tstats, B, g, Fmatrix)
+		{
+			# B is the number of permutations were going to use!
+			# g is the first column of the second sample
+			# matrix stores tstats for each taxa(row) for each permuted trial(column)
+			M = nrow(Imatrix);
+			ps <- array(0, dim=c(M)); # to store the pvalues
+			if (is.null(M) || M == 0){
+				return (ps);
+			}
+			permuted_ttests <- array(0, dim=c(M, B));
+			ncols = ncol(Fmatrix);
+			# calculate null version of tstats using B permutations.
+			for (j in 1:B){
+				trial_ts <- private$permute_and_calc_ts(Imatrix, sample(1:ncol(Imatrix)), g);
+				permuted_ttests[,j] <- abs(trial_ts); 
+			}
+			# calculate each pvalue using the null ts
+			if ((g-1) < 8 || (ncols-g+1) < 8){
+				# then pool the t's together!
+				# count how many high freq taxa there are
+				hfc = 0;
+				for (i in 1:M){                   # for each taxa
+					if (sum(Fmatrix[i,1:(g-1)]) >= (g-1) || sum(Fmatrix[i,g:ncols]) >= (ncols-g+1)){
+						hfc = hfc + 1;
+					}
+				}
+				# the array pooling just the frequently observed ts  
+				cleanedpermuted_ttests <- array(0, dim=c(hfc,B));
+				hfc = 1;
+				for (i in 1:M){
+					if (sum(Fmatrix[i,1:(g-1)]) >= (g-1) || sum(Fmatrix[i,g:ncols]) >= (ncols-g+1)){
+						cleanedpermuted_ttests[hfc,] = permuted_ttests[i,];
+						hfc = hfc + 1;
+					}
+				}
+				#now for each taxa
+				for (i in 1:M){  
+					ps[i] = (1/(B*hfc))*sum(cleanedpermuted_ttests > abs(tstats[i]));
+				}
+			}else{
+				for (i in 1:M){
+					ps[i] = (1/(B+1))*(sum(permuted_ttests[i,] > abs(tstats[i]))+1);
+				}
+			}
+			return(ps)
+		}
 	),
 	lock_class = FALSE,
 	lock_objects = FALSE
 )
-

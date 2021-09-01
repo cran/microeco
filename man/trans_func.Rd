@@ -4,8 +4,9 @@
 \alias{trans_func}
 \title{Create trans_func object for functional analysis.}
 \description{
-This class is a wrapper for a series of functional analysis on species and communities, including the prokaryotes function identification based on Louca et al. (2016) 
-<doi:10.1126/science.aaf4507> or fungi function identification based on Nguyen et al. (2016) <10.1016/j.funeco.2015.06.006>, 
+This class is a wrapper for a series of functional analysis on species and communities, including the prokaryotes function identification based on 
+Louca et al. (2016) <doi:10.1126/science.aaf4507> and Lim et al. (2020) <10.1038/s41597-020-0516-5>, 
+or fungi function identification based on Nguyen et al. (2016) <10.1016/j.funeco.2015.06.006> and Polme et al. (2020) <doi:10.1007/s13225-020-00466-2>; 
 functional redundancy calculation and metabolic pathway abundance prediction Abhauer et al. (2015) <10.1093/bioinformatics/btv287>.
 }
 \examples{
@@ -92,6 +93,7 @@ t1$cal_tax4fun2_FRI()
 \if{html}{\out{<a id="method-new"></a>}}
 \if{latex}{\out{\hypertarget{method-new}{}}}
 \subsection{Method \code{new()}}{
+Create the trans_func object. This function can identify the data type for Prokaryotes or Fungi automatically.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_func$new(dataset = NULL)}\if{html}{\out{</div>}}
 }
@@ -104,7 +106,7 @@ t1$cal_tax4fun2_FRI()
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-for_what : "prok" or "fungi" or NA, "prok" represent prokaryotes. "fungi" represent fungi. NA represent not identified according to the Kingdom information, 
+for_what : "prok" or "fungi" or NA, "prok" represent prokaryotes. "fungi" represent fungi. NA stand for not identified according to the Kingdom information, 
 at this time, if you want to use the functions to identify species traits, you need provide "prok" or "fungi" manually, e.g. dataset$for_what <- "prok".
 }
 \subsection{Examples}{
@@ -122,21 +124,27 @@ t1 <- trans_func$new(dataset = dataset)
 \if{latex}{\out{\hypertarget{method-cal_spe_func}{}}}
 \subsection{Method \code{cal_spe_func()}}{
 Confirm traits of each OTU by matching the taxonomic assignments to the functional database;
-Prokaryotes: based on the FAPROTAX database, please also cite the original FAPROTAX paper: 
-Louca, S., Parfrey, L. W., & Doebeli, M. (2016). Decoupling function and taxonomy in the global ocean microbiome. Science, 353(6305), 1272. <doi:10.1126/science.aaf4507>;
+Prokaryotes, based on the FAPROTAX database or NJC19 database, please also cite: 
+FAPROTAX: Louca et al. (2016). Decoupling function and taxonomy in the global ocean microbiome. Science, 353(6305), 1272. <doi:10.1126/science.aaf4507>; 
+NJC19: Lim et al. (2020). Large-scale metabolic interaction network of the mouse and human gut microbiota. Scientific Data, 7(1). <10.1038/s41597-020-0516-5>.
 Fungi, based on the FUNGuild database or FungalTraits database, please also cite:
 FUNGuild: Nguyen et al. (2016). 
-FUNGuild: An open annotation tool for parsing fungal community datasets by ecological guild. Fungal Ecology, 20(1), 241-248, <doi:10.1016/j.funeco.2015.06.006>
+FUNGuild: An open annotation tool for parsing fungal community datasets by ecological guild. Fungal Ecology, 20(1), 241-248, <doi:10.1016/j.funeco.2015.06.006>; 
 FungalTraits: Polme et al. FungalTraits: a user-friendly traits database of fungi and fungus-like stramenopiles. 
 Fungal Diversity 105, 1-16 (2020). <doi:10.1007/s13225-020-00466-2>
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_spe_func(fungi_database = c("FUNGuild", "FungalTraits")[1])}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_spe_func(
+  prok_database = c("FAPROTAX", "NJC19")[1],
+  fungi_database = c("FUNGuild", "FungalTraits")[1]
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{fungi_database}}{default "FUNGuild"; select a fungi trait database for the trait identification, "FUNGuild" or "FungalTraits"; see the description in this function.}
+\item{\code{prok_database}}{default "FAPROTAX"; "FAPROTAX" or "NJC19", selecting a prokaryotic trait database; see the description in this function.}
+
+\item{\code{fungi_database}}{default "FUNGuild"; "FUNGuild" or "FungalTraits", a fungi trait database for the identification; see the description in this function.}
 }
 \if{html}{\out{</div>}}
 }
@@ -173,7 +181,8 @@ The percentages of the OTUs with specific trait can reflect the potential of the
 \describe{
 \item{\code{use_community}}{default TRUE; whether calculate community; if FALSE, use module.}
 
-\item{\code{abundance_weighted}}{default FALSE; whether use abundance. If FALSE, calculate the functional population percentage. If TRUE, calculate the functional individual percentage.}
+\item{\code{abundance_weighted}}{default FALSE; whether use abundance. If FALSE, calculate the functional population percentage. If TRUE, 
+calculate the functional individual percentage.}
 
 \item{\code{node_type_table}}{default NULL; If use_community FALSE; provide the node_type_table with the module information, such as the result of cal_node_type.}
 }
@@ -197,7 +206,7 @@ t1$cal_spe_func_perc(use_community = TRUE)
 \if{html}{\out{<a id="method-show_prok_func"></a>}}
 \if{latex}{\out{\hypertarget{method-show_prok_func}{}}}
 \subsection{Method \code{show_prok_func()}}{
-Show the basic information for a specific function of prokaryotes.
+Show the annotation information for a function of prokaryotes from FAPROTAX database.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_func$show_prok_func(use_func = NULL)}\if{html}{\out{</div>}}
 }
@@ -294,7 +303,8 @@ tax4fun_KO and tax4fun_path in object.
 \subsection{Method \code{cal_tax4fun2()}}{
 Predict functional potential of communities with Tax4Fun2 method.
 please also cite: 
-Tax4Fun2: prediction of habitat-specific functional profiles and functional redundancy based on 16S rRNA gene sequences. Environmental Microbiome 15, 11 (2020). <doi:10.1186/s40793-020-00358-7>
+Tax4Fun2: prediction of habitat-specific functional profiles and functional redundancy based on 16S rRNA gene sequences. Environmental Microbiome 15, 11 (2020).
+	 <doi:10.1186/s40793-020-00358-7>
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_tax4fun2(
   blast_tool_path = NULL,
@@ -318,9 +328,11 @@ if blast_tool_path is NULL, search the tools in the environmental path variable.
 
 \item{\code{path_to_reference_data}}{default "Tax4Fun2_ReferenceData_v2"; the path that points to files used in the prediction; 
 The directory must contain the Ref99NR/Ref100NR folder; 
-download Ref99NR.zip from "https://cloudstor.aarnet.edu.au/plus/s/DkoZIyZpMNbrzSw/download"  or Ref100NR.zip from "https://cloudstor.aarnet.edu.au/plus/s/jIByczak9ZAFUB4/download" .}
+download Ref99NR.zip from "https://cloudstor.aarnet.edu.au/plus/s/DkoZIyZpMNbrzSw/download"  or 
+Ref100NR.zip from "https://cloudstor.aarnet.edu.au/plus/s/jIByczak9ZAFUB4/download" .}
 
-\item{\code{path_to_temp_folder}}{default NULL; The temporary folder to store the logfile, intermediate file and result files; if NULL, use the default temporary in the computer.}
+\item{\code{path_to_temp_folder}}{default NULL; The temporary folder to store the logfile, intermediate file and result files; if NULL, 
+use the default temporary in the computer.}
 
 \item{\code{database_mode}}{default 'Ref99NR'; "Ref99NR" or "Ref100NR" .}
 
@@ -360,7 +372,8 @@ t1$cal_tax4fun2(blast_tool_path = "ncbi-blast-2.11.0+/bin",
 Calculate (multi-) functional redundancy index (FRI) of prokaryotic community with Tax4Fun2 method.
 This function is used to calculating aFRI and rFRI use the intermediate files generated by the function cal_tax4fun2().
 please also cite: 
-Tax4Fun2: prediction of habitat-specific functional profiles and functional redundancy based on 16S rRNA gene sequences. Environmental Microbiome 15, 11 (2020). <doi:10.1186/s40793-020-00358-7>
+Tax4Fun2: prediction of habitat-specific functional profiles and functional redundancy based on 16S rRNA gene sequences. 
+	 Environmental Microbiome 15, 11 (2020). <doi:10.1186/s40793-020-00358-7>
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_func$cal_tax4fun2_FRI()}\if{html}{\out{</div>}}
 }

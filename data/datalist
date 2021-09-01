@@ -7,7 +7,8 @@ ko_map
 otu_table_16S
 otu_table_ITS
 phylo_tree_16S
-prok_func
+prok_func_FAPROTAX
+prok_func_NJC19_list
 rep_fasta_16S
 sample_info_16S
 sample_info_ITS
