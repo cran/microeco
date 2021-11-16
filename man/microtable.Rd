@@ -49,6 +49,14 @@ dataset$rarefy_samples(sample.size = min(dataset$sample_sums()), replace = TRUE)
 dataset$tidy_dataset(main_data = TRUE)
 
 ## ------------------------------------------------
+## Method `microtable$add_rownames2taxonomy`
+## ------------------------------------------------
+
+\donttest{
+dataset$add_rownames2taxonomy()
+}
+
+## ------------------------------------------------
 ## Method `microtable$cal_abund`
 ## ------------------------------------------------
 
@@ -97,6 +105,14 @@ dataset$taxa_names()
 }
 
 ## ------------------------------------------------
+## Method `microtable$rename_taxa`
+## ------------------------------------------------
+
+\donttest{
+dataset$rename_taxa()
+}
+
+## ------------------------------------------------
 ## Method `microtable$merge_samples`
 ## ------------------------------------------------
 
@@ -138,12 +154,14 @@ class(dataset$beta_diversity)
 \item \href{#method-filter_pollution}{\code{microtable$filter_pollution()}}
 \item \href{#method-rarefy_samples}{\code{microtable$rarefy_samples()}}
 \item \href{#method-tidy_dataset}{\code{microtable$tidy_dataset()}}
+\item \href{#method-add_rownames2taxonomy}{\code{microtable$add_rownames2taxonomy()}}
 \item \href{#method-cal_abund}{\code{microtable$cal_abund()}}
 \item \href{#method-save_abund}{\code{microtable$save_abund()}}
 \item \href{#method-sample_sums}{\code{microtable$sample_sums()}}
 \item \href{#method-taxa_sums}{\code{microtable$taxa_sums()}}
 \item \href{#method-sample_names}{\code{microtable$sample_names()}}
 \item \href{#method-taxa_names}{\code{microtable$taxa_names()}}
+\item \href{#method-rename_taxa}{\code{microtable$rename_taxa()}}
 \item \href{#method-merge_samples}{\code{microtable$merge_samples()}}
 \item \href{#method-merge_taxa}{\code{microtable$merge_taxa()}}
 \item \href{#method-cal_alphadiv}{\code{microtable$cal_alphadiv()}}
@@ -256,8 +274,7 @@ None
 \if{html}{\out{<a id="method-rarefy_samples"></a>}}
 \if{latex}{\out{\hypertarget{method-rarefy_samples}{}}}
 \subsection{Method \code{rarefy_samples()}}{
-Rarefy communities to make all samples have same species number, modified from the rarefy_even_depth() in phyloseq package, 
-see Paul et al. (2013) <doi:10.1371/journal.pone.0061217>.
+Rarefy communities to make all samples have same species number. See also \code{\link{rrarefy}} for the alternative method.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{microtable$rarefy_samples(sample.size = NULL, rngseed = 123, replace = TRUE)}\if{html}{\out{</div>}}
 }
@@ -269,7 +286,7 @@ see Paul et al. (2013) <doi:10.1371/journal.pone.0061217>.
 
 \item{\code{rngseed}}{random seed; default: 123.}
 
-\item{\code{replace}}{default: TRUE; see \code{\link{sample}} for the random sampling.}
+\item{\code{replace}}{default: TRUE; See \code{\link{sample}} for the random sampling.}
 }
 \if{html}{\out{</div>}}
 }
@@ -311,6 +328,37 @@ None, Object of microtable itself cleaned up.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{dataset$tidy_dataset(main_data = TRUE)
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-add_rownames2taxonomy"></a>}}
+\if{latex}{\out{\hypertarget{method-add_rownames2taxonomy}{}}}
+\subsection{Method \code{add_rownames2taxonomy()}}{
+Add the rownames of tax_table as the last column of tax_table. 
+This is especially useful when the rownames of tax_table are required as a taxonomic level for the following taxa_abund calculation and biomarker idenfification.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{microtable$add_rownames2taxonomy(use_name = "OTU")}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{use_name}}{default "OTU"; The column name used in the tax_table.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+new tax_table stored in object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+dataset$add_rownames2taxonomy()
+}
 }
 \if{html}{\out{</div>}}
 
@@ -464,7 +512,7 @@ dataset$sample_names()
 \if{html}{\out{<a id="method-taxa_names"></a>}}
 \if{latex}{\out{\hypertarget{method-taxa_names}{}}}
 \subsection{Method \code{taxa_names()}}{
-Show taxa names.
+Show taxa names of tax_table.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{microtable$taxa_names()}\if{html}{\out{</div>}}
 }
@@ -476,6 +524,36 @@ taxa names.
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
 dataset$taxa_names()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-rename_taxa"></a>}}
+\if{latex}{\out{\hypertarget{method-rename_taxa}{}}}
+\subsection{Method \code{rename_taxa()}}{
+Rename the taxa, including the rownames of otu_table, rownames of tax_table, tip labels of phylogenetic tree and representative sequences.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{microtable$rename_taxa(newname_prefix = "ASV_")}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{newname_prefix}}{default "ASV_"; the prefix of new names; new names will be newname_prefix + numbers according to the rowname order of otu_table.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+renamed dataset.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+dataset$rename_taxa()
 }
 }
 \if{html}{\out{</div>}}
@@ -601,7 +679,7 @@ Save alpha diversity table to the computer.
 Calculate beta diversity in microtable object, including Bray-Curtis, Jaccard, and UniFrac.
 See An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035> and Lozupone et al. (2005) <doi:10.1128/AEM.71.12.8228–8235.2005>.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{microtable$cal_betadiv(method = NULL, unifrac = FALSE, ...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{microtable$cal_betadiv(method = NULL, unifrac = FALSE, binary = FALSE, ...)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -611,6 +689,8 @@ See An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035> and Lozupone et al. (2
 see \code{\link{vegdist}} function and method parameter in vegan package.}
 
 \item{\code{unifrac}}{default FALSE; TRUE or FALSE, whether unifrac index should be calculated.}
+
+\item{\code{binary}}{default FALSE; TRUE is used for jaccard and unweighted unifrac; optional for other indexes.}
 
 \item{\code{...}}{parameters passed to \code{\link{vegdist}} function.}
 }

@@ -287,6 +287,10 @@ trans_network <- R6Class(classname = "trans_network",
 		#' @description
 		#' Add network modules to the network.
 		#'
+		#' @param method default "cluster_fast_greedy"; the method used to find the optimal community structure of a graph;
+		#' 	 the following are available functions (options) from igraph package: "cluster_fast_greedy", "cluster_optimal",
+		#' 	 "cluster_edge_betweenness", "cluster_infomap", "cluster_label_prop", "cluster_leading_eigen",
+		#' 	 "cluster_louvain", "cluster_spinglass", "cluster_walktrap".
 		#' @param module_name_prefix default "M"; the prefix of module names; module names are made of the module_name_prefix and numbers;
 		#'   numbers are assigned according to the sorting result of node numbers in modules with decreasing trend.
 		#' @return a network with modules, stored in object.
@@ -294,10 +298,16 @@ trans_network <- R6Class(classname = "trans_network",
 		#' \donttest{
 		#' t1$cal_module()
 		#' }
-		cal_module = function(module_name_prefix = "M"){
+		cal_module = function(method = "cluster_fast_greedy", module_name_prefix = "M"){
 			# add modules
 			network <- self$res_network
-			mod1 <- as.character(cluster_fast_greedy(network)$membership)
+			if(!is.character(method)){
+				stop("The parameter method must be character!")
+			}
+			# use NSE
+			res_member <- parse(text = paste0(method, "(network)")) %>% eval
+			
+			mod1 <- as.character(res_member$membership)
 			mod2 <- sort(table(mod1), decreasing = TRUE)
 			for(i in seq_along(mod2)){
 				mod1[mod1 == names(mod2)[i]] <- paste0(module_name_prefix, i)
@@ -490,6 +500,68 @@ trans_network <- R6Class(classname = "trans_network",
 			sub_network
 		},
 		#' @description
+		#' Get the table of edges, including connected nodes, labels and weight.
+		#'
+		#' @return data.frame
+		#' @examples
+		#' \donttest{
+		#' t1$get_edge_table()
+		#' }
+		get_edge_table = function(){
+			network <- self$res_network
+			edges <- t(sapply(1:ecount(network), function(x) ends(network, x)))
+			edge_label <- E(network)$label
+			if(!is.null(E(network)$weight)){
+				edge_weight <- E(network)$weight
+			}else{
+				edge_weight <- rep(NA, times = length(edge_label))
+			}
+			res_edge_table <- data.frame(edges, edge_label, edge_weight)
+			colnames(res_edge_table) <- c("node1", "node2", "label", "weight")
+			res_edge_table
+		},
+		#' @description
+		#' Perform a bootstrapping hypothesis test to determine whether degrees follows a power law distribution;
+		#' a significant p represents the distribution does not follow power law.
+		#'
+		#' @param ... paremeters pass to bootstrap_p in poweRlaw package.
+		#' @return two lists stored in object; see estimate_xmin and bootstrap_p in poweRlaw package for the details.
+		#' @examples
+		#' \donttest{
+		#' t1$cal_powerlaw_p()
+		#' }
+		cal_powerlaw_p = function(...){
+			network <- self$res_network
+			degree_dis <- degree(network)
+			if(!require(poweRlaw)){
+				stop("Please first install poweRlaw package from CRAN !")
+			}
+			resdispl <- poweRlaw::displ$new(degree_dis + 1)
+			est_xmin <- poweRlaw::estimate_xmin(resdispl)
+			resdispl$setXmin(est_xmin)
+			res <- poweRlaw::bootstrap_p(resdispl, ...)
+			self$res_powerlaw_min <- est_xmin
+			message('Estimated lower bound result is stored in object$res_powerlaw_min ...')
+			self$res_powerlaw_p <- res
+			message('Bootstrap p value is stored in object$res_powerlaw_p ...')			
+		},
+		#' @description
+		#' Fit degrees to a power law distribution.
+		#'
+		#' @param xmin default NULL; See xmin in fit_power_law function; suggest using the result res_powerlaw_min from cal_powerlaw_p function.
+		#' @param ... paremeters pass to fit_power_law function in igraph package.
+		#' @return list stored in object; see fit_power_law function for the details explanation.
+		#' @examples
+		#' \donttest{
+		#' t1$cal_powerlaw_fit()
+		#' }
+		cal_powerlaw_fit = function(xmin = NULL, ...){
+			network <- self$res_network
+			degree_dis <- degree(network, mode="in")
+			self$res_powerlaw_fit <- fit_power_law(degree_dis + 1, xmin = xmin, ...)
+			message('Powerlaw fitting result is stored in object$res_powerlaw_fit ...')
+		},
+		#' @description
 		#' Print the trans_network object.
 		print = function() {
 			cat("trans_network class:\n")
@@ -537,16 +609,16 @@ trans_network <- R6Class(classname = "trans_network",
 			res <- list(cor = res_cor, p = res_p)
 			res
 		},
-		rmt = function(cormat,lcor=0.4, hcor=0.8){
+		# RMT optimization
+		rmt = function(cormat, lcor = 0.4, hcor = 0.8){
 			s <- seq(0, 3, 0.1)
 			pois <- exp(-s)
-			geo <- 0.5 * pi * s * exp(-0.25 * pi * s^2)
 			ps <- NULL  
 			for(i in seq(lcor, hcor, 0.01)){
 				cormat1 <- abs(cormat)
 				cormat1[cormat1 < i] <- 0  
-				eigen <- sort(eigen(cormat1)$value)
-				ssp <- smooth.spline(eigen, control.spar = list(low = 0, high = 3)) 
+				eigen_res <- sort(eigen(cormat1)$value)
+				ssp <- smooth.spline(eigen_res, control.spar = list(low = 0, high = 3)) 
 				nnsd1 <- density(private$nnsd(ssp$y))
 				nnsdpois <- density(private$nnsd(pois))
 				chival1 <- sum((nnsd1$y - nnsdpois$y)^2/nnsdpois$y/512)
@@ -605,6 +677,10 @@ trans_network <- R6Class(classname = "trans_network",
 			td <- degree(comm_graph) %>% data.frame(taxa = names(.), total_links = ., stringsAsFactors = FALSE)
 			wmd <- private$within_module_degree(comm_graph)
 			z <- private$zscore(wmd)
+			# NaN may generate in Zi for modules with very few nodes
+			if(any(is.nan(z$z))){
+				message('The nodes (', sum(is.nan(z$z)),') with NaN in z will be filtered ...')
+			}
 			amd <- private$among_module_connectivity(comm_graph)
 			pc <- private$participation_coeffiecient(amd, td)
 			zp <- data.frame(z, pc)
@@ -734,7 +810,7 @@ trans_network <- R6Class(classname = "trans_network",
 			}
 			p <- p + theme(strip.background = element_rect(fill = "white")) + 
 				xlab("Among-module connectivity") + 
-				ylab(" Within-module connectivity")
+				ylab("Within-module connectivity")
 			p
 		},
 		# plot z and p according to the taxonomic levels

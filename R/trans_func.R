@@ -177,6 +177,7 @@ trans_func <- R6Class(classname = "trans_func",
 					res_table[is.na(res_table)] <- ""
 					# store the raw table similar with the FUNGuild results from python version
 					self$res_spe_func_raw_funguild <- res_table
+					message('Mapped raw FUNGuild result is stored in object$res_spe_func_raw_funguild ...')
 					# generate a data frame store the binary data
 					otu_func_table <- res_table[, c("taxon"), drop = FALSE]
 					# generate trophicMode binary information
@@ -194,7 +195,7 @@ trans_func <- R6Class(classname = "trans_func",
 						stop("No Genus column found in tax_table of dataset!")
 					}
 					data("fungi_func_FungalTraits", envir=environment())
-					message("Please also cite the original FungalTraits paper: <doi:10.1007/s13225-020-00466-2>. ")
+					message("Please also cite: ")
 					message("FungalTraits: a user-friendly traits database of fungi and fungus-like stramenopiles. Fungal Diversity 105, 1-16 (2020).\n")
 					# remove the redundant data
 					fungi_func_FungalTraits %<>% .[- c(3109, 3288, 4741, 7092), ]
@@ -228,7 +229,8 @@ trans_func <- R6Class(classname = "trans_func",
 					}
 					
 					# store the raw table for personalized use
-					self$res_spe_func_raw_FungalTraits <- res_table					
+					self$res_spe_func_raw_FungalTraits <- res_table
+					message('Mapped raw FungalTraits result is stored in object$res_spe_func_raw_FungalTraits ...')
 					# then parse the result for calculation
 					filter_data <- res_table
 					colnames(filter_data) %<>% gsub("_template", "", .)
@@ -264,7 +266,7 @@ trans_func <- R6Class(classname = "trans_func",
 				self$fungi_database <- fungi_database
 			}
 			self$res_spe_func <- otu_func_table
-			message('The functional table is stored in object$res_spe_func ...')
+			message('The functional binary table is stored in object$res_spe_func ...')
 		},
 		#' @description
 		#' Calculating the percentages of species with specific trait in communities or modules.
@@ -312,6 +314,9 @@ trans_func <- R6Class(classname = "trans_func",
 				if(is.null(node_type_table)){
 					stop("No node_type_table provided! see parameter: node_type_table !")
 				}else{
+					# if(!colnames(node_type_table) %in% c("module")){
+						# stop("No column name is 'module'! Please check the input node_type_table")
+					# }
 					if(abundance_weighted){
 						otu_total_abund <- apply(otu_table, 1, sum)
 					}
@@ -419,10 +424,10 @@ trans_func <- R6Class(classname = "trans_func",
 					plot_data$variable %<>% gsub(".*\\|", "", .)
 				}
 			}
-			g1 <- ggplot(aes(x=sampname, y=variable, fill=value), data=plot_data) + 
+			g1 <- ggplot(aes(x = sampname, y = variable, fill = value), data = plot_data) + 
 				theme_bw() + 
 				geom_tile() + 
-				scale_fill_gradient2(low="#00008B", high="#9E0142") +
+				scale_fill_gradient2(low = "#00008B", high = "#9E0142") +
 				scale_y_discrete(position = "right") + 
 				labs(y=NULL, x=NULL, fill="Percentage (%)") +
 				theme(axis.text.x = element_text(angle = 35, colour = "black", vjust = 1, hjust = 1, size = 14), axis.text.y = element_text(size = 10)) +
@@ -438,7 +443,8 @@ trans_func <- R6Class(classname = "trans_func",
 		},
 		#' @description
 		#' Predict functional potential of communities using tax4fun.
-		#' please also cite: Tax4Fun: Predicting functional profiles from metagenomic 16S rRNA data. Bioinformatics, 31(17), 2882-2884, <doi:10.1093/bioinformatics/btv287>
+		#' please also cite: Tax4Fun: Predicting functional profiles from metagenomic 16S rRNA data. Bioinformatics, 31(17), 2882-2884, <doi:10.1093/bioinformatics/btv287>.
+		#' Note that this function requires a standard prefix in taxonomic table with double underlines (e.g. g__) .
 		#'
 		#' @param keep_tem default FALSE; whether keep the intermediate file, that is, the otu table in local place.
 		#' @param folderReferenceData default NULL; the folder, see http://tax4fun.gobics.de/ and Tax4Fun function in Tax4Fun package.
@@ -625,7 +631,7 @@ trans_func <- R6Class(classname = "trans_func",
 			if(min_identity_to_reference < 90){
 				warning("Minimum identity of less than 90% will likly results in inaccurate predictions!")
 			}
-			message(paste0("Using minimum idenity cutoff of ", min_identity_to_reference, "% to nearest neighbor"))
+			message(paste0("Using minimum identity cutoff of ", min_identity_to_reference, "% to nearest neighbor"))
 			ref_blast_result <- read.delim(res_blast_path, h = F)
 			ref_blast_result_reduced <- ref_blast_result[which(ref_blast_result$V3 >= min_identity_to_reference), 1:2]
 

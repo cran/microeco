@@ -43,16 +43,7 @@ microtable <- R6Class(classname = "microtable",
 			if(!all(sapply(otu_table, is.numeric))){
 				stop("Some columns in otu_table are not numeric vector! Please check the otu_table!")
 			}else{
-				if(any(apply(otu_table, 1, sum) == 0)){
-					remove_num <- sum(apply(otu_table, 1, sum) == 0)
-					message(remove_num, " taxa are removed from the otu_table, as the abundance is 0 ...")
-					otu_table <- otu_table[apply(otu_table, 1, sum) > 0, , drop = FALSE]
-				}
-				if(any(apply(otu_table, 2, sum) == 0)){
-					remove_num <- sum(apply(otu_table, 2, sum) == 0)
-					message(remove_num, " samples are removed from the otu_table, as the abundance is 0 ...")
-					otu_table <- otu_table[, apply(otu_table, 2, sum) > 0, drop = FALSE]
-				}
+				otu_table <- private$check_abund_table(otu_table)
 				self$otu_table <- otu_table
 			}
 			if(is.null(sample_table)){
@@ -112,12 +103,11 @@ microtable <- R6Class(classname = "microtable",
 			self$tax_table <- tax_table_use
 		},
 		#' @description
-		#' Rarefy communities to make all samples have same species number, modified from the rarefy_even_depth() in phyloseq package, 
-		#' see Paul et al. (2013) <doi:10.1371/journal.pone.0061217>.
+		#' Rarefy communities to make all samples have same species number. See also \code{\link{rrarefy}} for the alternative method.
 		#'
 		#' @param sample.size default:NULL; species number, If not provided, use minimum number of all samples.
 		#' @param rngseed random seed; default: 123.
-		#' @param replace default: TRUE; see \code{\link{sample}} for the random sampling.
+		#' @param replace default: TRUE; See \code{\link{sample}} for the random sampling.
 		#' @return None; rarefied dataset.
 		#' @examples
 		#' \donttest{
@@ -141,7 +131,7 @@ microtable <- R6Class(classname = "microtable",
 			}
 			if (min(self$sample_sums()) < sample.size) {
 				rmsamples <- self$sample_names()[self$sample_sums() < sample.size]
-				message(length(rmsamples), " samples removed", "because they contained fewer reads than `sample.size`.")
+				message(length(rmsamples), " samples removed, ", "because they contained fewer reads than `sample.size`.")
 				self$sample_table <- base::subset(self$sample_table, ! self$sample_names() %in% rmsamples)
 				self$tidy_dataset()
 			}
@@ -167,6 +157,9 @@ microtable <- R6Class(classname = "microtable",
 		#' @examples
 		#' dataset$tidy_dataset(main_data = TRUE)
 		tidy_dataset = function(main_data = TRUE){
+			# check whether there is 0 abundance in otu_table
+			self$otu_table <- private$check_abund_table(self$otu_table)
+			
 			sample_names <- intersect(rownames(self$sample_table), colnames(self$otu_table))
 			if(length(sample_names) == 0){
 				stop("No same sample name found between rownames of sample_table and colnames of otu_table! Please check whether the rownames of sample_table are sample names!")
@@ -202,6 +195,29 @@ microtable <- R6Class(classname = "microtable",
 					self$beta_diversity %<>% lapply(., function(x) x[sample_names, sample_names, drop = FALSE])
 				}
 			}
+		},
+		#' @description
+		#' Add the rownames of tax_table as the last column of tax_table. 
+		#' This is especially useful when the rownames of tax_table are required as a taxonomic level for the following taxa_abund calculation and biomarker idenfification.
+		#'
+		#' @param use_name default "OTU"; The column name used in the tax_table.
+		#' @return new tax_table stored in object.
+		#' @examples
+		#' \donttest{
+		#' dataset$add_rownames2taxonomy()
+		#' }
+		add_rownames2taxonomy = function(use_name = "OTU"){
+			if(is.null(self$tax_table)){
+				stop("The tax_table in the microtable object is NULL ! However it is necessary!")
+			}else{
+				tax_table_use <- self$tax_table
+			}
+			tax_table_use <- data.frame(tax_table_use, rownames(tax_table_use), check.names = FALSE, stringsAsFactors = FALSE)
+			if(use_name %in% colnames(tax_table_use)){
+				stop("The input use_name: ", use_name, " has been used in the raw tax_table! Please check it!")
+			}
+			colnames(tax_table_use)[ncol(tax_table_use)] <- use_name
+			self$tax_table <- tax_table_use
 		},
 		#' @description
 		#' Calculate the taxonomic abundance at each taxonomic rank.
@@ -328,7 +344,7 @@ microtable <- R6Class(classname = "microtable",
 			rownames(self$sample_table)
 		},
 		#' @description
-		#' Show taxa names.
+		#' Show taxa names of tax_table.
 		#'
 		#' @return taxa names.
 		#' @examples
@@ -337,6 +353,31 @@ microtable <- R6Class(classname = "microtable",
 		#' }
 		taxa_names = function(){
 			rownames(self$tax_table)
+		},
+		#' @description
+		#' Rename the taxa, including the rownames of otu_table, rownames of tax_table, tip labels of phylogenetic tree and representative sequences.
+		#'
+		#' @param newname_prefix default "ASV_"; the prefix of new names; new names will be newname_prefix + numbers according to the rowname order of otu_table.
+		#' @return renamed dataset.
+		#' @examples
+		#' \donttest{
+		#' dataset$rename_taxa()
+		#' }
+		rename_taxa = function(newname_prefix = "ASV_"){
+			self$tidy_dataset()
+			# extract old names for futher matching
+			old_names <- rownames(self$otu_table)
+			new_names <- paste0(newname_prefix, seq_len(nrow(self$otu_table)))
+			rownames(self$otu_table) <- new_names
+			if(!is.null(self$tax_table)){
+				rownames(self$tax_table) <- new_names
+			}
+			if(!is.null(self$phylo_tree)){
+				self$phylo_tree$tip.label[match(old_names, self$phylo_tree$tip.label)] <- new_names
+			}
+			if(!is.null(self$rep_fasta)){
+				names(self$rep_fasta)[match(old_names, names(self$rep_fasta))] <- new_names
+			}
 		},
 		#' @description
 		#' Merge samples according to specific group to generate a new microtable.
@@ -502,6 +543,7 @@ microtable <- R6Class(classname = "microtable",
 		#' @param method default NULL; a character vector with one or more elements; If default, "bray" and "jaccard" will be used; 
 		#'   see \code{\link{vegdist}} function and method parameter in vegan package. 
 		#' @param unifrac default FALSE; TRUE or FALSE, whether unifrac index should be calculated.
+		#' @param binary default FALSE; TRUE is used for jaccard and unweighted unifrac; optional for other indexes.
 		#' @param ... parameters passed to \code{\link{vegdist}} function.
 		#' @return beta_diversity stored in object.
 		#' @examples
@@ -509,7 +551,7 @@ microtable <- R6Class(classname = "microtable",
 		#' dataset$cal_betadiv(unifrac = FALSE)
 		#' class(dataset$beta_diversity)
 		#' }
-		cal_betadiv = function(method = NULL, unifrac = FALSE, ...){
+		cal_betadiv = function(method = NULL, unifrac = FALSE, binary = FALSE, ...){
 			res <- list()
 			eco_table <- t(self$otu_table)
 			sample_table <- self$sample_table
@@ -517,7 +559,12 @@ microtable <- R6Class(classname = "microtable",
 				method <- c("bray", "jaccard")
 			}
 			for(i in method){
-				res[[i]] <- as.matrix(vegan::vegdist(eco_table, method = i, ...))
+				if(i == "jaccard"){
+					binary_use <- TRUE
+				}else{
+					binary_use <- binary
+				}
+				res[[i]] <- as.matrix(vegan::vegdist(eco_table, method = i, binary = binary_use, ...))
 			}
 			
 			if(unifrac == T){
@@ -551,6 +598,28 @@ microtable <- R6Class(classname = "microtable",
 		}
 		),
 	private = list(
+		# check whether there is OTU or sample with 0 abundance
+		# input and return are both otu_table
+		check_abund_table = function(otu_table){
+			if(any(apply(otu_table, 1, sum) == 0)){
+				remove_num <- sum(apply(otu_table, 1, sum) == 0)
+				message(remove_num, " taxa are removed from the otu_table, as the abundance is 0 ...")
+				otu_table %<>% .[apply(., 1, sum) > 0, , drop = FALSE]
+			}
+			if(any(apply(otu_table, 2, sum) == 0)){
+				remove_num <- sum(apply(otu_table, 2, sum) == 0)
+				message(remove_num, " samples are removed from the otu_table, as the abundance is 0 ...")
+				otu_table %<>% .[, apply(., 2, sum) > 0, drop = FALSE]
+			}
+			if(ncol(otu_table) == 0){
+				stop("No sample have abundance! Please check you data!")
+			}
+			if(nrow(otu_table) == 0){
+				stop("No taxon have abundance! Please check you data!")
+			}
+			otu_table
+		},
+		# taxa abundance calculation function
 		transform_data_proportion = function(
 			input, 
 			columns, 
@@ -596,26 +665,25 @@ microtable <- R6Class(classname = "microtable",
 			abund2
 		},
 		rarefaction_subsample = function(x, sample.size, replace=FALSE){
+			# Adapted from the rarefy_even_depth() in phyloseq package, see Paul et al. (2013) <doi:10.1371/journal.pone.0061217>.
+			# All rights reserved.
 			# Create replacement species vector
 			rarvec <- numeric(length(x))
 			# Perform the sub-sampling. Suppress warnings due to old R compat issue.
-			# Also, make sure to avoid errors from x summing to zero, 
-			# and there are no observations to sample.
-			# The initialization of rarvec above is already sufficient.
 			if(sum(x) <= 0){
 				# Protect against, and quickly return an empty vector, 
 				# if x is already an empty count vector
 				return(rarvec)
 			}
 			if(replace){
-				suppressWarnings(subsample <- sample(1:length(x), sample.size, replace=TRUE, prob=x))
+				suppressWarnings(subsample <- sample(1:length(x), sample.size, replace = TRUE, prob=x))
 			} else {
 				# resample without replacement
 				obsvec <- apply(data.frame(OTUi=1:length(x), times=x), 1, function(x){
 					rep_len(x["OTUi"], x["times"])
 				})
 				obsvec <- unlist(obsvec, use.names=FALSE)
-				suppressWarnings(subsample <- sample(obsvec, sample.size, replace=FALSE))
+				suppressWarnings(subsample <- sample(obsvec, sample.size, replace = FALSE))
 			}
 			sstab <- table(subsample)
 			# Assign the tabulated random subsample values to the species vector

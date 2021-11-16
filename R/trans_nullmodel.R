@@ -326,12 +326,13 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		#'
 		#' @param runs default 1000; simulation runs.
 		#' @param verbose default TRUE; whether show the calculation process message.
+		#' @param null.model default "independentswap"; see more available options in randomizeMatrix function of picante package.
 		#' @return res_rcbray in object.
 		#' @examples
 		#' \donttest{
 		#' t1$cal_rcbray(runs=200)
 		#' }
-		cal_rcbray = function(runs=1000, verbose = TRUE) {
+		cal_rcbray = function(runs=1000, verbose = TRUE, null.model = "independentswap") {
 			comm <- self$comm
 			betaobs_vec <- as.vector(vegdist(comm, method="bray"))
 			all_samples <- rownames(comm)
@@ -339,7 +340,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				if(verbose){
 					private$show_run(x = x, runs = runs)
 				}
-				vegdist(picante::randomizeMatrix(comm, "independentswap"), "bray")
+				vegdist(picante::randomizeMatrix(comm, null.model = null.model), "bray")
 			}, simplify = "array") %>% as.data.frame
 			beta_rand[, (runs + 1)] <- betaobs_vec
 			beta_obs_z <- apply(X = beta_rand, MARGIN = 1, FUN = function(x){sum(x > x[length(x)])/length(x)})
@@ -374,6 +375,30 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			}
 			self$res_process <- private$percen_proc(ses_phylo_beta = ses_phylo_beta, ses_comm = ses_comm)
 			message('The result is stored in object$res_process ...')
+		},
+		#' @description
+		#' Calculates the (normalised) mean number of checkerboard combinations (C-score) using C.score function in bipartite package.
+		#'
+		#' @param by_group default NULL; one column name or number in sample_table; calculate C-score for different groups separately.
+		#' @param ... paremeters pass to C.score function in bipartite package.
+		#' @return results directly.
+		#' @examples
+		#' \donttest{
+		#' t1$cal_Cscore()
+		#' }
+		cal_Cscore = function(by_group = NULL, ...){
+			comm <- self$comm
+			
+			if(is.null(by_group)){
+				bipartite::C.score(comm, ...)
+			}else{
+				sample_table <- self$sample_table
+				lapply(unique(sample_table[, by_group]), function(x){
+					use_comm <- comm[sample_table[, by_group] %in% x, ]
+					use_comm %<>% .[, apply(., 2, sum) >0, drop = FALSE]
+					bipartite::C.score(use_comm, ...)
+				})
+			}
 		}
 	),
 	private = list(
