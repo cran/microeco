@@ -6,7 +6,7 @@
 #' including the microtable object creation, data reduction, data rarefaction based on Paul et al. (2013) <doi:10.1371/journal.pone.0061217>, taxa abundance calculation, 
 #' alpha and beta diversity calculation based on the An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035> and 
 #' Lozupone et al. (2005) <doi:10.1128/AEM.71.12.8228–8235.2005> and other basic operations.
-#'
+#' 
 #' @export
 microtable <- R6Class(classname = "microtable",
 	public = list(
@@ -15,7 +15,8 @@ microtable <- R6Class(classname = "microtable",
 		#' 	If not provided, the function can generate a table automatically according to the sample names in otu_table.
 		#' @param tax_table data.frame; default NULL; The taxonomic information table, rows are species, cols are taxonomic classes.
 		#' @param phylo_tree phylo; default NULL; The phylogenetic tree; use read.tree function in ape package for input.
-		#' @param rep_fasta list; default NULL; The representative sequences; use read.fasta function in seqinr package for input.
+		#' @param rep_fasta list or DNAStringSet; default NULL; The representative sequences; 
+		#'   use read.fasta function in seqinr package or readDNAStringSet function in Biostrings package for input.
 		#' @return an object of class "microtable" with the following components:
 		#' \describe{
 		#'   \item{\code{sample_table}}{The sample information table.}
@@ -151,12 +152,12 @@ microtable <- R6Class(classname = "microtable",
 		#' Tidy the object of microtable Class.
 		#' Trim files in the object to make taxa and samples consistent across all files in the object. So the results are intersections.
 		#'
-		#' @param main_data TRUE or FALSE, if TRUE, only basic files in microtable object is trimmed, otherwise, all files, 
+		#' @param main_data default FALSE; if TRUE, only basic files in microtable object is trimmed. Otherwise, all files, 
 		#' 	  including taxa_abund, alpha_diversity and beta_diversity, are all trimed.
 		#' @return None, Object of microtable itself cleaned up. 
 		#' @examples
 		#' dataset$tidy_dataset(main_data = TRUE)
-		tidy_dataset = function(main_data = TRUE){
+		tidy_dataset = function(main_data = FALSE){
 			# check whether there is 0 abundance in otu_table
 			self$otu_table <- private$check_abund_table(self$otu_table)
 			

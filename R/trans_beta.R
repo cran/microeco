@@ -4,6 +4,7 @@
 #' This class is a wrapper for a series of beta-diversity related analysis, 
 #' including several ordination calculations and plotting based on An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035>, group distance comparision, 
 #' clustering, perMANOVA based on Anderson al. (2008) <doi:10.1111/j.1442-9993.2001.01070.pp.x> and PERMDISP.
+#' Please also cite the original paper: An et al. (2019). Soil bacterial community structure in Chinese wetlands. Geoderma, 337, 290-299.
 #'
 #' @export
 trans_beta <- R6Class(classname = "trans_beta",
@@ -31,7 +32,6 @@ trans_beta <- R6Class(classname = "trans_beta",
 					self$use_matrix <- dataset$beta_diversity[[measure]]
 				}
 			}
-			message("Please also cite the original paper: An et al. (2019). Soil bacterial community structure in Chinese wetlands. Geoderma, 337, 290-299.")
 			self$sample_table <- dataset$sample_table
 			self$measure <- measure
 			self$group <- group
@@ -305,8 +305,10 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @param plot_group_order default NULL; a vector used to order the groups in the plot.
 		#' @param color_values colors for presentation.
 		#' @param distance_pair_stat default FALSE; whether do the paired comparisions.
-		#' @param pair_compare_filter_match default NULL; if provided, remove the matched groups; use the regular express to match the paired groups.
-		#' @param pair_compare_filter_select default NULL; numeric vector; if provided, only select those input groups.
+		#' @param hide_ns default FALSE; whether hide the "ns" pairs, i.e. non significant comparisions.
+		#' @param hide_ns_more default NULL; character vector; available when hide_ns = TRUE; if provided, used for the specific significance filtering, such as c("ns", "*").
+		#' @param pair_compare_filter_match default NULL; only available when hide_ns = FALSE; if provided, remove the matched groups; use the regular express to match the paired groups.
+		#' @param pair_compare_filter_select default NULL; numeric vector;only available when hide_ns = FALSE; if provided, only select those input groups.
 		#'   This parameter must be a numeric vector used to select the paired combination of groups. For example, pair_compare_filter_select = c(1, 3) 
 		#'   can be used to select "CW"-"IW" and "IW"-"TW" from all the three pairs "CW"-"IW", "CW"-"TW" and "IW"-"TW" of ordered groups ("CW", "IW", "TW").
 		#'   The parameter pair_compare_filter_select and pair_compare_filter_match can not be both used together.
@@ -316,11 +318,16 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @examples
 		#' \donttest{
 		#' t1$plot_group_distance(distance_pair_stat = TRUE)
+		#' t1$plot_group_distance(distance_pair_stat = TRUE, hide_ns = TRUE)
+		#' t1$plot_group_distance(distance_pair_stat = TRUE, hide_ns = TRUE, hide_ns_more = c("ns", "*"))
+		#' t1$plot_group_distance(distance_pair_stat = TRUE, pair_compare_filter_select = 3)
 		#' }
 		plot_group_distance = function(
 			plot_group_order = NULL,
 			color_values = RColorBrewer::brewer.pal(8, "Dark2"),
 			distance_pair_stat = FALSE,
+			hide_ns = FALSE,
+			hide_ns_more = NULL,
 			pair_compare_filter_match = NULL,
 			pair_compare_filter_select = NULL,
 			pair_compare_method = "wilcox.test",
@@ -359,26 +366,37 @@ trans_beta <- R6Class(classname = "trans_beta",
 				p <- p + theme(axis.text.x = element_text(angle = plot_distance_xtype, colour = "black", vjust = 1, hjust = 1, size = 10))
 			}
 			if(distance_pair_stat == T){
-				# remove some groups
+				# first generate pairs
 				comparisons_list <- levels(group_distance[, group]) %>% 
 					combn(., 2)
-				if(!is.null(pair_compare_filter_match) & !is.null(pair_compare_filter_select)){
-					stop("The parameter pair_compare_filter_select and pair_compare_filter_match can not be both used together!")
-				}
-				if(!is.null(pair_compare_filter_match)){
-					comparisons_list %<>% {.[, unlist(lapply(as.data.frame(.), function(x) any(grepl(pair_compare_filter_match, x)))), drop = FALSE]}
-				}
-				if(!is.null(pair_compare_filter_select)){
-					if(!is.numeric(pair_compare_filter_select)){
-						stop("The parameter pair_compare_filter_select must be numeric !")
+				# filter based on the significance
+				if(hide_ns){
+					pre_filter <- ggpubr::compare_means(reformulate(group, "value"), group_distance)
+					if(is.null(hide_ns_more)){
+						filter_mark <- "ns"
+					}else{
+						filter_mark <- hide_ns_more
 					}
-					messages_use <- unlist(lapply(as.data.frame(comparisons_list[, pair_compare_filter_select, drop = FALSE]), 
-						function(x){paste0(x, collapse = "-")}))
-					
-					message("Selected groups are ", paste0(messages_use, collapse = " "), " ...")
-					comparisons_list %<>% .[, pair_compare_filter_select, drop = FALSE]
+					comparisons_list %<>% .[, !(pre_filter$p.signif %in% filter_mark), drop = FALSE]
+				}else{
+					# remove specific groups
+					if(!is.null(pair_compare_filter_match) & !is.null(pair_compare_filter_select)){
+						stop("The parameter pair_compare_filter_select and pair_compare_filter_match can not be both used together!")
+					}
+					if(!is.null(pair_compare_filter_match)){
+						comparisons_list %<>% {.[, unlist(lapply(as.data.frame(.), function(x) any(grepl(pair_compare_filter_match, x)))), drop = FALSE]}
+					}
+					if(!is.null(pair_compare_filter_select)){
+						if(!is.numeric(pair_compare_filter_select)){
+							stop("The parameter pair_compare_filter_select must be numeric !")
+						}
+						messages_use <- unlist(lapply(as.data.frame(comparisons_list[, pair_compare_filter_select, drop = FALSE]), 
+							function(x){paste0(x, collapse = "-")}))
+						
+						message("Selected groups are ", paste0(messages_use, collapse = " "), " ...")
+						comparisons_list %<>% .[, pair_compare_filter_select, drop = FALSE]
+					}
 				}
-				
 				# generate the list
 				comparisons_list %<>% {lapply(seq_len(ncol(.)), function(x) .[, x])}
 				
