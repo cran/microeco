@@ -32,7 +32,7 @@ t1$plot_venn()
 ## ------------------------------------------------
 
 \donttest{
-t2 <- t1$trans_venn_com(use_OTUs_frequency = TRUE)
+t2 <- t1$trans_venn_com(use_frequency = TRUE)
 }
 }
 \section{Methods}{
@@ -50,7 +50,12 @@ t2 <- t1$trans_venn_com(use_OTUs_frequency = TRUE)
 \if{latex}{\out{\hypertarget{method-new}{}}}
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_venn$new(dataset = NULL, sample_names = NULL, ratio = "numratio")}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_venn$new(
+  dataset = NULL,
+  sample_names = NULL,
+  ratio = NULL,
+  add_abund_table = NULL
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -60,8 +65,11 @@ t2 <- t1$trans_venn_com(use_OTUs_frequency = TRUE)
 
 \item{\code{sample_names}}{default NULL; if provided, filter the samples.}
 
-\item{\code{ratio}}{default numratio; NULL, "numratio" or "seqratio"; numratio: calculate number percentage; seqratio: calculate sequence percentage; 
+\item{\code{ratio}}{default NULL; NULL, "numratio" or "seqratio"; numratio: calculate number percentage; seqratio: calculate sequence percentage; 
 NULL: no additional percentage.}
+
+\item{\code{add_abund_table}}{default NULL; data.frame or matrix format; additional data provided instead of dataset$otu_table;
+Features must be rows.}
 }
 \if{html}{\out{</div>}}
 }
@@ -170,13 +178,13 @@ t1$plot_venn()
 \subsection{Method \code{trans_venn_com()}}{
 Transform venn result for the composition analysis.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_venn$trans_venn_com(use_OTUs_frequency = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_venn$trans_venn_com(use_frequency = TRUE)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{use_OTUs_frequency}}{default TRUE; whether only use OTUs occurrence frequency, i.e. presence/absence data; if FALSE, use abundance data.}
+\item{\code{use_frequency}}{default TRUE; whether only use OTUs occurrence frequency, i.e. presence/absence data; if FALSE, use abundance data.}
 }
 \if{html}{\out{</div>}}
 }
@@ -186,7 +194,7 @@ a new \code{\link{microtable}} class.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t2 <- t1$trans_venn_com(use_OTUs_frequency = TRUE)
+t2 <- t1$trans_venn_com(use_frequency = TRUE)
 }
 }
 \if{html}{\out{</div>}}

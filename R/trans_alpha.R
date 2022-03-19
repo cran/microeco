@@ -18,82 +18,128 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' }
 		initialize = function(dataset = NULL, group = NULL, order_x = NULL) {
 			self$group <- group
-			
-			if(is.null(dataset$alpha_diversity)){
-				stop("The alpha diversity has not been calculated! Please first calculate it using cal_alphadiv() function in microtable class!")
-			}
-			alpha_data <- dataset$alpha_diversity %>% 
-				cbind.data.frame(Sample = rownames(.), ., stringsAsFactors = FALSE)
-			alpha_data %<>% .[, !grepl("^se", colnames(.))]
-			# to long format
-			alpha_data <- reshape2::melt(alpha_data, id.vars = "Sample")
-			colnames(alpha_data) <- c("Sample", "Measure", "Value")
-			alpha_data <- dplyr::left_join(alpha_data, rownames_to_column(dataset$sample_table), by = c("Sample" = "rowname"))
-			if(!is.null(order_x)){
-				if(length(order_x == 1)){
-					alpha_data$Sample %<>% factor(., levels = unique(dataset$sample_table[, order_x]))
-				} else {
-					alpha_data$Sample %<>% factor(., levels = order_x)
+			if(is.null(dataset)){
+				message("Parameter dataset not provided. Please run the functions with your other customized data!")
+				self$alpha_data <- NULL
+			}else{
+				if(is.null(dataset$alpha_diversity)){
+					message("Alpha diversity not found. Calculate it automatically ...")
+					dataset$cal_alphadiv()
 				}
+				alpha_data <- dataset$alpha_diversity %>% 
+					cbind.data.frame(Sample = rownames(.), ., stringsAsFactors = FALSE) %>%
+					.[, !grepl("^se", colnames(.))] %>%
+					# to long format
+					reshape2::melt(id.vars = "Sample") %>%
+					`colnames<-`(c("Sample", "Measure", "Value")) %>%
+					dplyr::left_join(., rownames_to_column(dataset$sample_table), by = c("Sample" = "rowname"))
+				if(!is.null(order_x)){
+					if(length(order_x == 1)){
+						alpha_data$Sample %<>% factor(., levels = unique(dataset$sample_table[, order_x]))
+					} else {
+						alpha_data$Sample %<>% factor(., levels = order_x)
+					}
+				}
+				self$alpha_data <- alpha_data
+				message('The transformed diversity data is stored in object$alpha_data ...')
 			}
+
 			if(!is.null(group)){
+				if(is.null(dataset)){
+					stop("Parameter dataset not provided, but group is provided!")
+				}
 				self$alpha_stat <- microeco:::summarySE_inter(alpha_data, measurevar = "Value", groupvars = c(self$group, "Measure"))
 				message('The group statistics are stored in object$alpha_stat ...')
 			}else{
 				self$alpha_stat <- NULL
-			}			
-			self$alpha_data <- alpha_data
-			message('The transformed diversity data is stored in object$alpha_data ...')
+			}
 		},
 		#' @description
 		#' Test the difference of alpha diversity across groups.
 		#'
-		#' @param method default "KW"; "KW" or "anova"; KW rank sum test or anova for the testing.
-		#' @param measures default NULL; a vector; if null, all indexes will be calculated; see names of alpha_diversity of dataset, 
+		#' @param method default "KW"; "KW_dunn" or "anova"; KW: Kruskal-Wallis Rank Sum Test (groups > 2) or Wilcoxon Rank Sum and Signed 
+		#'   Rank Tests (groups = 2); KW_dunn: Dunn's Kruskal-Wallis Multiple Comparisons, see dunnTest function in FSA package; 
+		#'   anova:  Duncan's multiple range test for anova;
+		#' @param measures default NULL; a vector; if null, all indexes will be calculated; see names of microtable$alpha_diversity, 
 		#' 	 e.g. Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage, PD.
+		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of p.adjust function for available options.
 		#' @param anova_set default NULL; specified group set for anova, such as 'block + N*P*K', see \code{\link{aov}}.
-		#' @return res_alpha_diff in object. A data.frame for method = 'KW' or 'anova'. A list for method = 'anova' and anova_set is assigned.
+		#' @param ... parameters passed to kruskal.test or wilcox.test function (method = "KW") or dunnTest function of FSA package (method = "KW_dunn") or
+		#'   agricolae::duncan.test (method = "anova").
+		#' @return res_alpha_diff in object. A data.frame generally. A list for anova when anova_set is assigned.
 		#' @examples
 		#' \donttest{
 		#' t1$cal_diff(method = "KW")
+		#' t1$cal_diff(method = "KW_dunn")
 		#' t1$cal_diff(method = "anova")
 		#' }
-		cal_diff = function(method = c("KW", "anova")[1], measures = NULL, anova_set = NULL){
+		cal_diff = function(method = c("KW", "KW_dunn", "anova")[1], measures = NULL, p_adjust_method = "fdr", anova_set = NULL, ...){
 			group <- self$group
 			alpha_data <- self$alpha_data
 			if(is.null(measures)){
 				measures <- unique(as.character(alpha_data$Measure))
+			}else{
+				if(! all(measures %in% as.character(alpha_data$Measure))){
+					stop("One or more measures input not in the alpha_data! Please check the input!")
+				}
 			}
 			if(method == "KW" & length(unique(as.character(alpha_data[, group]))) > 5){
 				stop("There are too many groups to do paired comparisons using KW method, please use anova!")
 			}
+			if(!is.null(anova_set)){
+				method <- "anova"
+			}
 			if(method == "KW"){
-				comnames = c()
-				p_value = c()
-				measure_use = c()
+				comnames <- c()
+				p_value <- c()
+				measure_use <- c()
+				test_method <- c()
 				for(k in measures){
 					div_table <- alpha_data[alpha_data$Measure == k, c(group, "Value")]
 					groupvec <- as.character(div_table[, group])
 					use_comp_group_num <- unique(c(2, length(unique(groupvec))))
 					for(i in use_comp_group_num){
 						all_name <- combn(unique(groupvec), i)
+						use_method <- ifelse(i == 2, "Wilcoxon Rank Sum Test", "Kruskal-Wallis Rank Sum Test")
 						for(j in 1:ncol(all_name)){
-							table_compare <- div_table[groupvec %in% as.character(all_name[,j]), ]
-							table_compare[,group] <- factor(table_compare[,group], levels = unique(as.character(table_compare[,group])))
+							table_compare <- div_table[groupvec %in% as.character(all_name[, j]), ]
+							table_compare[, group] %<>% factor(., levels = unique(as.character(.)))
 							formu <- reformulate(group, "Value")
-							res1 <- kruskal.test(formu, data = table_compare)
+							if(i == 2){
+								res1 <- wilcox.test(formu, data = table_compare, ...)
+							}else{
+								res1 <- kruskal.test(formu, data = table_compare, ...)
+							}
 							res2 <- res1$p.value
-							comnames = c(comnames, paste0(as.character(all_name[,j]), collapse = " vs "))
-							p_value = c(p_value, res2)
-							measure_use = c(measure_use, k)
+							comnames %<>% c(., paste0(as.character(all_name[,j]), collapse = " vs "))
+							p_value %<>% c(., res2)
+							measure_use %<>% c(., k)
+							test_method %<>% c(., use_method)
 						}
 					}
 				}
-				test_method <- rep(method, length(comnames))
-				significance_label <- cut(p_value, breaks=c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", ""))
-				compare_result <- data.frame(comnames, measure_use, test_method, p_value, significance_label)
-				colnames(compare_result) <- c("Groups", "Measure", "Test method", "p.value", "Significance")
-			}else{
+				p_value_adjust <- p.adjust(p_value, method = p_adjust_method)
+				significance_label <- cut(p_value_adjust, breaks=c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", ""))
+				compare_result <- data.frame(comnames, measure_use, test_method, p_value, p_value_adjust, significance_label)
+				colnames(compare_result) <- c("Groups", "Measure", "Test_method", "p.value", "p.adjust", "Significance")
+			}
+			if(method == "KW_dunn"){
+				if(length(unique(alpha_data[, group])) == 2){
+					stop("There are only 2 groups. Please select other method instead of KW_dunn !")
+				}
+				use_method <- "Dunn's Kruskal-Wallis Multiple Comparisons"
+				compare_result <- data.frame()
+				for(k in measures){
+					div_table <- alpha_data[alpha_data$Measure == k, c(group, "Value")]
+					table_compare <- div_table
+					table_compare[, group] %<>% factor(., levels = unique(as.character(.)))
+					formu <- reformulate(group, "Value")
+					dunnTest_raw <- FSA::dunnTest(formu, data = table_compare, ...)
+					dunnTest_res <- data.frame(Measure = k, Test_method = use_method, dunnTest_raw$res)
+					compare_result %<>% rbind(., dunnTest_res)
+				}
+			}
+			if(method == "anova"){
 				# library(agricolae)
 				if(is.null(anova_set)){
 					compare_result <- NULL
@@ -105,7 +151,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					use_data <- alpha_data[alpha_data$Measure == i, ]
 					if(is.null(anova_set)){
 						model <- aov(reformulate(group, "Value"), use_data)
-						out <- agricolae::duncan.test(model, group, main = i)
+						out <- agricolae::duncan.test(model, group, main = i, ...)
 						res2 <- out$groups[, "groups", drop = FALSE]
 						res2$groups <- as.character(res2$groups)
 						res2 <- data.frame(rownames(res2), res2, stringsAsFactors = FALSE, check.names = FALSE)
@@ -178,7 +224,13 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			if(order_x_mean){
 				use_data[, group] <- factor(use_data[, group], levels = names(sort(tapply(use_data$Value, use_data[, group], mean), decreasing = TRUE)))
 			}
-			
+			if(add_letter){
+				order_groups <- names(tapply(use_data$Value, use_data[, group], max))
+				add_letter_text <- self$res_alpha_diff[order_groups, measure]
+				if(is.null(add_letter_text)){
+					stop("Please first run cal_diff function with method = 'anova' ! Otherwise, no letters can be used !")
+				}
+			}
 			if(use_boxplot){
 				if(boxplot_color){
 					color_use <- group
@@ -197,14 +249,13 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					...
 					)
 				
-				if(add_letter){
-					order_groups <- names(tapply(use_data$Value, use_data[, group], max))
+				if(add_letter){					
 					group_position <- tapply(use_data$Value, use_data[, group], function(x) {res <- max(x); ifelse(is.na(res), x, res)}) %>% 
 						{. + max(.)/30}
 					textdata <- data.frame(
 						x = order_groups, 
 						y = group_position[order_groups], 
-						add = self$res_alpha_diff[order_groups, measure], 
+						add = add_letter_text, 
 						stringsAsFactors = FALSE
 						)
 					p <- p + geom_text(aes(x = x, y = y, label = add), data = textdata, size = 7)
@@ -230,9 +281,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					stat_summary(fun.y=mean, geom="point", size = rel(3))
 
 				if(add_letter){
-					order_groups <- names(tapply(use_data$Value, use_data[, group], max))
 					group_position <- tapply(use_data$Value, use_data[, group], function(x) {res <- mean_se(x)$ymax; ifelse(is.na(res), x, res)}) %>% {. + max(.)/50}
-					textdata <- data.frame(x = order_groups, y = group_position[order_groups], add = self$res_alpha_diff[order_groups, measure], stringsAsFactors = FALSE)
+					textdata <- data.frame(x = order_groups, y = group_position[order_groups], add = add_letter_text, stringsAsFactors = FALSE)
 					p <- p + geom_text(aes(x = x, y = y, label = add), data = textdata, size = 7)
 				}
 				p <- p + theme(

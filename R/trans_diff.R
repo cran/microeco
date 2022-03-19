@@ -2,8 +2,9 @@
 #' Create trans_diff object for the differential analysis on the taxonomic abundance.
 #'
 #' @description
-#' This class is a wrapper for a series of differential abundance test and indicator analysis methods, including non-parametric test, 
-#' LEfSe based on the Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>, random forest, metastat based on White et al. (2009) <doi:10.1371/journal.pcbi.1000352> and
+#' This class is a wrapper for a series of differential abundance test and indicator analysis methods, including non-parametric Kruskal-Wallis Rank Sum Test,
+ #' Dunn's Kruskal-Wallis Multiple Comparisons based on the FSA package, LEfSe based on the Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>,
+#'  random forest <doi:10.1016/j.geoderma.2018.09.035>, metastat based on White et al. (2009) <doi:10.1371/journal.pcbi.1000352> and
 #' the method in R package metagenomeSeq Paulson et al. (2013) <doi:10.1038/nmeth.2658>.
 #' 
 #' Authors: Chi Liu, Yang Cao, Chenhao Li
@@ -12,22 +13,32 @@
 trans_diff <- R6Class(classname = "trans_diff",
 	public = list(
 		#' @param dataset the object of \code{\link{microtable}} Class.
-		#' @param method default "lefse"; "lefse", "rf", "metastat" or "mseq". "lefse": Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>; 
-		#' 	  "rf" represents random forest; metastat: White et al. (2009) <doi:10.1371/journal.pcbi.1000352>; "mseq" represents the method in metagenomeSeq package.
+		#' @param method default "lefse"; one of "lefse", "rf", "KW", "KW_dunn", "metastat" or "mseq"; see the following details:
+		#'   \describe{
+		#'     \item{\strong{'lefse'}}{from Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>}
+		#'     \item{\strong{'rf'}}{random forest, from An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035>}
+		#'     \item{\strong{'KW'}}{Kruskal-Wallis Rank Sum Test (groups > 2) or Wilcoxon Rank Sum Tests (groups = 2) for a specific taxonomic level or 
+		#'       all levels of microtable$taxa_abund}
+		#'     \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons based on the FSA package}
+		#'     \item{\strong{'metastat'}}{White et al. (2009) <doi:10.1371/journal.pcbi.1000352>}
+		#'     \item{\strong{'mseq'}}{the method based on the zero-inflated log-normal model in metagenomeSeq package.}
+		#'   }
 		#' @param group default NULL; sample group used for main comparision.
+		#' @param taxa_level default "all"; use abundance data at all taxonomic ranks; For testing at a specific rank, provide taxonomic rank name, such as "Genus".
+		#' @param filter_thres default 0; the relative abundance threshold used for method = "lefse" or "rf". 
 		#' @param lefse_subgroup default NULL; sample sub group used for sub-comparision in lefse; Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>.
 		#' @param alpha default .05; significance threshold.
 		#' @param lefse_min_subsam default 10; sample numbers required in the subgroup test.
 		#' @param lefse_norm default 1000000; scale value in lefse.
 		#' @param nresam default .6667; sample number ratio used in each bootstrap or LEfSe or random forest.
 		#' @param boots default 30; bootstrap test number for lefse or rf.
-		#' @param rf_taxa_level default "all"; use all taxonomic rank data, if want to test a specific rank, provide taxonomic rank name, such as "Genus".
 		#' @param rf_ntree default 1000; see ntree in randomForest function of randomForest package.
 		#' @param metastat_taxa_level default "Genus"; taxonomic rank level used in metastat test; White et al. (2009) <doi:10.1371/journal.pcbi.1000352>.
 		#' @param group_choose_paired default NULL; a vector used for selecting the required groups for paired testing, only used for metastat or mseq.
 		#' @param mseq_adjustMethod default "fdr"; Method to adjust p-values by. Default is "fdr". 
 		#'   Options include "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none".
 		#' @param mseq_count default 1; Filter features to have at least 'counts' counts.; see the count parameter in MRcoefs function of metagenomeSeq package.
+		#' @param ... parameters passed to kruskal.test function or wilcox.test function (method = "KW") or dunnTest function of FSA package (method = "KW_dunn").
 		#' @return res_rf, res_lefse, res_abund, res_metastat, or res_mseq in trans_diff object, depending on the method.
 		#' @examples
 		#' \donttest{
@@ -36,42 +47,64 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' }
 		initialize = function(
 			dataset = NULL,
-			method = c("lefse", "rf", "metastat", "mseq")[1],
+			method = c("lefse", "rf", "KW", "KW_dunn", "metastat", "mseq")[1],
 			group = NULL,
+			taxa_level = "all",
+			filter_thres = 0,
 			lefse_subgroup = NULL,
 			alpha = 0.05,
 			lefse_min_subsam = 10,
 			lefse_norm = 1000000,
 			nresam = 0.6667,
 			boots = 30,
-			rf_taxa_level = "all",
 			rf_ntree = 1000,
 			metastat_taxa_level = "Genus",
 			group_choose_paired = NULL,
 			mseq_adjustMethod = "fdr",
-			mseq_count = 1
+			mseq_count = 1,
+			...
 			){
 			if(is.null(dataset)){
 				stop("No dataset provided!")
 			}
+			
+			method <- match.arg(method, c("lefse", "rf", "KW", "KW_dunn", "metastat", "mseq"))
+
 			sampleinfo <- dataset$sample_table
 			sampleinfo[, group] %<>% as.character
 #			self$method <- method
-			if(grepl("lefse|rf", method, ignore.case = TRUE)){
+			if(grepl("lefse|rf|KW|KW_dunn", method, ignore.case = TRUE)){
 				if(is.null(dataset$taxa_abund)){
 					stop("Please first calculate taxa_abund! see cal_abund function in microtable class!")
 				}
-				if(grepl("lefse", method, ignore.case = TRUE)){
-					abund_table <- do.call(rbind, unname(lapply(dataset$taxa_abund, function(x) x * lefse_norm)))
-					self$lefse_norm <- lefse_norm
+				if(grepl("all", taxa_level, ignore.case = TRUE)){
+					abund_table <- do.call(rbind, unname(dataset$taxa_abund))
 				}else{
-					if(grepl("all", rf_taxa_level, ignore.case = TRUE)){
-						abund_table <- do.call(rbind, unname(dataset$taxa_abund))
+					abund_table <- dataset$taxa_abund[[taxa_level]]
+				}
+				if(filter_thres > 0){
+					if(filter_thres >= 1){
+						stop("Parameter filter_thres represents relative abudance. It should be smaller than 1 !")
 					}else{
-						abund_table <- dataset$taxa_abund[[rf_taxa_level]]
+						abund_table %<>% .[apply(., 1, mean) > filter_thres, ]
 					}
 				}
-				abund_table %<>% {.[!grepl("__$|uncultured$|Incertae..edis$|_sp$", rownames(.)), ]}
+				if(grepl("lefse", method, ignore.case = TRUE)){
+					abund_table %<>% {. * lefse_norm}
+					self$lefse_norm <- lefse_norm
+				}
+				abund_table %<>% {.[!grepl("__$|uncultured$|Incertae..edis$|_sp$", rownames(.), ignore.case = TRUE), ]}
+			}
+			if(method %in% c("KW", "KW_dunn")){
+				tem_data <- clone(dataset)
+				# use test method in trans_alpha
+				tem_data$alpha_diversity <- as.data.frame(t(abund_table))
+				tem_data1 <- suppressMessages(trans_alpha$new(dataset = tem_data, group = group))
+				suppressMessages(tem_data1$cal_diff(method = method, ...))
+				self$res_diff <- tem_data1$res_alpha_diff
+				message('The result is stored in object$res_diff ...')
+			}
+			if(grepl("lefse|rf", method, ignore.case = TRUE)){
 				# differential test
 				group_vec <- sampleinfo[, group] %>% as.factor
 				message("Start differential test for ", group, " ...")
@@ -339,7 +372,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				message('The metastat group information is stored in object$res_metastat_group_matrix ...')
 			}
 			if(grepl("mseq", method, ignore.case = TRUE)){
-				if(!require(metagenomeSeq)){
+				if(!require("metagenomeSeq")){
 					stop("metagenomeSeq package not installed")
 				}
 				message("Total ", ncol(all_name), " paired group for calculation ...")
@@ -508,7 +541,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				theme(panel.grid.minor.y = element_blank(), panel.grid.major.y = element_blank(), panel.border = element_blank(), 
 					panel.background=element_rect(fill="white")) +
 				theme(axis.title = element_text(size = 17)) +
-				guides(fill=guide_legend(reverse=TRUE, ncol=1), color = FALSE)
+				guides(fill=guide_legend(reverse=TRUE, ncol=1), color = "none")
 			
 			if(only_abund_plot == T){
 				p2 <- p2 + theme(axis.title.y=element_blank(), axis.text.y = element_text(size = axis_text_y, color = "black")) + 
@@ -629,7 +662,12 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' @param sep default "|"; the seperate character in the taxonomic information
 		#' @param branch_size default 0.2; numberic, size of branch
 		#' @param alpha default 0.2; shading of the color
-		#' @param clade_label_size default 0.7; size for the clade label
+		#' @param clade_label_size default 2; basic size for the clade label; please also see clade_label_size_add and clade_label_size_log
+		#' @param clade_label_size_add default 5; added basic size for the clade label; see the formula in clade_label_size_log parameter.
+		#' @param clade_label_size_log default exp(1); the base of log function for added size of the clade label; the size formula: 
+		#'   clade_label_size + log(clade_label_level + clade_label_size_add, base = clade_label_size_log); 
+		#'   so use clade_label_size_log, clade_label_size_add and clade_label_size
+		#'   can totally control the label size for different taxonomic levels.
 		#' @param node_size_scale default 1; scale for the node size
 		#' @param node_size_offset default 1; offset for the node size
 		#' @param annotation_shape default 22; shape used in the annotation legend
@@ -651,7 +689,9 @@ trans_diff <- R6Class(classname = "trans_diff",
 			sep = "|",
 			branch_size = 0.2,
 			alpha = 0.2,
-			clade_label_size = 0.7,
+			clade_label_size = 2,
+			clade_label_size_add = 5,
+			clade_label_size_log = exp(1),
 			node_size_scale = 1,
 			node_size_offset = 1,
 			annotation_shape = 22,
@@ -669,11 +709,10 @@ trans_diff <- R6Class(classname = "trans_diff",
 			color <- color[1:length(unique(marker_table$Group))]
 
 			# filter the taxa with unidentified classification or with space, in case of the unexpected error in the following operations
-			abund_table %<>% {.[!grepl("\\|.__\\|", rownames(.)), ]}
-			abund_table %<>% {.[!grepl("\\s", rownames(.)), ]}
-			# also filter uncleared classification to make it in line with the lefse above
-			abund_table %<>% {.[!grepl("Incertae_sedis", rownames(.)), ]}
-			abund_table %<>% {.[!grepl("unculture", rownames(.)), ]}
+			abund_table %<>% {.[!grepl("\\|.__\\|", rownames(.)), ]} %>%
+				{.[!grepl("\\s", rownames(.)), ]} %>%
+				# also filter uncleared classification to make it in line with the lefse above
+				{.[!grepl("Incertae_sedis|unculture", rownames(.)), ]}
 
 			if(!is.null(use_taxa_num)){
 				abund_table %<>% .[names(sort(apply(., 1, mean), decreasing = TRUE)[1:use_taxa_num]), ]
@@ -681,7 +720,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			if(!is.null(filter_taxa)){
 				abund_table %<>% .[apply(., 1, mean) > (self$lefse_norm * filter_taxa), ]
 			}
-			abund_table %<>% .[sort(rownames(abund_table)), ]
+			abund_table %<>% .[sort(rownames(.)), ]
 
 			tree_table <- data.frame(taxa = row.names(abund_table), abd = rowMeans(abund_table), stringsAsFactors = FALSE) %>%
 				dplyr::mutate(taxa =  paste("r__Root", .data$taxa, sep = sep), abd = .data$abd/max(.data$abd)*100)
@@ -699,15 +738,14 @@ trans_diff <- R6Class(classname = "trans_diff",
 			}
 
 			# add root node
-			nodes <- c("r__Root", nodes)
+			nodes %<>% c("r__Root", .)
 			# levels used for extend of clade label
 			label_levels <- purrr::map_chr(nodes, ~ gsub("__.*$", "", .x)) %>%
-				factor(levels = rev(unlist(lapply(taxa_split, function(x) gsub("(.)__.*", "\\1", x))) %>% 
-				.[!duplicated(.)]))
+				factor(levels = rev(unlist(lapply(taxa_split, function(x) gsub("(.)__.*", "\\1", x))) %>% .[!duplicated(.)]))
 
-			nodes_parent <- purrr::map_chr(taxa_split, ~ .x[length(.x) - 1])
 			# root must be a parent node
-			nodes_parent <- c("root", nodes_parent)
+			nodes_parent <- purrr::map_chr(taxa_split, ~ .x[length(.x) - 1]) %>%
+				c("root", .)
 
 			## add index for nodes
 			is_tip <- !nodes %in% nodes_parent
@@ -741,7 +779,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			}else{
 				color_groups <- group_order
 			}
-			annotation <- private$generate_cladogram_annotation(marker_table, tree = tree, color = color, color_groups = color_groups)			
+			annotation <- private$generate_cladogram_annotation(marker_table, tree = tree, color = color, color_groups = color_groups)
 			# backgroup hilight
 			annotation_info <- dplyr::left_join(annotation, tree$data, by = c("node" = "label")) %>%
 				dplyr::mutate(label = .data$node, id = .data$node.y, level = as.numeric(.data$node_class))
@@ -760,8 +798,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 			hilights_df$x <- 0
 			hilights_df$y <- 1
 			# resort the table used for the legend color and text
-			rownames(hilights_df) <- hilights_df$enrich_group
-			hilights_df <- hilights_df[color_groups, ]
+			hilights_df %<>% `row.names<-`(.$enrich_group) %>%
+				.[color_groups, ]
 			# make sure the right order in legend
 			hilights_df$enrich_group %<>% factor(., levels = color_groups)
 
@@ -785,7 +823,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				offset.text = 0,
 				angle = purrr::map_dbl(.data$id, private$get_angle, tree = tree),
 				label = .data$label,
-				fontsize = clade_label_size + log(.data$level + 20),
+				fontsize = clade_label_size + log(.data$level + clade_label_size_add, base = clade_label_size_log),
 				barsize = 0,
 				extend = 0.2,
 				hjust = 0.5,
@@ -800,6 +838,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 
 			# add letters label to replace long taxonomic label
 			if(is.null(select_show_labels)){
+				# outer circle --> larger level; label smaller levels, i.e. finer taxonomy
 				ind <- clade_label$level < clade_label_level	
 			}else{
 				ind <- ! clade_label$label %in% select_show_labels
@@ -820,30 +859,26 @@ trans_diff <- R6Class(classname = "trans_diff",
 				clade_label_new$label_show[ind] <- use_letters[1:ind_num]
 				clade_label_new$label_legend[ind] <- paste0(clade_label_new$label_show[ind], ": ", clade_label_new$label[ind])
 				clade_label_new$label <- clade_label_new$label_show
+				# delete redundant columns to avoid warnings
+				clade_label <- clade_label_new %>% .[, which(! colnames(.) %in% c("label_raw", "label_show", "label_legend", "level"))]
 			}
 
-			clade_label_g <- purrr::pmap(clade_label_new, ggtree::geom_cladelabel)
-			p <- purrr::reduce(clade_label_g, `+`, .init = tree)
+			clade_label_g <- purrr::pmap(clade_label, ggtree::geom_cladelabel)
+			tree <- purrr::reduce(clade_label_g, `+`, .init = tree)
 
 			# if letters are used, add guide labels
 			if(ind_num > 0){
 				guide_label <- clade_label_new[ind, ] %>%
 					dplyr::mutate(color = annotation_info$color[match(.data$label_raw, annotation_info$label)])
-				p <- p + 
-					geom_point(data = guide_label, 
-						inherit.aes = FALSE, 
-						aes_(x = 0, y = 0, shape = ~label_legend), 
-						size = 0, 
-						stroke = 0) +
-					scale_shape_manual(values = rep(annotation_shape, nrow(guide_label))) +
-					guides(shape = guide_legend(override.aes = list(
-						size = annotation_shape_size, 
-						shape = annotation_shape, 
-						fill = guide_label$color
-						)))
+				tree <- tree + 
+					geom_point(data = guide_label, inherit.aes = FALSE, aes_(x = 0, y = 0, shape = ~label_legend), size = 0, stroke = 0) +
+						scale_shape_manual(values = rep(annotation_shape, nrow(guide_label))) +
+						guides(shape = guide_legend(override.aes = list(
+							size = annotation_shape_size, shape = annotation_shape, fill = guide_label$color)))
 			}
-			p <- p + theme(legend.position = "right", legend.title = element_blank())
-			p
+			tree <- tree + theme(legend.position = "right", legend.title = element_blank())
+			tree
+
 		},
 		#' @description
 		#' Bar plot for metastat.

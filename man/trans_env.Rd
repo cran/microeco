@@ -18,35 +18,35 @@ data(env_data_16S)
 t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S)
 
 ## ------------------------------------------------
-## Method `trans_env$cal_rda`
+## Method `trans_env$cal_ordination`
 ## ------------------------------------------------
 
 \donttest{
-t1$cal_rda(use_dbrda = TRUE, use_measure = "bray")
+t1$cal_ordination(method = "RDA", use_measure = "bray")
 }
 
 ## ------------------------------------------------
-## Method `trans_env$cal_rda_envsquare`
+## Method `trans_env$cal_ordination_envsquare`
 ## ------------------------------------------------
 
 \donttest{
-t1$cal_rda_envsquare()
+t1$cal_ordination_envsquare()
 }
 
 ## ------------------------------------------------
-## Method `trans_env$trans_rda`
+## Method `trans_env$trans_ordination`
 ## ------------------------------------------------
 
 \donttest{
-t1$trans_rda(adjust_arrow_length = TRUE, max_perc_env = 10)
+t1$trans_ordination(adjust_arrow_length = TRUE, max_perc_env = 10)
 }
 
 ## ------------------------------------------------
-## Method `trans_env$plot_rda`
+## Method `trans_env$plot_ordination`
 ## ------------------------------------------------
 
 \donttest{
-t1$plot_rda(plot_color = "Group")
+t1$plot_ordination(plot_color = "Group")
 }
 
 ## ------------------------------------------------
@@ -87,10 +87,10 @@ t1$plot_scatterfit(x = 1, y = 2, alpha = .5)
 \subsection{Public methods}{
 \itemize{
 \item \href{#method-new}{\code{trans_env$new()}}
-\item \href{#method-cal_rda}{\code{trans_env$cal_rda()}}
-\item \href{#method-cal_rda_envsquare}{\code{trans_env$cal_rda_envsquare()}}
-\item \href{#method-trans_rda}{\code{trans_env$trans_rda()}}
-\item \href{#method-plot_rda}{\code{trans_env$plot_rda()}}
+\item \href{#method-cal_ordination}{\code{trans_env$cal_ordination()}}
+\item \href{#method-cal_ordination_envsquare}{\code{trans_env$cal_ordination_envsquare()}}
+\item \href{#method-trans_ordination}{\code{trans_env$trans_ordination()}}
+\item \href{#method-plot_ordination}{\code{trans_env$plot_ordination()}}
 \item \href{#method-cal_mantel}{\code{trans_env$cal_mantel()}}
 \item \href{#method-cal_cor}{\code{trans_env$cal_cor()}}
 \item \href{#method-plot_cor}{\code{trans_env$plot_cor()}}
@@ -125,7 +125,8 @@ Either numeric vector or character vector of colnames.}
 
 \item{\code{character2numeric}}{default TRUE; whether transform the characters or factors to numeric attributes.}
 
-\item{\code{complete_na}}{default FALSE; Whether fill the NA (missing value) in the environmental data.}
+\item{\code{complete_na}}{default FALSE; Whether fill the NA (missing value) in the environmental data;
+If TRUE, the function can run the interpolation with the mice package; Please first install mice package.}
 }
 \if{html}{\out{</div>}}
 }
@@ -144,45 +145,50 @@ t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-cal_rda"></a>}}
-\if{latex}{\out{\hypertarget{method-cal_rda}{}}}
-\subsection{Method \code{cal_rda()}}{
-Redundancy analysis (RDA) based on the rda function in vegan package.
+\if{html}{\out{<a id="method-cal_ordination"></a>}}
+\if{latex}{\out{\hypertarget{method-cal_ordination}{}}}
+\subsection{Method \code{cal_ordination()}}{
+Redundancy analysis (RDA) and Correspondence Analysis (CCA) based on the vegan package.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_rda(
-  use_dbrda = TRUE,
-  add_matrix = NULL,
-  use_measure = NULL,
+\if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_ordination(
+  method = c("RDA", "dbRDA", "CCA")[1],
   feature_sel = FALSE,
   taxa_level = NULL,
-  taxa_filter_thres = NULL
+  taxa_filter_thres = NULL,
+  use_measure = NULL,
+  add_matrix = NULL,
+  ...
 )}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{use_dbrda}}{default TRUE; whether use db-RDA, if FALSE, use RDA.}
-
-\item{\code{add_matrix}}{default NULL; additional distance matrix provided, if you do not want to use the beta diversity matrix within the dataset.}
-
-\item{\code{use_measure}}{default NULL; name of beta diversity matrix. If necessary and not provided, use the first beta diversity matrix.}
+\item{\code{method}}{default c("RDA", "dbRDA", "CCA")[1]; the ordination method.}
 
 \item{\code{feature_sel}}{default FALSE; whether perform the feature selection.}
 
-\item{\code{taxa_level}}{default NULL; If use RDA, provide the taxonomic rank.}
+\item{\code{taxa_level}}{default NULL; If use RDA or CCA, provide the taxonomic rank, such as "Phylum" or "Genus";
+If use otu_table; please input "OTU".}
 
 \item{\code{taxa_filter_thres}}{default NULL; If want to filter taxa, provide the relative abundance threshold.}
+
+\item{\code{use_measure}}{default NULL; name of beta diversity matrix. If necessary and not provided, use the first beta diversity matrix.}
+
+\item{\code{add_matrix}}{default NULL; additional distance matrix provided, when you do not want to use the beta diversity matrix within the dataset;
+only available when method = "dbRDA".}
+
+\item{\code{...}}{paremeters pass to dbrda or rda or cca function according to the input of method.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-res_rda, res_rda_R2, res_rda_terms and res_rda_axis in object.
+res_ordination, res_ordination_R2, res_ordination_terms and res_ordination_axis in object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$cal_rda(use_dbrda = TRUE, use_measure = "bray")
+t1$cal_ordination(method = "RDA", use_measure = "bray")
 }
 }
 \if{html}{\out{</div>}}
@@ -191,12 +197,12 @@ t1$cal_rda(use_dbrda = TRUE, use_measure = "bray")
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-cal_rda_envsquare"></a>}}
-\if{latex}{\out{\hypertarget{method-cal_rda_envsquare}{}}}
-\subsection{Method \code{cal_rda_envsquare()}}{
-Fits each environmental vector onto the RDA ordination to obtain the contribution of each variable.
+\if{html}{\out{<a id="method-cal_ordination_envsquare"></a>}}
+\if{latex}{\out{\hypertarget{method-cal_ordination_envsquare}{}}}
+\subsection{Method \code{cal_ordination_envsquare()}}{
+Fits each environmental vector onto the ordination to obtain the contribution of each variable.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_rda_envsquare(...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_ordination_envsquare(...)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -207,12 +213,12 @@ Fits each environmental vector onto the RDA ordination to obtain the contributio
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-res_rda_envsquare in object.
+res_ordination_envsquare in object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$cal_rda_envsquare()
+t1$cal_ordination_envsquare()
 }
 }
 \if{html}{\out{</div>}}
@@ -221,18 +227,18 @@ t1$cal_rda_envsquare()
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-trans_rda"></a>}}
-\if{latex}{\out{\hypertarget{method-trans_rda}{}}}
-\subsection{Method \code{trans_rda()}}{
-transform RDA result for the following plotting.
+\if{html}{\out{<a id="method-trans_ordination"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_ordination}{}}}
+\subsection{Method \code{trans_ordination()}}{
+transform ordination result for the following plotting.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_env$trans_rda(
+\if{html}{\out{<div class="r">}}\preformatted{trans_env$trans_ordination(
   show_taxa = 10,
   adjust_arrow_length = FALSE,
-  min_perc_env = 1,
-  max_perc_env = 100,
-  min_perc_tax = 1,
-  max_perc_tax = 100
+  min_perc_env = 0.1,
+  max_perc_env = 0.8,
+  min_perc_tax = 0.1,
+  max_perc_tax = 0.8
 )}\if{html}{\out{</div>}}
 }
 
@@ -243,23 +249,23 @@ transform RDA result for the following plotting.
 
 \item{\code{adjust_arrow_length}}{default FALSE; whether adjust the arrow length to be clear}
 
-\item{\code{min_perc_env}}{default 1; minimum scale value for env arrow, relatively.}
+\item{\code{min_perc_env}}{default 0.1; used for scaling up the minimum of env arrow; multiply by the maximum distance between samples and origin.}
 
-\item{\code{max_perc_env}}{default 100; maximum scale value for env arrow, relatively.}
+\item{\code{max_perc_env}}{default 0.8; used for scaling up the maximum of env arrow; multiply by the maximum distance between samples and origin.}
 
-\item{\code{min_perc_tax}}{default 1; minimum scale value for tax arrow, relatively.}
+\item{\code{min_perc_tax}}{default 0.1; used for scaling up the minimum of tax arrow; multiply by the maximum distance between samples and origin.}
 
-\item{\code{max_perc_tax}}{default 100; maximum scale value for tax arrow, relatively.}
+\item{\code{max_perc_tax}}{default 0.8; used for scaling up the maximum of tax arrow; multiply by the maximum distance between samples and origin.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-res_rda_trans in object.
+res_ordination_trans in object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$trans_rda(adjust_arrow_length = TRUE, max_perc_env = 10)
+t1$trans_ordination(adjust_arrow_length = TRUE, max_perc_env = 10)
 }
 }
 \if{html}{\out{</div>}}
@@ -268,18 +274,18 @@ t1$trans_rda(adjust_arrow_length = TRUE, max_perc_env = 10)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_rda"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_rda}{}}}
-\subsection{Method \code{plot_rda()}}{
-plot RDA result.
+\if{html}{\out{<a id="method-plot_ordination"></a>}}
+\if{latex}{\out{\hypertarget{method-plot_ordination}{}}}
+\subsection{Method \code{plot_ordination()}}{
+plot ordination result.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_env$plot_rda(
+\if{html}{\out{<div class="r">}}\preformatted{trans_env$plot_ordination(
   plot_color = NULL,
   plot_shape = NULL,
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),
   shape_values = c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14),
   taxa_text_color = "firebrick1",
-  taxa_text_type = "italic"
+  taxa_text_italic = TRUE
 )}\if{html}{\out{</div>}}
 }
 
@@ -296,7 +302,7 @@ plot RDA result.
 
 \item{\code{taxa_text_color}}{default "firebrick1"; taxa text colors.}
 
-\item{\code{taxa_text_type}}{default "italic"; taxa text style; better to use "italic" for Genus, use "normal" for others.}
+\item{\code{taxa_text_italic}}{default TRUE; "italic"; whether use "italic" style for the taxa text in the plot.}
 }
 \if{html}{\out{</div>}}
 }
@@ -306,7 +312,7 @@ ggplot object.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$plot_rda(plot_color = "Group")
+t1$plot_ordination(plot_color = "Group")
 }
 }
 \if{html}{\out{</div>}}
@@ -444,9 +450,15 @@ Plot correlation heatmap.
   ylab_type_italic = FALSE,
   keep_full_name = FALSE,
   keep_prefix = TRUE,
-  plot_x_size = 9,
-  mylabels_x = NULL,
+  text_y_order = NULL,
+  text_x_order = NULL,
   font_family = NULL,
+  cluster_ggplot = "none",
+  cluster_height_rows = 0.2,
+  cluster_height_cols = 0.2,
+  text_y_position = "right",
+  fontsize = 9,
+  mylabels_x = NULL,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -458,7 +470,7 @@ Plot correlation heatmap.
 
 \item{\code{color_palette}}{default NULL; a customized palette with more color values; if provided, use it instead of color_vector.}
 
-\item{\code{pheatmap}}{default FALSE; whether use heatmap with clustering plot.}
+\item{\code{pheatmap}}{default FALSE; whether use pheatmap package to plot the heatmap.}
 
 \item{\code{filter_feature}}{default NULL; character vector; used to filter features that only have significance labels in the filter_feature vector. 
 For example, filter_feature = "" can be used to filter features that only have "", no any "*".}
@@ -469,11 +481,26 @@ For example, filter_feature = "" can be used to filter features that only have "
 
 \item{\code{keep_prefix}}{default TRUE; whether retain the taxonomic prefix.}
 
-\item{\code{plot_x_size}}{default 9; x axis text size.}
+\item{\code{text_y_order}}{default NULL; character vector; provide customized text order for y axis; shown in the plot the top down.}
 
-\item{\code{mylabels_x}}{default NULL; provide x axis text labels additionally; only available when pheatmap = TRUE.}
+\item{\code{text_x_order}}{default NULL; character vector; provide customized text order for x axis.}
 
 \item{\code{font_family}}{default NULL; font family used in ggplot2; only available when pheatmap = FALSE.}
+
+\item{\code{cluster_ggplot}}{default "none"; add clustering dendrogram for ggplot2 based heatmap; 
+available options: "none", "row", "col" or "both". "none": no any clustering used;
+"row": add clustering for rows; "col": add clustering for columns; "both":  add clustering for both rows and columns.
+Only available when pheatmap = FALSE.}
+
+\item{\code{cluster_height_rows}}{default 0.2, the dendrogram plot height for rows; available when cluster_ggplot != "none".}
+
+\item{\code{cluster_height_cols}}{default 0.2, the dendrogram plot height for columns; available cluster_ggplot != "none".}
+
+\item{\code{text_y_position}}{default "right"; "left" or "right"; the y axis text position; ggplot2 based heatmap.}
+
+\item{\code{fontsize}}{default 9; base fontsize for the plot; see fontsize in pheatmap.}
+
+\item{\code{mylabels_x}}{default NULL; provide x axis text labels additionally; only available when pheatmap = TRUE.}
 
 \item{\code{...}}{paremeters pass to ggplot2::geom_tile or pheatmap, depending on the pheatmap = FALSE or TRUE.}
 }

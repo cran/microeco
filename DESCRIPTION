@@ -1,7 +1,7 @@
 Package: microeco
 Type: Package
 Title: Microbial Community Ecology Data Analysis
-Version: 0.6.5
+Version: 0.7.1
 Authors@R: c(person("Chi", "Liu", role = c("aut", "cre"), email = "liuchi0426@126.com"),
               person("Felipe", "R. P. Mansoldo", role = "ctb", email = "mansoldo@micro.ufrj.br"),
 			  person("Umer Zeeshan", "Ijaz", role = "ctb", email = "Umer.Ijaz@glasgow.ac.uk"),
@@ -18,19 +18,18 @@ Author: Chi Liu [aut, cre],
   Minjie Yao [ctb],
   Xiangzhen Li [ctb]
 Maintainer: Chi Liu <liuchi0426@126.com>
-Description: A series of statistical and plotting approaches in microbial community ecology based on the R6 class. The classes are designed for data preprocessing, taxa abundance plotting, alpha diversity statistics, beta diversity statistics, differential abundance test and indicator taxon analysis, environmental data analysis, null model analysis, network analysis and functional analysis.
+Description: A series of statistical and plotting approaches in microbial community ecology based on the R6 class. The classes are designed for data preprocessing, taxa abundance plotting, alpha diversity statistics, beta diversity statistics, differential abundance test, environmental data analysis, null model analysis, network analysis, machine learning and functional analysis.
 URL: https://github.com/ChiLiubio/microeco
 Depends: R (>= 3.5.0)
 Imports: R6, stats, ape, vegan, rlang, data.table, magrittr, dplyr,
         tibble, scales, grid, ggplot2, RColorBrewer, reshape2
 Suggests: GUniFrac, MASS, ggpubr, randomForest, ggdendro, ggrepel,
-        agricolae, gridExtra, picante, pheatmap, igraph, rgexf,
-        tidytree, mice, ggtree
+        agricolae, gridExtra, picante, pheatmap, igraph, rgexf, mice
 License: GPL-3
 LazyData: true
 Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2022-01-07 13:37:33 UTC; Chi
+Packaged: 2022-03-19 09:03:22 UTC; Chi
 Repository: CRAN
-Date/Publication: 2022-01-07 15:32:41 UTC
-RoxygenNote: 7.1.1
+Date/Publication: 2022-03-19 10:00:02 UTC
+RoxygenNote: 7.1.2

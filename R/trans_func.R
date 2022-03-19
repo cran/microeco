@@ -453,7 +453,7 @@ trans_func <- R6Class(classname = "trans_func",
 			if(is.null(folderReferenceData)){
 				stop("No folderReferenceData provided! Please see the help document!")
 			}
-			if(!require(Tax4Fun)){
+			if(!require("Tax4Fun")){
 				stop("Tax4Fun package not installed! see http://tax4fun.gobics.de/ ")
 			}
 			otu_file <- self$otu_table
@@ -488,8 +488,8 @@ trans_func <- R6Class(classname = "trans_func",
 		#' Tax4Fun2: prediction of habitat-specific functional profiles and functional redundancy based on 16S rRNA gene sequences. Environmental Microbiome 15, 11 (2020).
 		#' 	 <doi:10.1186/s40793-020-00358-7>
 		#'
-		#' @param blast_tool_path default NULL; the folder path, e.g. ncbi-blast-2.11.0+/bin ; blast tools folder downloaded from 
-		#'   "ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+"  ; e.g. ncbi-blast-2.11.0+-x64-win64.tar.gz  for windows system; 
+		#' @param blast_tool_path default NULL; the folder path, e.g. ncbi-blast-2.5.0+/bin ; blast tools folder downloaded from 
+		#'   "ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+"  ; e.g. ncbi-blast-2.5.0+-x64-win64.tar.gz  for windows system; 
 		#'   if blast_tool_path is NULL, search the tools in the environmental path variable.
 		#' @param path_to_reference_data default "Tax4Fun2_ReferenceData_v2"; the path that points to files used in the prediction; 
 		#'   The directory must contain the Ref99NR/Ref100NR folder; 
@@ -508,7 +508,7 @@ trans_func <- R6Class(classname = "trans_func",
 		#' @return res_tax4fun2_KO and res_tax4fun2_pathway in object.
 		#' @examples
 		#' \dontrun{
-		#' t1$cal_tax4fun2(blast_tool_path = "ncbi-blast-2.11.0+/bin", 
+		#' t1$cal_tax4fun2(blast_tool_path = "ncbi-blast-2.5.0+/bin", 
 		#'     path_to_reference_data = "Tax4Fun2_ReferenceData_v2")
 		#' }
 		cal_tax4fun2 = function(
@@ -604,13 +604,13 @@ trans_func <- R6Class(classname = "trans_func",
 			}
 			# write the fasta file
 			rep_fasta_path <- file.path(path_to_temp_folder, "rep_fasta.tmp.fasta")
-			if(class(self$rep_fasta) == "list"){
+			if(inherits(self$rep_fasta, "list")){
 				seqinr::write.fasta(self$rep_fasta, names = names(self$rep_fasta), file.out = rep_fasta_path)
 			}else{
-				if(class(self$rep_fasta) == "DNAStringSet"){
+				if(inherits(self$rep_fasta, "DNAStringSet")){
 					Biostrings::writeXStringSet(x = self$rep_fasta, filepath = rep_fasta_path)
 				}else{
-					stop("Unknown fasta format! Must be either list or DNAStringSet !")
+					stop("Unknown fasta format! Must be either list (from read.fasta of seqinr package) or DNAStringSet (from readDNAStringSet of Biostrings package) !")
 				}
 			}
 			
@@ -713,7 +713,7 @@ trans_func <- R6Class(classname = "trans_func",
 			write.table(x = functional_prediction_final, file = file.path(path_to_temp_folder, 'functional_prediction.txt'), append = F, quote = F, 
 				sep = "\t", row.names = F, col.names = T)
 			self$res_tax4fun2_KO <- functional_prediction_final
-			message('Result KO abundance is stored in object$res_tax4fun2_KO!')
+			message('Result KO abundance is stored in object$res_tax4fun2_KO ...')
 
 			# Converting the KO profile to a profile of KEGG pathways
 			message('Converting functions to pathways')
@@ -731,16 +731,19 @@ trans_func <- R6Class(classname = "trans_func",
 				pathway_prediction[,-1] <- t(t(pathway_prediction[,-1]) / sum(pathway_prediction[,-1]))
 				keep <- which(pathway_prediction[,2] > 0)
 			}
-			if(sum(pathway_prediction[,-1]) == 0) stop("Conversion to pathway failed!")
+			if(sum(pathway_prediction[, -1]) == 0) stop("Conversion to pathway failed!")
+			pathway_prediction %<>% .[keep, ]
 			names(pathway_prediction) <- names(otu_table)
-			names(pathway_prediction)[1] <- 'pathway'
-
+			rownames(pathway_prediction) <- pathway_prediction[, 1]
+			pathway_prediction <- pathway_prediction[, -1, drop = FALSE]
+			
+			self$res_tax4fun2_pathway <- pathway_prediction
+			message('Pathway abundance table is stored in object$res_tax4fun2_pathway ...')			
 			ptw_desc <- Tax4Fun2_KEGG$ptw_desc
-			pathway_prediction_final <- merge(pathway_prediction, ptw_desc)[keep,]
+			pathway_prediction_final <- data.frame(pathway_prediction, ptw_desc[rownames(pathway_prediction), ])
+			pathway_prediction_final <- data.frame(pathway = rownames(pathway_prediction_final), pathway_prediction_final)
 			write.table(x = pathway_prediction_final, file = file.path(path_to_temp_folder, 'pathway_prediction.txt'), 
 				append = F, quote = F, sep = "\t", row.names = F, col.names = T)
-			self$res_tax4fun2_pathway <- pathway_prediction_final
-			message('Result pathway abundance is stored in object$res_tax4fun2_pathway!')
 		},
 		#' @description
 		#' Calculate (multi-) functional redundancy index (FRI) of prokaryotic community with Tax4Fun2 method.
@@ -806,8 +809,8 @@ trans_func <- R6Class(classname = "trans_func",
 			abs_functional_redundancy_tab <- data.frame(abs_functional_redundancy_tab)
 			rel_functional_redundancy_tab <- data.frame(rel_functional_redundancy_tab)
 
-			colnames(abs_functional_redundancy_tab) <- names(otu_table)[2:ncol(otu_table_reduced_aggregated)]
-			colnames(rel_functional_redundancy_tab) <- names(otu_table)[2:ncol(otu_table_reduced_aggregated)]
+			colnames(abs_functional_redundancy_tab) <- names(self$otu_table)[2:ncol(otu_table_reduced_aggregated)]
+			colnames(rel_functional_redundancy_tab) <- names(self$otu_table)[2:ncol(otu_table_reduced_aggregated)]
 
 			abs_functional_redundancy_final <- data.frame(KO = ko_list$ko, abs_functional_redundancy_tab, description = ko_list$description)
 			rel_functional_redundancy_final <- data.frame(KO = ko_list$ko, rel_functional_redundancy_tab, description = ko_list$description)
