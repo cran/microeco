@@ -4,10 +4,9 @@
 \alias{trans_network}
 \title{Create trans_network object for co-occurrence network analysis.}
 \description{
-This class is a wrapper for a series of network analysis related methods, 
-including the correlation based <doi:10.1186/1471-2105-13-113>, SpiecEasi <doi:10.1371/journal.pcbi.1004226>,
-and Probabilistic Graphical Models based <doi:10.1016/j.cels.2019.08.002> network construction approaches, network and node attributes analysis
-eigengene analysis, network subsetting and other network operations.
+This class is a wrapper for a series of network analysis methods, 
+including the network construction approaches, network attributes analysis,
+eigengene analysis, network subsetting, node and edge properties extraction, network plotting, and other network operations.
 }
 \examples{
 
@@ -17,12 +16,11 @@ eigengene analysis, network subsetting and other network operations.
 
 \donttest{
 data(dataset)
-# correlation network
-t1 <- trans_network$new(
-		dataset = dataset, 
-		cal_cor = "base", 
-		taxa_level = "OTU", 
-		filter_thres = 0.001)
+# for correlation network
+t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
+		taxa_level = "OTU", filter_thres = 0.0001)
+# for other network
+t1 <- trans_network$new(dataset = dataset, cal_cor = NA)
 }
 
 ## ------------------------------------------------
@@ -30,7 +28,14 @@ t1 <- trans_network$new(
 ## ------------------------------------------------
 
 \donttest{
-t1$cal_network(p_thres = 0.01, COR_cut = 0.6)
+# for correlation network
+t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
+		taxa_level = "OTU", filter_thres = 0.0001)
+t1$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
+t1 <- trans_network$new(dataset = dataset, cal_cor = NA)
+t1$cal_network(network_method = "SpiecEasi")
+t1$cal_network(network_method = "beemStatic")
+t1$cal_network(network_method = "FlashWeave")
 }
 
 ## ------------------------------------------------
@@ -38,7 +43,15 @@ t1$cal_network(p_thres = 0.01, COR_cut = 0.6)
 ## ------------------------------------------------
 
 \donttest{
-t1$cal_module()
+t1$cal_module(method = "cluster_fast_greedy")
+}
+
+## ------------------------------------------------
+## Method `trans_network$save_network`
+## ------------------------------------------------
+
+\dontrun{
+t1$save_network(filepath = "network.gexf")
 }
 
 ## ------------------------------------------------
@@ -50,11 +63,29 @@ t1$cal_network_attr()
 }
 
 ## ------------------------------------------------
-## Method `trans_network$cal_node_type`
+## Method `trans_network$get_node_table`
 ## ------------------------------------------------
 
 \donttest{
-t1$cal_node_type()
+t1$get_node_table(node_roles = TRUE)
+}
+
+## ------------------------------------------------
+## Method `trans_network$get_edge_table`
+## ------------------------------------------------
+
+\donttest{
+t1$get_edge_table()
+}
+
+## ------------------------------------------------
+## Method `trans_network$plot_network`
+## ------------------------------------------------
+
+\donttest{
+t1$plot_network(method = "igraph", layout = layout_with_kk)
+t1$plot_network(method = "ggraph", node_color = "module")
+t1$plot_network(method = "networkD3", node_color = "module")
 }
 
 ## ------------------------------------------------
@@ -70,7 +101,7 @@ t1$cal_eigen()
 ## ------------------------------------------------
 
 \donttest{
-t1$plot_taxa_roles()
+t1$plot_taxa_roles(roles_color_background = FALSE)
 }
 
 ## ------------------------------------------------
@@ -78,17 +109,9 @@ t1$plot_taxa_roles()
 ## ------------------------------------------------
 
 \donttest{
-t1$subset_network(node = t1$res_node_type \%>\% .[.$module == "M1", ] \%>\% 
+t1$subset_network(node = t1$res_node_table \%>\% .[.$module == "M1", ] \%>\% 
   rownames, rm_single = TRUE)
 # return a sub network that contains all nodes of module M1
-}
-
-## ------------------------------------------------
-## Method `trans_network$get_edge_table`
-## ------------------------------------------------
-
-\donttest{
-t1$get_edge_table()
 }
 
 ## ------------------------------------------------
@@ -116,10 +139,12 @@ t1$cal_powerlaw_fit()
 \item \href{#method-save_network}{\code{trans_network$save_network()}}
 \item \href{#method-cal_network_attr}{\code{trans_network$cal_network_attr()}}
 \item \href{#method-cal_node_type}{\code{trans_network$cal_node_type()}}
+\item \href{#method-get_node_table}{\code{trans_network$get_node_table()}}
+\item \href{#method-get_edge_table}{\code{trans_network$get_edge_table()}}
+\item \href{#method-plot_network}{\code{trans_network$plot_network()}}
 \item \href{#method-cal_eigen}{\code{trans_network$cal_eigen()}}
 \item \href{#method-plot_taxa_roles}{\code{trans_network$plot_taxa_roles()}}
 \item \href{#method-subset_network}{\code{trans_network$subset_network()}}
-\item \href{#method-get_edge_table}{\code{trans_network$get_edge_table()}}
 \item \href{#method-cal_powerlaw_p}{\code{trans_network$cal_powerlaw_p()}}
 \item \href{#method-cal_powerlaw_fit}{\code{trans_network$cal_powerlaw_fit()}}
 \item \href{#method-print}{\code{trans_network$print()}}
@@ -151,11 +176,13 @@ This function is used to create the trans_network object, store the important in
 \describe{
 \item{\code{dataset}}{the object of \code{\link{microtable}} Class.}
 
-\item{\code{cor_method}}{default "pearson"; "pearson", "spearman" or "kendall"; correlation algorithm, only use for correlation based network.}
+\item{\code{cor_method}}{default "pearson"; "pearson", "spearman" or "kendall"; correlation algorithm, only use for correlation-based network.}
 
-\item{\code{cal_cor}}{default "base"; "base", "WGCNA", "SparCC" or NA; correlation method; NA represent do not calculate correlations, used for non-correlation based network.}
+\item{\code{cal_cor}}{default "base"; "base", "WGCNA", "SparCC" or NA; correlation method; NA represents no correlation calculation, 
+used for non-correlation based network, such as SpiecEasi and FlashWeave methods.}
 
-\item{\code{taxa_level}}{default "OTU"; taxonomic rank.}
+\item{\code{taxa_level}}{default "OTU"; taxonomic rank; 'OTU' represents using feature table directly; 
+other available options should be one of the colnames of microtable$tax_table.}
 
 \item{\code{filter_thres}}{default 0; the relative abundance threshold.}
 
@@ -163,25 +190,25 @@ This function is used to create the trans_network object, store the important in
 
 \item{\code{SparCC_simu_num}}{default 100; SparCC simulation number for bootstrap.}
 
-\item{\code{env_cols}}{default NULL; number or name vector to select the physicochemical data in dataset$sample_table.}
+\item{\code{env_cols}}{default NULL; numeric or character vector to select the column names of environmental data in dataset$sample_table;
+the environmental data can be used in the correlation network (as the nodes) or FlashWeave network.}
 
-\item{\code{add_data}}{default NULL; provide physicochemical table additionally.}
+\item{\code{add_data}}{default NULL; provide environmental table additionally instead of env_cols parameter; rownames must be sample names.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-res_cor_p list.
+res_cor_p list; include the correlation matrix and p value matrix.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
 data(dataset)
-# correlation network
-t1 <- trans_network$new(
-		dataset = dataset, 
-		cal_cor = "base", 
-		taxa_level = "OTU", 
-		filter_thres = 0.001)
+# for correlation network
+t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
+		taxa_level = "OTU", filter_thres = 0.0001)
+# for other network
+t1 <- trans_network$new(dataset = dataset, cal_cor = NA)
 }
 }
 \if{html}{\out{</div>}}
@@ -193,23 +220,22 @@ t1 <- trans_network$new(
 \if{html}{\out{<a id="method-cal_network"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_network}{}}}
 \subsection{Method \code{cal_network()}}{
-Calculate network either based on the correlation method or based on SpiecEasi or based on the Probabilistic Graphical Models (PGM) in julia FlashWeave; 
-See Deng et al. (2012) <doi:10.1186/1471-2105-13-113> for correlation based method, 
-Kurtz et al. (2015) <doi:doi:10.1371/journal.pcbi.1004226> for SpiecEasi method, 
-Tackmann et al. (2019) <doi:10.1016/j.cels.2019.08.002> for PGM based method.
+Calculate network based on the correlation method or SpiecEasi package or julia FlashWeave package or beemStatic package.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_network(
-  network_method = c("COR", "SpiecEasi", "PGM")[1],
-  p_thres = 0.01,
-  COR_weight = TRUE,
+  network_method = c("COR", "SpiecEasi", "FlashWeave", "beemStatic")[1],
+  COR_p_thres = 0.01,
   COR_p_adjust = "fdr",
+  COR_weight = TRUE,
   COR_cut = 0.6,
-  COR_low_threshold = 0.4,
   COR_optimization = FALSE,
-  PGM_meta_data = FALSE,
-  PGM_sensitive = "true",
-  PGM_heterogeneous = "true",
+  COR_low_threshold = 0.4,
   SpiecEasi_method = "mb",
+  FlashWeave_tempdir = NULL,
+  FlashWeave_meta_data = FALSE,
+  FlashWeave_other_para = "alpha=0.01,sensitive=true,heterogeneous=true",
+  beemStatic_t_strength = 0.001,
+  beemStatic_t_stab = 0.8,
   add_taxa_name = "Phylum",
   usename_rawtaxa_when_taxalevel_notOTU = FALSE,
   ...
@@ -219,43 +245,77 @@ Tackmann et al. (2019) <doi:10.1016/j.cels.2019.08.002> for PGM based method.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{network_method}}{default "COR"; "COR", "SpiecEasi" or "PGM"; COR: correlation based method; PGM: Probabilistic Graphical Models based method.}
+\item{\code{network_method}}{default "COR"; "COR", "SpiecEasi", "FlashWeave" or "beemStatic"; The option details: 
+\describe{
+  \item{\strong{'COR'}}{correlation-based network; use the correlation and p value matrixes in object$res_cor_p returned from trans_network$new; 
+        See Deng et al. (2012) <doi:10.1186/1471-2105-13-113> for other details}
+  \item{\strong{'SpiecEasi'}}{SpiecEasi network; relies on algorithms for sparse neighborhood and inverse covariance selection;
+        belong to the category of conditional dependence and graphical models;
+        see \href{https://github.com/zdk123/SpiecEasi}{https://github.com/zdk123/SpiecEasi} for installing the R package; 
+        see Kurtz et al. (2015) <doi:10.1371/journal.pcbi.1004226> for the algorithm details}
+  \item{\strong{'FlashWeave'}}{FlashWeave network; Local-to-global learning framework; belong to the category of conditional dependence and graphical models;
+     good performance on heterogenous datasets to find direct associations among taxa;
+     see \href{https://github.com/meringlab/FlashWeave.jl}{https://github.com/meringlab/FlashWeave.jl} for installing julia language and FlashWeave package;
+     julia must be in the computer system env path, otherwise the program can not find julia;
+     see Tackmann et al. (2019) <doi:10.1016/j.cels.2019.08.002> for the algorithm details}
+  \item{\strong{'beemStatic'}}{beemStatic network;
+     extend generalized Lotka-Volterra model to cases of cross-sectional datasets to infer interaction among taxa based on expectation-maximization algorithm;
+     see \href{https://github.com/CSB5/BEEM-static}{https://github.com/CSB5/BEEM-static} for installing the R package;
+     see Li et al. (2021) <doi:10.1371/journal.pcbi.1009343> for algorithm details}
+}}
 
-\item{\code{p_thres}}{default .01; the p value threshold.}
+\item{\code{COR_p_thres}}{default 0.01; the p value threshold for the correlation-based network.}
 
-\item{\code{COR_weight}}{default TRUE; whether use correlation coefficient as the weight of edges.}
+\item{\code{COR_p_adjust}}{default "fdr"; p value adjustment method, see method of p.adjust function for available options.}
 
-\item{\code{COR_p_adjust}}{default "fdr"; p.adjust method, see p.adjust.methods.}
+\item{\code{COR_weight}}{default TRUE; whether use correlation coefficient as the weight of edges; FALSE represents weight = 1 for all edges.}
 
-\item{\code{COR_cut}}{default .6; correlation coefficient threshold.}
-
-\item{\code{COR_low_threshold}}{default .4; the lowest correlation coefficient threshold, use with COR_optimization = TRUE.}
+\item{\code{COR_cut}}{default 0.6; correlation coefficient threshold for the correlation network.}
 
 \item{\code{COR_optimization}}{default FALSE; whether use random matrix theory to optimize the choice of correlation coefficient, see https://doi.org/10.1186/1471-2105-13-113}
 
-\item{\code{PGM_meta_data}}{default FALSE; whether use env data for the optimization, If TRUE, will automatically find the env_data in the object.}
+\item{\code{COR_low_threshold}}{default 0.4; the lowest correlation coefficient threshold, only useful when COR_optimization = TRUE.}
 
-\item{\code{PGM_sensitive}}{default "true"; whether use sensitive type in the PGM model.}
+\item{\code{SpiecEasi_method}}{default "mb"; either 'glasso' or 'mb';see spiec.easi function in package SpiecEasi and https://github.com/zdk123/SpiecEasi.}
 
-\item{\code{PGM_heterogeneous}}{default "true"; whether use heterogeneous type in the PGM model.}
+\item{\code{FlashWeave_tempdir}}{default NULL; The temporary directory used to save the temporary files for running FlashWeave; If not assigned, use the system user temp.}
 
-\item{\code{SpiecEasi_method}}{default "mb"; either 'glasso' or 'mb';see spiec.easi in package SpiecEasi and https://github.com/zdk123/SpiecEasi.}
+\item{\code{FlashWeave_meta_data}}{default FALSE; whether use env data for the optimization, If TRUE, the function automatically find the object$env_data in the object and
+generate a file for meta_data_path parameter of FlashWeave.}
 
-\item{\code{add_taxa_name}}{default "Phylum"; NULL or a taxonomic rank name; used to add taxonomic rank name to network.}
+\item{\code{FlashWeave_other_para}}{default "alpha=0.01,sensitive=true,heterogeneous=true"; the parameters used for FlashWeave;
+user can change the parameters or add more according to FlashWeave help document;
+An exception is meta_data_path parameter as it is generated based on the data inside the object, see FlashWeave_meta_data parameter for the description.}
+
+\item{\code{beemStatic_t_strength}}{default 0.001; for network_method = "beemStatic"; the threshold used to limit the number of interactions (strength);
+same with the t.strength parameter in showInteraction function of beemStatic package.}
+
+\item{\code{beemStatic_t_stab}}{default 0.8; for network_method = "beemStatic"; 
+the threshold used to limit the number of interactions (stability); same with the t.stab parameter in showInteraction function of beemStatic package.}
+
+\item{\code{add_taxa_name}}{default "Phylum"; NULL or a taxonomic rank name; used to add taxonomic rank name to network node properties.}
 
 \item{\code{usename_rawtaxa_when_taxalevel_notOTU}}{default FALSE; whether replace the name of nodes using the taxonomic information.}
 
-\item{\code{...}}{paremeters pass to spiec.easi in package SpiecEasi for network_method = "SpiecEasi".}
+\item{\code{...}}{paremeters pass to spiec.easi function of SpiecEasi package when network_method = "SpiecEasi" or 
+func.EM function of beemStatic package when network_method = "beemStatic".}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-res_network in object.
+res_network stored in object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$cal_network(p_thres = 0.01, COR_cut = 0.6)
+# for correlation network
+t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
+		taxa_level = "OTU", filter_thres = 0.0001)
+t1$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
+t1 <- trans_network$new(dataset = dataset, cal_cor = NA)
+t1$cal_network(network_method = "SpiecEasi")
+t1$cal_network(network_method = "beemStatic")
+t1$cal_network(network_method = "FlashWeave")
 }
 }
 \if{html}{\out{</div>}}
@@ -267,7 +327,7 @@ t1$cal_network(p_thres = 0.01, COR_cut = 0.6)
 \if{html}{\out{<a id="method-cal_module"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_module}{}}}
 \subsection{Method \code{cal_module()}}{
-Add network modules to the network.
+Calculate network modules and add module names to the network node properties.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_module(
   method = "cluster_fast_greedy",
@@ -281,7 +341,11 @@ Add network modules to the network.
 \item{\code{method}}{default "cluster_fast_greedy"; the method used to find the optimal community structure of a graph;
 the following are available functions (options) from igraph package: "cluster_fast_greedy", "cluster_optimal",
 "cluster_edge_betweenness", "cluster_infomap", "cluster_label_prop", "cluster_leading_eigen",
-"cluster_louvain", "cluster_spinglass", "cluster_walktrap".}
+"cluster_louvain", "cluster_spinglass", "cluster_walktrap". 
+For the details of these functions, see the help document, such as help(cluster_fast_greedy);
+Note that the default "cluster_fast_greedy" method can only be used for undirected network. 
+If the user selects network_method = "beemStatic" in cal_network function or provides other directed network, 
+please use cluster_optimal or others for the modules identification.}
 
 \item{\code{module_name_prefix}}{default "M"; the prefix of module names; module names are made of the module_name_prefix and numbers;
 numbers are assigned according to the sorting result of node numbers in modules with decreasing trend.}
@@ -289,12 +353,12 @@ numbers are assigned according to the sorting result of node numbers in modules 
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-a network with modules, stored in object.
+res_network with modules, stored in object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$cal_module()
+t1$cal_module(method = "cluster_fast_greedy")
 }
 }
 \if{html}{\out{</div>}}
@@ -306,7 +370,7 @@ t1$cal_module()
 \if{html}{\out{<a id="method-save_network"></a>}}
 \if{latex}{\out{\hypertarget{method-save_network}{}}}
 \subsection{Method \code{save_network()}}{
-Save network as gexf style, which can be opened by Gephi <https://gephi.org/>.
+Save network as gexf style, which can be opened by Gephi (\href{https://gephi.org/}{https://gephi.org/}).
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$save_network(filepath = "network.gexf")}\if{html}{\out{</div>}}
 }
@@ -314,13 +378,23 @@ Save network as gexf style, which can be opened by Gephi <https://gephi.org/>.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{filepath}}{default "network.gexf"; file path.}
+\item{\code{filepath}}{default "network.gexf"; file path to save the network.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
 None.
 }
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$save_network(filepath = "network.gexf")
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-cal_network_attr"></a>}}
@@ -332,7 +406,7 @@ Calculate network properties.
 }
 
 \subsection{Returns}{
-res_network_attr in object.
+res_network_attr stored in object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -349,20 +423,139 @@ t1$cal_network_attr()
 \if{html}{\out{<a id="method-cal_node_type"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_node_type}{}}}
 \subsection{Method \code{cal_node_type()}}{
-Calculate node properties.
-
-Authors: Chi Liu, Umer Zeeshan Ijaz
+Calculate node properties. This function will be deprecated in the next release! Please use get_node_table function!
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_node_type()}\if{html}{\out{</div>}}
 }
 
 \subsection{Returns}{
-res_node_type in object.
+see the Return part in function get_node_table.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-get_node_table"></a>}}
+\if{latex}{\out{\hypertarget{method-get_node_table}{}}}
+\subsection{Method \code{get_node_table()}}{
+Get the node property table. The properties may include the node names, modules allocation, degree, betweenness, abundance, 
+  taxonomy, within-module connectivity and among-module connectivity <doi:10.1016/j.geoderma.2022.115866>.
+
+Authors: Chi Liu, Umer Zeeshan Ijaz
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_network$get_node_table(node_roles = TRUE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{node_roles}}{default TRUE; whether calculate node roles, i.e. Module hubs, Network hubs, Connectors and Peripherals <doi:10.1016/j.geoderma.2022.115866>.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+res_node_table in object; Abundance expressed as a percentage; z represents within-module connectivity;
+  p represents among-module connectivity.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$cal_node_type()
+t1$get_node_table(node_roles = TRUE)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-get_edge_table"></a>}}
+\if{latex}{\out{\hypertarget{method-get_edge_table}{}}}
+\subsection{Method \code{get_edge_table()}}{
+Get the edge property table, including connected nodes, label and weight.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_network$get_edge_table()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+res_edge_table in object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+t1$get_edge_table()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-plot_network"></a>}}
+\if{latex}{\out{\hypertarget{method-plot_network}{}}}
+\subsection{Method \code{plot_network()}}{
+Plot the network based on a series of methods from other packages, such as igraph, ggraph and networkD3. 
+The networkD3 package provides dynamic network. It is especially useful for a glimpse of the whole network structure and finding 
+the interested nodes and edges in a large network. In contrast, the igraph and ggraph methods are suitable for relatively small network.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_network$plot_network(
+  method = c("igraph", "ggraph", "networkD3")[1],
+  node_label = "name",
+  node_color = NULL,
+  ggraph_layout = "fr",
+  ggraph_node_size = 2,
+  ggraph_text_color = NULL,
+  ggraph_text_size = 3,
+  networkD3_node_legend = TRUE,
+  networkD3_zoom = TRUE,
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{method}}{default "igraph"; The available options:
+\describe{
+  \item{\strong{'igraph'}}{call plot.igraph function in igraph package for a static network; see plot.igraph for the parameters}
+  \item{\strong{'ggraph'}}{call ggraph function in ggraph package for a static network}
+  \item{\strong{'networkD3'}}{use forceNetwork function in networkD3 package for a dynamic network; see forceNetwork function for the parameters}
+}}
+
+\item{\code{node_label}}{default "name"; node label shown in the plot for method = "ggraph" or method = "networkD3"; 
+Please see the column names of object$res_node_table, which is the returned table of function object$get_node_table;
+User can select other column names in res_node_table.}
+
+\item{\code{node_color}}{default NULL; node color assignment for method = "ggraph" or method = "networkD3"; 
+Select a column name of object$res_node_table, such as "module".}
+
+\item{\code{ggraph_layout}}{default "fr"; for method = "ggraph"; see layout parameter of create_layout function in ggraph package.}
+
+\item{\code{ggraph_node_size}}{default 2; for method = "ggraph"; the node size.}
+
+\item{\code{ggraph_text_color}}{default NULL; for method = "ggraph"; a column name of object$res_node_table;
+User can select other column names or change the content of object$res_node_table.}
+
+\item{\code{ggraph_text_size}}{default 3; for method = "ggraph"; the node label text size.}
+
+\item{\code{networkD3_node_legend}}{default TRUE; used for method = "networkD3"; logical value to enable node colour legends;
+Please see the legend parameter in networkD3::forceNetwork function.}
+
+\item{\code{networkD3_zoom}}{default TRUE; used for method = "networkD3"; logical value to enable (TRUE) or disable (FALSE) zooming;
+Please see the zoom parameter in networkD3::forceNetwork function.}
+
+\item{\code{...}}{parameters passed to plot.igraph function when method = "igraph" or forceNetwork function when method = "networkD3".}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+network plot.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+t1$plot_network(method = "igraph", layout = layout_with_kk)
+t1$plot_network(method = "ggraph", node_color = "module")
+t1$plot_network(method = "networkD3", node_color = "module")
 }
 }
 \if{html}{\out{</div>}}
@@ -374,7 +567,7 @@ t1$cal_node_type()
 \if{html}{\out{<a id="method-cal_eigen"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_eigen}{}}}
 \subsection{Method \code{cal_eigen()}}{
-Calculate eigengenes of modules, i.e. the first principal component based on PCA analysis, and the percentage of variance.
+Calculate eigengenes of modules, i.e. the first principal component based on PCA analysis, and the percentage of variance <doi:10.1186/1471-2105-13-113>.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_eigen()}\if{html}{\out{</div>}}
 }
@@ -397,12 +590,14 @@ t1$cal_eigen()
 \if{html}{\out{<a id="method-plot_taxa_roles"></a>}}
 \if{latex}{\out{\hypertarget{method-plot_taxa_roles}{}}}
 \subsection{Method \code{plot_taxa_roles()}}{
-Plot the classification and importance of nodes, see object$res_node_type for the variable names used in the parameters.
+Plot the classification and importance of nodes, see object$res_node_table for the variable names used in the parameters.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$plot_taxa_roles(
   use_type = c(1, 2)[1],
-  roles_colors = NULL,
+  roles_color_background = FALSE,
+  roles_color_values = NULL,
   plot_module = FALSE,
+  x_lim = c(0, 1),
   use_level = "Phylum",
   show_value = c("z", "p"),
   show_number = 1:10,
@@ -410,7 +605,8 @@ Plot the classification and importance of nodes, see object$res_node_type for th
   plot_shape = "taxa_roles",
   plot_size = "Abundance",
   color_values = RColorBrewer::brewer.pal(12, "Paired"),
-  shape_values = c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14)
+  shape_values = c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14),
+  ...
 )}\if{html}{\out{</div>}}
 }
 
@@ -419,25 +615,31 @@ Plot the classification and importance of nodes, see object$res_node_type for th
 \describe{
 \item{\code{use_type}}{default 1; 1 or 2; 1 represents taxa roles area plot; 2 represents the layered plot with taxa as x axis.}
 
-\item{\code{roles_colors}}{default NULL; for use_type 1; colors for each group.}
+\item{\code{roles_color_background}}{default FALSE; for use_type=1; TRUE: use background colors for each area; FALSE: use classic point colors.}
 
-\item{\code{plot_module}}{default FALSE; for use_type 1; whether plot the modules information.}
+\item{\code{roles_color_values}}{default NULL; for use_type=1; color palette for background or points.}
 
-\item{\code{use_level}}{default "Phylum"; for use_type 2; used taxonomic level in x axis.}
+\item{\code{plot_module}}{default FALSE; for use_type=1; whether plot the modules information.}
 
-\item{\code{show_value}}{default c("z", "p"); for use_type 2; used variable in y axis.}
+\item{\code{x_lim}}{default c(0, 1); for use_type=1; x axis range when roles_color_background = FALSE.}
 
-\item{\code{show_number}}{default 1:10; for use_type 2; showed number in x axis, sorting according to the nodes number.}
+\item{\code{use_level}}{default "Phylum"; for use_type=2; used taxonomic level in x axis.}
 
-\item{\code{plot_color}}{default "Phylum"; for use_type 2; used variable for color.}
+\item{\code{show_value}}{default c("z", "p"); for use_type=2; used variable in y axis.}
 
-\item{\code{plot_shape}}{default "taxa_roles"; for use_type 2; used variable for shape.}
+\item{\code{show_number}}{default 1:10; for use_type=2; showed number in x axis, sorting according to the nodes number.}
 
-\item{\code{plot_size}}{default "Abundance"; for use_type 2; used for point size; a fixed number (e.g. 5) is also available.}
+\item{\code{plot_color}}{default "Phylum"; for use_type=2; used variable for color.}
 
-\item{\code{color_values}}{default RColorBrewer::brewer.pal(12, "Paired"); for use_type 2; color vector}
+\item{\code{plot_shape}}{default "taxa_roles"; for use_type=2; used variable for shape.}
 
-\item{\code{shape_values}}{default c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14); for use_type 2; shape vector, see ggplot2 tutorial for the shape meaning.}
+\item{\code{plot_size}}{default "Abundance"; for use_type=2; used for point size; a fixed number (e.g. 5) is also available.}
+
+\item{\code{color_values}}{default RColorBrewer::brewer.pal(12, "Paired"); for use_type=2; color vector}
+
+\item{\code{shape_values}}{default c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14); for use_type=2; shape vector, see ggplot2 tutorial for the shape meaning.}
+
+\item{\code{...}}{paremeters pass to geom_point.}
 }
 \if{html}{\out{</div>}}
 }
@@ -447,7 +649,7 @@ ggplot.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$plot_taxa_roles()
+t1$plot_taxa_roles(roles_color_background = FALSE)
 }
 }
 \if{html}{\out{</div>}}
@@ -481,32 +683,9 @@ a new network
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$subset_network(node = t1$res_node_type \%>\% .[.$module == "M1", ] \%>\% 
+t1$subset_network(node = t1$res_node_table \%>\% .[.$module == "M1", ] \%>\% 
   rownames, rm_single = TRUE)
 # return a sub network that contains all nodes of module M1
-}
-}
-\if{html}{\out{</div>}}
-
-}
-
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-get_edge_table"></a>}}
-\if{latex}{\out{\hypertarget{method-get_edge_table}{}}}
-\subsection{Method \code{get_edge_table()}}{
-Get the table of edges, including connected nodes, labels and weight.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_network$get_edge_table()}\if{html}{\out{</div>}}
-}
-
-\subsection{Returns}{
-data.frame
-}
-\subsection{Examples}{
-\if{html}{\out{<div class="r example copy">}}
-\preformatted{\donttest{
-t1$get_edge_table()
 }
 }
 \if{html}{\out{</div>}}
@@ -564,7 +743,7 @@ Fit degrees to a power law distribution.
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-list stored in object; see fit_power_law function for the details explanation.
+res_powerlaw_fit stored in object; see fit_power_law function for the details explanation.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}

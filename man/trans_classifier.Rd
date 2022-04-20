@@ -4,7 +4,8 @@
 \alias{trans_classifier}
 \title{Create trans_classifier object for machine-learning-based model prediction.}
 \description{
-This class is a wrapper for methods of machine-learning-based classification models.
+This class is a wrapper for methods of machine-learning-based classification models, including data pre-processing, feature selection, 
+data split, model training, prediction, confusionMatrix and ROC (Receiver Operator Characteristic) or PR (Precision-Recall) curve.
 
 Author(s): Felipe Mansoldo and Chi Liu
 }
@@ -18,8 +19,16 @@ Author(s): Felipe Mansoldo and Chi Liu
 data(dataset)
 t1 <- trans_classifier$new(
 		dataset = dataset, 
-		x.predictors = "all",
+		x.predictors = "Genus",
 		y.response = "Group")
+}
+
+## ------------------------------------------------
+## Method `trans_classifier$cal_preProcess`
+## ------------------------------------------------
+
+\dontrun{
+t1$cal_preProcess(method = c("center", "scale", "nzv"))
 }
 
 ## ------------------------------------------------
@@ -43,7 +52,7 @@ t1$cal_split(prop.train = 3/4)
 ## ------------------------------------------------
 
 \dontrun{
-t1$set_trainControl()
+t1$set_trainControl(method = 'repeatedcv')
 }
 
 ## ------------------------------------------------
@@ -51,7 +60,10 @@ t1$set_trainControl()
 ## ------------------------------------------------
 
 \dontrun{
-t1$cal_train()
+# random forest
+t1$cal_train(method = "rf")
+# Support Vector Machines with Radial Basis Function Kernel
+t1$cal_train(method = "svmRadial", tuneLength = 15)
 }
 
 ## ------------------------------------------------
@@ -98,6 +110,7 @@ t1$plot_ROC(size = 1, alpha = 0.7)
 \subsection{Public methods}{
 \itemize{
 \item \href{#method-new}{\code{trans_classifier$new()}}
+\item \href{#method-cal_preProcess}{\code{trans_classifier$cal_preProcess()}}
 \item \href{#method-cal_feature_sel}{\code{trans_classifier$cal_feature_sel()}}
 \item \href{#method-cal_split}{\code{trans_classifier$cal_split()}}
 \item \href{#method-set_trainControl}{\code{trans_classifier$set_trainControl()}}
@@ -130,11 +143,11 @@ Create the trans_classifier object.
 \item{\code{dataset}}{the object of \code{\link{microtable}} Class.}
 
 \item{\code{x.predictors}}{default "all"; character string or data.frame; a character string represents selecting the corresponding data from microtable$taxa_abund; 
-data.frame represents other customized data. See the following available options and description:
+data.frame represents other customized data. See the following available options:
 \describe{
   \item{\strong{'all'}}{use all the taxa stored in microtable$taxa_abund}
-  \item{\strong{'Genus'}}{use Genus level table in microtable$taxa_abund, or other specific taxonomic rank}
-  \item{\strong{other input}}{must be a data.frame; It should be have the same format with the data.frame in microtable$taxa_abund, i.e. rows are features; 
+  \item{\strong{'Genus'}}{use Genus level table in microtable$taxa_abund, or other specific taxonomic rank, e.g. 'Phylum'}
+  \item{\strong{other input}}{must be a data.frame; It should have the same format with the data.frame in microtable$taxa_abund, i.e. rows are features; 
     cols are samples with same names in sample_table}
 }}
 
@@ -153,8 +166,39 @@ data_feature and data_response in the object.
 data(dataset)
 t1 <- trans_classifier$new(
 		dataset = dataset, 
-		x.predictors = "all",
+		x.predictors = "Genus",
 		y.response = "Group")
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-cal_preProcess"></a>}}
+\if{latex}{\out{\hypertarget{method-cal_preProcess}{}}}
+\subsection{Method \code{cal_preProcess()}}{
+Pre-process (centering, scaling etc.) of the feature data based on the caret::preProcess function. 
+	 See \href{https://topepo.github.io/caret/pre-processing.html}{https://topepo.github.io/caret/pre-processing.html} for more details.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_preProcess(...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{parameters pass to preProcess function of caret package.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+converted data_feature in the object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$cal_preProcess(method = c("center", "scale", "nzv"))
 }
 }
 \if{html}{\out{</div>}}
@@ -167,6 +211,7 @@ t1 <- trans_classifier$new(
 \if{latex}{\out{\hypertarget{method-cal_feature_sel}{}}}
 \subsection{Method \code{cal_feature_sel()}}{
 Perform feature selection.
+	 See \href{https://topepo.github.io/caret/feature-selection-overview.html}{https://topepo.github.io/caret/feature-selection-overview.html} for more details.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_feature_sel(
   boruta.maxRuns = 300,
@@ -220,7 +265,7 @@ Split data for training and testing.
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-optimized data_feature in the object.
+data_train and data_test in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -237,15 +282,26 @@ t1$cal_split(prop.train = 3/4)
 \if{html}{\out{<a id="method-set_trainControl"></a>}}
 \if{latex}{\out{\hypertarget{method-set_trainControl}{}}}
 \subsection{Method \code{set_trainControl()}}{
-Set trainControl for the following training.
+Control parameters for the following training. See trainControl function of caret package for details.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$set_trainControl(method = "repeatedcv", ...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$set_trainControl(
+  method = "repeatedcv",
+  classProbs = TRUE,
+  savePredictions = TRUE,
+  ...
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{method}}{default 'repeatedcv'; the method used in trainControl function of caret package.}
+\item{\code{method}}{default 'repeatedcv'; 'repeatedcv': Repeated k-Fold cross validation; 
+see method parameter in trainControl function of caret package for available options.}
+
+\item{\code{classProbs}}{default TRUE; should class probabilities be computed for classification models?;
+see classProbs parameter in caret::trainControl function.}
+
+\item{\code{savePredictions}}{default TRUE; see savePredictions parameter in caret::trainControl function}
 
 \item{\code{...}}{parameters pass to trainControl function of caret package.}
 }
@@ -257,7 +313,7 @@ trainControl in the object.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
-t1$set_trainControl()
+t1$set_trainControl(method = 'repeatedcv')
 }
 }
 \if{html}{\out{</div>}}
@@ -269,7 +325,7 @@ t1$set_trainControl()
 \if{html}{\out{<a id="method-cal_train"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_train}{}}}
 \subsection{Method \code{cal_train()}}{
-Run the training.
+Run the model training.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_train(
   method = "rf",
@@ -283,13 +339,13 @@ Run the training.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{method}}{default "rf"; representing the random forest method; see method in train function of caret package.}
+\item{\code{method}}{default "rf"; "rf": random forest; see method in caret::train function for other options.}
 
-\item{\code{metric}}{default "Accuracy"; see metric in train function of caret package.}
+\item{\code{metric}}{default "Accuracy"; see metric in caret::train function for other options.}
 
-\item{\code{max.mtry}}{default 2; maximum mtry.}
+\item{\code{max.mtry}}{default 2; for method = "rf"; maximum mtry used for the tunegrid to do hyperparameter tuning to optimize the model.}
 
-\item{\code{max.ntree}}{default 200; Number of trees to grow; pass to the ntree parameter of randomForest function in randomForest package.}
+\item{\code{max.ntree}}{default 200; for method = "rf"; maximum number of trees used to optimize the model.}
 
 \item{\code{...}}{parameters pass to train function of caret package.}
 }
@@ -301,7 +357,10 @@ res_train in the object.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
-t1$cal_train()
+# random forest
+t1$cal_train(method = "rf")
+# Support Vector Machines with Radial Basis Function Kernel
+t1$cal_train(method = "svmRadial", tuneLength = 15)
 }
 }
 \if{html}{\out{</div>}}
@@ -321,7 +380,7 @@ Get feature importance from the training model.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{...}}{parameters pass to the evaluating function; If "rf" used, pass to randomForest::importance.}
+\item{\code{...}}{parameters pass to varImp function of caret package.}
 }
 \if{html}{\out{</div>}}
 }
@@ -351,12 +410,13 @@ Run the prediction.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{positive_class}}{default NULL; see positive parameter in confusionMatrix function of caret package.}
+\item{\code{positive_class}}{default NULL; see positive parameter in confusionMatrix function of caret package;
+If positive_class is NULL, use the first group in data as the positive class automatically.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-res_confusion_fit and res_confusion_stats stored in the object.
+res_predict, res_confusion_fit and res_confusion_stats stored in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -391,7 +451,7 @@ Plot the cross-tabulation of observed and predicted classes with associated stat
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-ggplot object in the object.
+ggplot object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -408,20 +468,21 @@ t1$plot_confusionMatrix()
 \if{html}{\out{<a id="method-cal_ROC"></a>}}
 \if{latex}{\out{\hypertarget{method-cal_ROC}{}}}
 \subsection{Method \code{cal_ROC()}}{
-Get ROC curve data and the performance data.
+Get ROC (Receiver Operator Characteristic) curve data and the performance data.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_ROC(...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_ROC(input = "pred")}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{...}}{parameters pass to plot.performance function of ROCR package.}
+\item{\code{input}}{default "pred"; 'pred' or 'train'; 'pred' represents using prediction results;
+'train' represents using training results.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-a list including res_perf, all_auc_perf and all_perf_table stored in the object.
+a list res_ROC stored in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -441,7 +502,11 @@ t1$cal_ROC()
 Plot ROC curve.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$plot_ROC(
+  plot_type = c("ROC", "PR")[1],
+  plot_group = "all",
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),
+  add_AUC = TRUE,
+  plot_method = FALSE,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -449,9 +514,21 @@ Plot ROC curve.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
+\item{\code{plot_type}}{default c("ROC", "PR")[1]; 'ROC' represents ROC (Receiver Operator Characteristic) curve; 
+'PR' represents PR (Precision-Recall) curve.}
+
+\item{\code{plot_group}}{default "all"; 'all' represents all the classes in the model;
+'add' represents all adding micro-average and macro-average results, see 
+\href{https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html}{https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html};
+other options should be one or more class names, same with the names in Group column of res_ROC$res_roc from cal_ROC function.}
+
 \item{\code{color_values}}{default RColorBrewer::brewer.pal(8, "Dark2"); colors used in the plot.}
 
-\item{\code{...}}{parameters pass to geom_line function of ggplot2 package.}
+\item{\code{add_AUC}}{default TRUE; whether add AUC in the legend.}
+
+\item{\code{plot_method}}{default FALSE; If TRUE, show the method in the legend though only one method is found.}
+
+\item{\code{...}}{parameters pass to geom_path function of ggplot2 package.}
 }
 \if{html}{\out{</div>}}
 }
