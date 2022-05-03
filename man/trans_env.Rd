@@ -18,6 +18,24 @@ data(env_data_16S)
 t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S[, 4:11])
 
 ## ------------------------------------------------
+## Method `trans_env$cal_diff`
+## ------------------------------------------------
+
+\donttest{
+t1$cal_diff(group = "Group", method = "KW")
+t1$cal_diff(group = "Group", method = "KW_dunn")
+t1$cal_diff(group = "Group", method = "anova")
+}
+
+## ------------------------------------------------
+## Method `trans_env$cal_autocor`
+## ------------------------------------------------
+
+\donttest{
+t1$cal_autocor(method = "GGally")
+}
+
+## ------------------------------------------------
 ## Method `trans_env$cal_ordination`
 ## ------------------------------------------------
 
@@ -51,6 +69,10 @@ t1$trans_ordination(adjust_arrow_length = TRUE, min_perc_env = 0.1, max_perc_env
 t1$cal_ordination(method = "RDA")
 t1$trans_ordination(adjust_arrow_length = TRUE, max_perc_env = 1.5)
 t1$plot_ordination(plot_color = "Group")
+t1$plot_ordination(plot_color = "Group", plot_shape = "Group", plot_type = c("point", "ellipse"))
+t1$plot_ordination(plot_color = "Group", plot_type = c("point", "chull"))
+t1$plot_ordination(plot_color = "Group", plot_type = c("point", "centroid"), 
+	  centroid_segment_linetype = 1)
 t1$plot_ordination(plot_color = "Group", env_nudge_x = c(0.4, 0, 0, 0, 0, -0.2, 0, 0), 
 	  env_nudge_y = c(0.6, 0, 0.2, 0.5, 0, 0.1, 0, 0.2))
 }
@@ -71,7 +93,7 @@ t1$cal_mantel(partial_mantel = TRUE, use_measure = "bray")
 \donttest{
 t2 <- trans_diff$new(dataset = dataset, method = "rf", group = "Group", rf_taxa_level = "Genus")
 t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S[, 4:11])
-t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_rf$Taxa[1:40])
+t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_diff$Taxa[1:40])
 }
 
 ## ------------------------------------------------
@@ -87,13 +109,19 @@ t1$plot_cor(pheatmap = FALSE)
 ## ------------------------------------------------
 
 \donttest{
-t1$plot_scatterfit(x = 1, y = 2, alpha = .5)
+t1$plot_scatterfit(x = 1, y = 2, type = "cor")
+t1$plot_scatterfit(x = 1, y = 2, type = "lm", point_alpha = .3)
+t1$plot_scatterfit(x = "pH", y = "TOC", type = "lm", group = "Group", line_se = FALSE)
+t1$plot_scatterfit(x = 
+	 dataset$beta_diversity$bray[rownames(t1$data_env), rownames(t1$data_env)], y = "pH")
 }
 }
 \section{Methods}{
 \subsection{Public methods}{
 \itemize{
 \item \href{#method-new}{\code{trans_env$new()}}
+\item \href{#method-cal_diff}{\code{trans_env$cal_diff()}}
+\item \href{#method-cal_autocor}{\code{trans_env$cal_autocor()}}
 \item \href{#method-cal_ordination}{\code{trans_env$cal_ordination()}}
 \item \href{#method-cal_ordination_envsquare}{\code{trans_env$cal_ordination_envsquare()}}
 \item \href{#method-trans_ordination}{\code{trans_env$trans_ordination()}}
@@ -141,13 +169,113 @@ If TRUE, the function can run the interpolation with the mice package; to use th
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-env_data in trans_env object.
+data_env in trans_env object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{data(dataset)
 data(env_data_16S)
 t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S[, 4:11])
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-cal_diff"></a>}}
+\if{latex}{\out{\hypertarget{method-cal_diff}{}}}
+\subsection{Method \code{cal_diff()}}{
+Test the difference of environmental variable across groups.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_diff(
+  group = NULL,
+  method = c("KW", "KW_dunn", "wilcox", "t.test", "anova")[1],
+  measure = NULL,
+  p_adjust_method = "fdr",
+  anova_set = NULL,
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{group}}{default NULL; a colname of sample_table used to compare values across groups.}
+
+\item{\code{method}}{default "KW"; see the following available options:
+\describe{
+  \item{\strong{'KW'}}{KW: Kruskal-Wallis Rank Sum Test for all groups (>= 2)}
+  \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons, see dunnTest function in FSA package}
+  \item{\strong{'wilcox'}}{Wilcoxon Rank Sum and Signed Rank Tests for all paired groups }
+  \item{\strong{'t.test'}}{Student's t-Test for all paired groups}
+  \item{\strong{'anova'}}{Duncan's multiple range test for anova}
+}}
+
+\item{\code{measure}}{default NULL; a vector; if null, all variables will be calculated.}
+
+\item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of p.adjust function for available options.}
+
+\item{\code{anova_set}}{default NULL; specified group set for anova, such as 'block + N*P*K', see \code{\link{aov}}.}
+
+\item{\code{...}}{parameters passed to kruskal.test or wilcox.test function (method = "KW") or dunnTest function of FSA package (method = "KW_dunn") or
+agricolae::duncan.test (method = "anova").}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+res_diff in object. A data.frame generally. A list for anova when anova_set is assigned.
+  In the data frame, 'Group' column means that the group has the maximum median or mean value across the test groups;
+  For non-parametric methods, maximum median value; For t.test, maximum mean value.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+t1$cal_diff(group = "Group", method = "KW")
+t1$cal_diff(group = "Group", method = "KW_dunn")
+t1$cal_diff(group = "Group", method = "anova")
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-cal_autocor"></a>}}
+\if{latex}{\out{\hypertarget{method-cal_autocor}{}}}
+\subsection{Method \code{cal_autocor()}}{
+Calculate the autocorrelations among environmental variables and plot the result.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_autocor(
+  group = NULL,
+  color_values = RColorBrewer::brewer.pal(8, "Dark2"),
+  alpha = 0.8,
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{group}}{default NULL; a colname of sample_table; used to perform calculations for different groups.}
+
+\item{\code{color_values}}{default RColorBrewer::brewer.pal(8, "Dark2"); colors palette.}
+
+\item{\code{alpha}}{default 0.8; the alpha value to add transparency in colors; useful when group is not NULL.}
+
+\item{\code{...}}{default parameters passed to GGally::ggpairs.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+ggmatrix.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+t1$cal_autocor(method = "GGally")
+}
 }
 \if{html}{\out{</div>}}
 
@@ -301,10 +429,20 @@ plot ordination result.
   env_arrow_color = "grey30",
   taxa_text_color = "firebrick1",
   taxa_arrow_color = "firebrick1",
-  sample_point_size = 3.5,
   env_text_size = 3.7,
   taxa_text_size = 3,
   taxa_text_italic = TRUE,
+  plot_type = "point",
+  point_size = 3,
+  point_alpha = 0.8,
+  centroid_segment_alpha = 0.6,
+  centroid_segment_size = 1,
+  centroid_segment_linetype = 3,
+  ellipse_chull_fill = TRUE,
+  ellipse_chull_alpha = 0.1,
+  ellipse_level = 0.9,
+  ellipse_type = "t",
+  add_sample_label = NULL,
   env_nudge_x = NULL,
   env_nudge_y = NULL,
   taxa_nudge_x = NULL,
@@ -316,13 +454,13 @@ plot ordination result.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{plot_color}}{default NULL; group used for color.}
+\item{\code{plot_color}}{default NULL; a colname of sample_table to assign colors to different groups in plot.}
 
-\item{\code{plot_shape}}{default NULL; group used for shape.}
+\item{\code{plot_shape}}{default NULL; a colname of sample_table to assign shapes to different groups in plot.}
 
-\item{\code{color_values}}{default RColorBrewer::brewer.pal(8, "Dark2"); color pallete.}
+\item{\code{color_values}}{default RColorBrewer::brewer.pal(8, "Dark2"); color pallete for different groups.}
 
-\item{\code{shape_values}}{default c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14); vector used for the shape; see ggplot2 tutorial.}
+\item{\code{shape_values}}{default c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14); a vector for point shape types of groups, see ggplot2 tutorial.}
 
 \item{\code{env_text_color}}{default "black"; environmental variable text color.}
 
@@ -332,13 +470,39 @@ plot ordination result.
 
 \item{\code{taxa_arrow_color}}{default "firebrick1"; taxa arrow color.}
 
-\item{\code{sample_point_size}}{default 3.5; sample point size.}
-
 \item{\code{env_text_size}}{default 3.7; environmental variable text size.}
 
 \item{\code{taxa_text_size}}{default 3; taxa text size.}
 
 \item{\code{taxa_text_italic}}{default TRUE; "italic"; whether use "italic" style for the taxa text in the plot.}
+
+\item{\code{plot_type}}{default "point"; one or more elements of "point", "ellipse", "chull" and "centroid".
+\describe{
+  \item{\strong{'point'}}{add point}
+  \item{\strong{'ellipse'}}{add confidence ellipse for points of each group}
+  \item{\strong{'chull'}}{add convex hull for points of each group}
+  \item{\strong{'centroid'}}{add centroid line of each group}
+}}
+
+\item{\code{point_size}}{default 3; point size in plot when "point" is in plot_type.}
+
+\item{\code{point_alpha}}{default .8; point transparency in plot when "point" is in plot_type.}
+
+\item{\code{centroid_segment_alpha}}{default 0.6; segment transparency in plot when "centroid" is in plot_type.}
+
+\item{\code{centroid_segment_size}}{default 1; segment size in plot when "centroid" is in plot_type.}
+
+\item{\code{centroid_segment_linetype}}{default 3; the line type related with centroid in plot when "centroid" is in plot_type.}
+
+\item{\code{ellipse_chull_fill}}{default TRUE; whether fill colors to the area of ellipse or chull.}
+
+\item{\code{ellipse_chull_alpha}}{default 0.1; color transparency in the ellipse or convex hull depending on whether "ellipse" or "centroid" is in plot_type.}
+
+\item{\code{ellipse_level}}{default .9; confidence level of ellipse when "ellipse" is in plot_type.}
+
+\item{\code{ellipse_type}}{default "t"; ellipse type when "ellipse" is in plot_type; see type in \code{\link{stat_ellipse}}.}
+
+\item{\code{add_sample_label}}{default NULL; the column name in sample table, if provided, show the point name in plot.}
 
 \item{\code{env_nudge_x}}{default NULL; numeric vector to adjust the env text x axis position; passed to nudge_x parameter of geom_text_repel function of ggrepel package;
 default NULL represents automatic adjustment; the length must be same with the row number of object$res_ordination_trans$df_arrows. For example, 
@@ -370,6 +534,10 @@ ggplot object.
 t1$cal_ordination(method = "RDA")
 t1$trans_ordination(adjust_arrow_length = TRUE, max_perc_env = 1.5)
 t1$plot_ordination(plot_color = "Group")
+t1$plot_ordination(plot_color = "Group", plot_shape = "Group", plot_type = c("point", "ellipse"))
+t1$plot_ordination(plot_color = "Group", plot_type = c("point", "chull"))
+t1$plot_ordination(plot_color = "Group", plot_type = c("point", "centroid"), 
+	  centroid_segment_linetype = 1)
 t1$plot_ordination(plot_color = "Group", env_nudge_x = c(0.4, 0, 0, 0, 0, -0.2, 0, 0), 
 	  env_nudge_y = c(0.6, 0, 0.2, 0.5, 0, 0.1, 0, 0.2))
 }
@@ -399,7 +567,7 @@ Mantel test between beta diversity matrix and environmental data.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{select_env_data}}{default NULL; numeric or character vector to select columns in env_data; if not provided, automatically select the columns with numeric attributes.}
+\item{\code{select_env_data}}{default NULL; numeric or character vector to select columns in data_env; if not provided, automatically select the columns with numeric attributes.}
 
 \item{\code{partial_mantel}}{default FALSE; whether use partial mantel test; If TRUE, use other measurements as the zdis.}
 
@@ -459,7 +627,7 @@ Actually, it can also be used for calculating other correlation between any two 
 \item{\code{use_data}}{default "Genus"; "Genus", "all" or "other"; "Genus" or other taxonomic name: use genus or other taxonomic abundance table in taxa_abund; 
 "all": use all merged taxa abundance table; "other": provide additional taxa name with other_taxa parameter which is necessary.}
 
-\item{\code{select_env_data}}{default NULL; numeric or character vector to select columns in env_data; if not provided, automatically select the columns with numeric attributes.}
+\item{\code{select_env_data}}{default NULL; numeric or character vector to select columns in data_env; if not provided, automatically select the columns with numeric attributes.}
 
 \item{\code{cor_method}}{default "pearson"; "pearson", "spearman" or "kendall"; correlation method.}
 
@@ -493,7 +661,7 @@ res_cor in object.
 \preformatted{\donttest{
 t2 <- trans_diff$new(dataset = dataset, method = "rf", group = "Group", rf_taxa_level = "Genus")
 t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S[, 4:11])
-t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_rf$Taxa[1:40])
+t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_diff$Taxa[1:40])
 }
 }
 \if{html}{\out{</div>}}
@@ -589,19 +757,31 @@ t1$plot_cor(pheatmap = FALSE)
 Scatter plot and add fitted line. The most important thing is to make sure that the input x and y
  have correponding sample orders. If one of x and y is a matrix, the other will be also transformed to matrix with Euclidean distance.
  Then, both of them are transformed to be vectors. If x or y is a vector with a single value, x or y will be
- assigned according to the column selection of the env_data inside.
+ assigned according to the column selection of the data_env inside.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_env$plot_scatterfit(
   x = NULL,
   y = NULL,
-  use_cor = TRUE,
+  group = NULL,
+  group_order = NULL,
+  color_values = RColorBrewer::brewer.pal(8, "Dark2"),
+  shape_values = NULL,
+  type = c("cor", "lm")[1],
   cor_method = "pearson",
-  add_line = TRUE,
-  use_se = TRUE,
-  text_x_pos = NULL,
-  text_y_pos = NULL,
+  label_sep = ";",
+  label.x.npc = "left",
+  label.y.npc = "top",
+  label.x = NULL,
+  label.y = NULL,
   x_axis_title = "",
   y_axis_title = "",
+  point_size = 5,
+  point_alpha = 0.6,
+  line_size = 0.8,
+  line_alpha = 1,
+  line_color = "black",
+  line_se = TRUE,
+  line_se_color = "grey70",
   pvalue_trim = 4,
   cor_coef_trim = 3,
   lm_fir_trim = 2,
@@ -615,28 +795,60 @@ Scatter plot and add fitted line. The most important thing is to make sure that 
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{x}}{default NULL; a single numeric or character value or a vector or a distance matrix used for the x axis.
-If x is a single value, it will be used to select the column of env_data inside.
+If x is a single value, it will be used to select the column of data_env inside.
 If x is a distance matrix, it will be transformed to be a vector.}
 
 \item{\code{y}}{default NULL; a single numeric or character value or a vector or a distance matrix used for the y axis.
-If y is a single value, it will be used to select the column of env_data inside.
+If y is a single value, it will be used to select the column of data_env inside.
 If y is a distance matrix, it will be transformed to be a vector.}
 
-\item{\code{use_cor}}{default TRUE; TRUE for correlation; FALSE for regression.}
+\item{\code{group}}{default NULL; a character vector; if length is 1, must be a colname of dataset$sample_table;
+Otherwise, group should be a vector with same length of x/y (for vector) or ncol of x/y (for matrix).}
 
-\item{\code{cor_method}}{default "pearson"; one of "pearson", "kendall" and "spearman".}
+\item{\code{group_order}}{default NULL; a vector to order groups, i.e. reorder the legend and colors in plot when group is not NULL; 
+If group_order is NULL and group is provided, the function can first check whether the group column of dataset$sample_table is factor. 
+If provided, overlook the levels in the group of dataset$sample_table.}
 
-\item{\code{add_line}}{default TRUE; whether add the fitted line in the plot.}
+\item{\code{color_values}}{default RColorBrewer::brewer.pal(8, "Dark2"); color pallete for different groups.}
 
-\item{\code{use_se}}{default TRUE; Whether show the confidence interval for the fitting.}
+\item{\code{shape_values}}{default NULL; a numeric vector for point shape types of groups when group is not NULL, see ggplot2 tutorial.}
 
-\item{\code{text_x_pos}}{default NULL; the central x axis position of the fitting text.}
+\item{\code{type}}{default c("cor", "lm")[1]; "cor": correlation; "lm" for regression.}
 
-\item{\code{text_y_pos}}{default NULL; the central y axis position of the fitting text.}
+\item{\code{cor_method}}{default "pearson"; one of "pearson", "kendall" and "spearman"; correlation method.}
+
+\item{\code{label_sep}}{default ";"; the separator string between different label parts.}
+
+\item{\code{label.x.npc}}{default "left"; can be numeric or character vector of the same length as the number of groups and/or panels. If too short they will be recycled.
+\describe{
+  \item{numeric}{value should be between 0 and 1. Coordinates to be used for positioning the label, expressed in "normalized parent coordinates"}
+  \item{character}{allowed values include: i) one of c('right', 'left', 'center', 'centre', 'middle') for x-axis; ii) and one of 
+     c( 'bottom', 'top', 'center', 'centre', 'middle') for y-axis.}
+}}
+
+\item{\code{label.y.npc}}{default "top"; same usage with label.x.npc; see also label.y.npc parameter of stat_cor of ggpubr package.}
+
+\item{\code{label.x}}{default NULL; x axis absolute position for adding the statictic label.}
+
+\item{\code{label.y}}{default NULL; x axis absolute position for adding the statictic label.}
 
 \item{\code{x_axis_title}}{default ""; the title of x axis.}
 
 \item{\code{y_axis_title}}{default ""; the title of y axis.}
+
+\item{\code{point_size}}{default 5; point size value.}
+
+\item{\code{point_alpha}}{default 0.6; alpha value for the point color transparency.}
+
+\item{\code{line_size}}{default 0.8; line size value.}
+
+\item{\code{line_alpha}}{default 1; alpha value for the line color transparency.}
+
+\item{\code{line_color}}{default "black"; fitted line color only useful when group = NULL.}
+
+\item{\code{line_se}}{default TRUE; Whether show the confidence interval for the fitting.}
+
+\item{\code{line_se_color}}{default "grey70"; the color to fill the confidence interval when line_se = TRUE.}
 
 \item{\code{pvalue_trim}}{default 4; trim the decimal places of p value.}
 
@@ -648,7 +860,7 @@ If y is a distance matrix, it will be transformed to be a vector.}
 
 \item{\code{lm_squ_trim}}{default 2; trim the decimal places of regression R square.}
 
-\item{\code{...}}{the parameters passing to ggplot2::geom_point function.}
+\item{\code{...}}{other arguments to pass to geom_text or geom_label.}
 }
 \if{html}{\out{</div>}}
 }
@@ -658,7 +870,11 @@ plot.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$plot_scatterfit(x = 1, y = 2, alpha = .5)
+t1$plot_scatterfit(x = 1, y = 2, type = "cor")
+t1$plot_scatterfit(x = 1, y = 2, type = "lm", point_alpha = .3)
+t1$plot_scatterfit(x = "pH", y = "TOC", type = "lm", group = "Group", line_se = FALSE)
+t1$plot_scatterfit(x = 
+	 dataset$beta_diversity$bray[rownames(t1$data_env), rownames(t1$data_env)], y = "pH")
 }
 }
 \if{html}{\out{</div>}}

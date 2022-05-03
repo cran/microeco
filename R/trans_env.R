@@ -18,7 +18,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param character2numeric default TRUE; whether transform the characters or factors to numeric attributes.
 		#' @param complete_na default FALSE; Whether fill the NA (missing value) in the environmental data;
 		#'   If TRUE, the function can run the interpolation with the mice package; to use this parameter, please first install mice package.
-		#' @return env_data in trans_env object.
+		#' @return data_env in trans_env object.
 		#' @examples
 		#' data(dataset)
 		#' data(env_data_16S)
@@ -50,20 +50,20 @@ trans_env <- R6Class(classname = "trans_env",
 			}
 			
 			if(!is.null(dataset)){
-				dataset1 <- clone(dataset)
+				use_dataset <- clone(dataset)
 				if(!is.null(env_data)){
-					inter_sum <- sum(rownames(dataset1$sample_table) %in% rownames(env_data))
+					inter_sum <- sum(rownames(use_dataset$sample_table) %in% rownames(env_data))
 					if(inter_sum == 0){
 						stop("No sample names of sample_table found in env_data! Please check the names of env_data!")
 					}
-					if(inter_sum < nrow(dataset1$sample_table)){
-						message(nrow(dataset1$sample_table) - inter_sum, " sample(s) not found in env_data and removed!")
-						dataset1$sample_table %<>% base::subset(rownames(.) %in% rownames(env_data))
-						dataset1$tidy_dataset(main_data = FALSE)
+					if(inter_sum < nrow(use_dataset$sample_table)){
+						message(nrow(use_dataset$sample_table) - inter_sum, " sample(s) not found in env_data and removed!")
+						use_dataset$sample_table %<>% base::subset(rownames(.) %in% rownames(env_data))
+						use_dataset$tidy_dataset(main_data = FALSE)
 					}
-					env_data %<>% .[rownames(dataset1$sample_table), , drop = FALSE]
+					env_data %<>% .[rownames(use_dataset$sample_table), , drop = FALSE]
 				}
-				self$dataset <- dataset1
+				self$dataset <- use_dataset
 			}else{
 				self$dataset <- NULL
 			}
@@ -78,7 +78,98 @@ trans_env <- R6Class(classname = "trans_env",
 					env_data %<>% dropallfactors(., unfac2num = TRUE, char2num = TRUE)
 				}
 			}
-			self$env_data <- env_data
+			self$data_env <- env_data
+			message("Env data is stored in object$data_env ...\n")
+		},
+		#' @description
+		#' Test the difference of environmental variable across groups.
+		#'
+		#' @param group default NULL; a colname of sample_table used to compare values across groups.
+		#' @param method default "KW"; see the following available options:
+		#'   \describe{
+		#'     \item{\strong{'KW'}}{KW: Kruskal-Wallis Rank Sum Test for all groups (>= 2)}
+		#'     \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons, see dunnTest function in FSA package}
+		#'     \item{\strong{'wilcox'}}{Wilcoxon Rank Sum and Signed Rank Tests for all paired groups }
+		#'     \item{\strong{'t.test'}}{Student's t-Test for all paired groups}
+		#'     \item{\strong{'anova'}}{Duncan's multiple range test for anova}
+		#'   }
+		#' @param measure default NULL; a vector; if null, all variables will be calculated.
+		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of p.adjust function for available options.
+		#' @param anova_set default NULL; specified group set for anova, such as 'block + N*P*K', see \code{\link{aov}}.
+		#' @param ... parameters passed to kruskal.test or wilcox.test function (method = "KW") or dunnTest function of FSA package (method = "KW_dunn") or
+		#'   agricolae::duncan.test (method = "anova").
+		#' @return res_diff in object. A data.frame generally. A list for anova when anova_set is assigned.
+		#'   In the data frame, 'Group' column means that the group has the maximum median or mean value across the test groups;
+		#'   For non-parametric methods, maximum median value; For t.test, maximum mean value.
+		#' @examples
+		#' \donttest{
+		#' t1$cal_diff(group = "Group", method = "KW")
+		#' t1$cal_diff(group = "Group", method = "KW_dunn")
+		#' t1$cal_diff(group = "Group", method = "anova")
+		#' }
+		cal_diff = function(group = NULL, method = c("KW", "KW_dunn", "wilcox", "t.test", "anova")[1], measure = NULL, p_adjust_method = "fdr", anova_set = NULL, ...){
+			if(is.null(group)){
+				stop("Please provide the group parameter!")
+			}else{
+				if(!group %in% colnames(self$dataset$sample_table)){
+					stop("Provided parameter group must be one colname of sample_table! Please check it!")
+				}
+			}
+			if(is.null(self$data_env)){
+				stop("The data_env is NULL! Please check the data input when creating the object !")
+			}else{
+				env_data <- self$data_env
+			}
+			tem_data <- clone(self$dataset)
+			# use test method in trans_alpha
+			tem_data$alpha_diversity <- env_data
+			tem_data1 <- suppressMessages(trans_alpha$new(dataset = tem_data, group = group))
+			suppressMessages(tem_data1$cal_diff(method = method, measure = measure, p_adjust_method = p_adjust_method, anova_set = anova_set, ...))
+			self$res_diff <- tem_data1$res_diff
+			self$cal_diff_method <- method
+			self$group <- group
+			message('The result is stored in object$res_diff ...')
+		},
+		#' @description
+		#' Calculate the autocorrelations among environmental variables and plot the result.
+		#'
+		#' @param group default NULL; a colname of sample_table; used to perform calculations for different groups.
+		#' @param color_values default RColorBrewer::brewer.pal(8, "Dark2"); colors palette.
+		#' @param alpha default 0.8; the alpha value to add transparency in colors; useful when group is not NULL.
+		#' @param ... default parameters passed to GGally::ggpairs.
+		#' @return ggmatrix.
+		#' @examples
+		#' \donttest{
+		#' t1$cal_autocor(method = "GGally")
+		#' }
+		cal_autocor = function(group = NULL, color_values = RColorBrewer::brewer.pal(8, "Dark2"), alpha = 0.8, ...){
+			if(!requireNamespace("GGally", quietly = TRUE)){
+				stop("Please first install GGally with the command: install.packages('GGally') !")
+			}
+			if(is.null(self$data_env)){
+				stop("The data_env is NULL! Please check the data input when creating the object !")
+			}else{
+				env_data <- self$data_env
+			}
+			if(is.null(group)){
+				g <- GGally::ggpairs(env_data, ...)
+			}else{
+				sample_table <- self$dataset$sample_table
+				if(! group %in% colnames(sample_table)){
+					stop("Please provide a correct group name!")
+				}
+				merge_data <- cbind.data.frame(sample_table[, group, drop = FALSE], env_data[rownames(sample_table), ])
+				g <- GGally::ggpairs(merge_data, aes_string(color = group, alpha = alpha),  ...)
+				# Loop through each plot changing relevant scales 
+				for(i in 1:g$nrow){
+					for(j in 1:g$ncol){
+						g[i, j] <- g[i, j] + 
+							scale_fill_manual(values = color_values) +
+							scale_color_manual(values = color_values)
+					}
+				}
+			}
+			g
 		},
 		#' @description
 		#' Redundancy analysis (RDA) and Correspondence Analysis (CCA) based on the vegan package.
@@ -115,10 +206,10 @@ trans_env <- R6Class(classname = "trans_env",
 			if(! method %in% c("RDA", "dbRDA", "CCA")){
 				stop("The method should be one of 'RDA', 'dbRDA' and 'CCA' !")
 			}
-			if(is.null(self$env_data)){
-				stop("The env_data is NULL! Please check the data input when creating the object !")
+			if(is.null(self$data_env)){
+				stop("The data_env is NULL! Please check the data input when creating the object !")
 			}else{
-				env_data <- self$env_data
+				env_data <- self$data_env
 			}
 			
 			if(method == "dbRDA"){
@@ -235,7 +326,7 @@ trans_env <- R6Class(classname = "trans_env",
 			if(is.null(self$res_ordination)){
 				stop("Please first run cal_ordination function to obtain the ordination result!")
 			}else{
-				self$res_ordination_envsquare <- vegan::envfit(self$res_ordination, self$env_data, ...)
+				self$res_ordination_envsquare <- vegan::envfit(self$res_ordination, self$data_env, ...)
 				message('Result is stored in object$res_ordination_envsquare ...')
 			}
 		},
@@ -320,18 +411,34 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @description
 		#' plot ordination result.
 		#'
-		#' @param plot_color default NULL; group used for color.
-		#' @param plot_shape default NULL; group used for shape.
-		#' @param color_values default RColorBrewer::brewer.pal(8, "Dark2"); color pallete.
-		#' @param shape_values default c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14); vector used for the shape; see ggplot2 tutorial.
+		#' @param plot_color default NULL; a colname of sample_table to assign colors to different groups in plot.
+		#' @param plot_shape default NULL; a colname of sample_table to assign shapes to different groups in plot.
+		#' @param color_values default RColorBrewer::brewer.pal(8, "Dark2"); color pallete for different groups.
+		#' @param shape_values default c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14); a vector for point shape types of groups, see ggplot2 tutorial.
 		#' @param env_text_color default "black"; environmental variable text color.
 		#' @param env_arrow_color default "grey30"; environmental variable arrow color.
 		#' @param taxa_text_color default "firebrick1"; taxa text color.
 		#' @param taxa_arrow_color default "firebrick1"; taxa arrow color.
-		#' @param sample_point_size default 3.5; sample point size.
 		#' @param env_text_size default 3.7; environmental variable text size.
 		#' @param taxa_text_size default 3; taxa text size.
 		#' @param taxa_text_italic default TRUE; "italic"; whether use "italic" style for the taxa text in the plot.
+		#' @param plot_type default "point"; one or more elements of "point", "ellipse", "chull" and "centroid".
+		#'   \describe{
+		#'     \item{\strong{'point'}}{add point}
+		#'     \item{\strong{'ellipse'}}{add confidence ellipse for points of each group}
+		#'     \item{\strong{'chull'}}{add convex hull for points of each group}
+		#'     \item{\strong{'centroid'}}{add centroid line of each group}
+		#'   }
+		#' @param point_size default 3; point size in plot when "point" is in plot_type.
+		#' @param point_alpha default .8; point transparency in plot when "point" is in plot_type.
+		#' @param centroid_segment_alpha default 0.6; segment transparency in plot when "centroid" is in plot_type.
+		#' @param centroid_segment_size default 1; segment size in plot when "centroid" is in plot_type.
+		#' @param centroid_segment_linetype default 3; the line type related with centroid in plot when "centroid" is in plot_type.
+		#' @param ellipse_chull_fill default TRUE; whether fill colors to the area of ellipse or chull.
+		#' @param ellipse_chull_alpha default 0.1; color transparency in the ellipse or convex hull depending on whether "ellipse" or "centroid" is in plot_type.
+		#' @param ellipse_level default .9; confidence level of ellipse when "ellipse" is in plot_type.
+		#' @param ellipse_type default "t"; ellipse type when "ellipse" is in plot_type; see type in \code{\link{stat_ellipse}}.
+		#' @param add_sample_label default NULL; the column name in sample table, if provided, show the point name in plot.
 		#' @param env_nudge_x default NULL; numeric vector to adjust the env text x axis position; passed to nudge_x parameter of geom_text_repel function of ggrepel package;
 		#'   default NULL represents automatic adjustment; the length must be same with the row number of object$res_ordination_trans$df_arrows. For example, 
 		#'   if there are 5 env variables, env_nudge_x should be something like c(0.1, 0, -0.2, 0, 0). 
@@ -352,6 +459,10 @@ trans_env <- R6Class(classname = "trans_env",
 		#' t1$cal_ordination(method = "RDA")
 		#' t1$trans_ordination(adjust_arrow_length = TRUE, max_perc_env = 1.5)
 		#' t1$plot_ordination(plot_color = "Group")
+		#' t1$plot_ordination(plot_color = "Group", plot_shape = "Group", plot_type = c("point", "ellipse"))
+		#' t1$plot_ordination(plot_color = "Group", plot_type = c("point", "chull"))
+		#' t1$plot_ordination(plot_color = "Group", plot_type = c("point", "centroid"), 
+		#' 	  centroid_segment_linetype = 1)
 		#' t1$plot_ordination(plot_color = "Group", env_nudge_x = c(0.4, 0, 0, 0, 0, -0.2, 0, 0), 
 		#' 	  env_nudge_y = c(0.6, 0, 0.2, 0.5, 0, 0.1, 0, 0.2))
 		#' }
@@ -364,30 +475,53 @@ trans_env <- R6Class(classname = "trans_env",
 			env_arrow_color = "grey30",
 			taxa_text_color = "firebrick1",
 			taxa_arrow_color = "firebrick1",
-			sample_point_size = 3.5,
 			env_text_size = 3.7,
 			taxa_text_size = 3,
 			taxa_text_italic = TRUE,
+			plot_type = "point",
+			point_size = 3,
+			point_alpha = 0.8,
+			centroid_segment_alpha = 0.6,
+			centroid_segment_size = 1,
+			centroid_segment_linetype = 3,
+			ellipse_chull_fill = TRUE,
+			ellipse_chull_alpha = 0.1,
+			ellipse_level = 0.9,
+			ellipse_type = "t",
+			add_sample_label = NULL,
 			env_nudge_x = NULL,
 			env_nudge_y = NULL,
 			taxa_nudge_x = NULL,
-			taxa_nudge_y = NULL,			
+			taxa_nudge_y = NULL,
 			...
 			){
 			if(is.null(self$res_ordination_trans)){
 				stop("Please first run trans_ordination function !")
 			}
+			if(is.null(plot_color)){
+				if(any(c("ellipse", "chull", "centroid") %in% plot_type)){
+					stop("Plot ellipse or chull or centroid need groups! Please provide plot_color parameter!")
+				}
+			}
+			if(! all(plot_type %in% c("point", "ellipse", "chull", "centroid"))){
+				message("There maybe a typo in your plot_type input! plot_type should be one or more from 'point', 'ellipse', 'chull' and 'centroid'!")
+			}
+			df_sites <- self$res_ordination_trans$df_sites
+			
 			p <- ggplot()
 			p <- p + theme_bw()
 			p <- p + theme(panel.grid=element_blank())
 			p <- p + geom_vline(xintercept = 0, linetype = "dashed", color = "grey80")
 			p <- p + geom_hline(yintercept = 0, linetype = "dashed", color = "grey80")
-			p <- p + geom_point(
-				data=self$res_ordination_trans$df_sites, 
-				aes_string("x", "y", colour = plot_color, shape = plot_shape), 
-				size = sample_point_size,
-				...
-				)
+			if("point" %in% plot_type){
+				p <- p + geom_point(
+					data = df_sites, 
+					aes_string("x", "y", colour = plot_color, shape = plot_shape), 
+					size = point_size,
+					alpha = point_alpha,
+					...
+					)
+			}
 			# plot arrows
 			env_text_data <- self$res_ordination_trans$df_arrows %>% dplyr::mutate(label = gsub("`", "", rownames(.)))
 			p <- p + geom_segment(
@@ -428,6 +562,50 @@ trans_env <- R6Class(classname = "trans_env",
 				for(i in seq_len(nrow(env_text_data))){
 					p <- p + ggrepel::geom_text_repel(data = env_text_data[i, ], aes(x, y, label = label), size = env_text_size, 
 						color = env_text_color, segment.color = "white", nudge_x = env_nudge_x[i], nudge_y = env_nudge_y[i])
+				}
+			}
+			if("centroid" %in% plot_type){
+				centroid_xy <- data.frame(group = df_sites[, plot_color], x = df_sites[, "x"], y = df_sites[, "y"]) %>%
+					dplyr::group_by(group) %>%
+					dplyr::summarise(cx = mean(x), cy = mean(y)) %>%
+					as.data.frame()
+				combined_centroid_xy <- merge(df_sites, centroid_xy, by.x = plot_color, by.y = "group")
+				p <- p + geom_segment(
+					data = combined_centroid_xy, 
+					aes_string(x = "x", xend = "cx", y = "y", yend = "cy", color = plot_color),
+					alpha = centroid_segment_alpha, 
+					size = centroid_segment_size, 
+					linetype = centroid_segment_linetype
+				)
+			}
+			if(any(c("ellipse", "chull") %in% plot_type)){
+				if(ellipse_chull_fill){
+					ellipse_chull_fill_color <- plot_color
+				}else{
+					ellipse_chull_fill_color <- NULL
+					ellipse_chull_alpha <- 0
+				}
+				mapping <- aes_string(x = "x", y = "y", group = plot_color, color = plot_color, fill = ellipse_chull_fill_color)
+				if("ellipse" %in% plot_type){
+					p <- p + ggplot2::stat_ellipse(
+						mapping = mapping, 
+						data = df_sites, 
+						level = ellipse_level, 
+						type = ellipse_type, 
+						alpha = ellipse_chull_alpha, 
+						geom = "polygon"
+						)
+				}
+				if("chull" %in% plot_type){
+					p <- p + ggpubr::stat_chull(
+						mapping = mapping, 
+						data = df_sites, 
+						alpha = ellipse_chull_alpha,
+						geom = "polygon"
+						)
+				}
+				if(ellipse_chull_fill){
+					p <- p + scale_fill_manual(values = color_values)
 				}
 			}
 			if(!is.null(plot_color)){
@@ -487,12 +665,18 @@ trans_env <- R6Class(classname = "trans_env",
 					}
 				}
 			}
+			if(!is.null(add_sample_label)){
+				p <- p + ggrepel::geom_text_repel(
+					data = df_sites,
+					mapping = aes_string(x = "x", y = "y", label = add_sample_label)
+					)
+			}
 			p
 		},
 		#' @description
 		#' Mantel test between beta diversity matrix and environmental data.
 		#'
-		#' @param select_env_data default NULL; numeric or character vector to select columns in env_data; if not provided, automatically select the columns with numeric attributes.
+		#' @param select_env_data default NULL; numeric or character vector to select columns in data_env; if not provided, automatically select the columns with numeric attributes.
 		#' @param partial_mantel default FALSE; whether use partial mantel test; If TRUE, use other measurements as the zdis.
 		#' @param add_matrix default NULL; additional distance matrix provided, if you donot want to use the beta diversity matrix in the dataset.
 		#' @param use_measure default NULL; name of beta diversity matrix. If necessary and not provided, use the first beta diversity matrix.
@@ -532,10 +716,10 @@ trans_env <- R6Class(classname = "trans_env",
 			}else{
 				use_matrix <- add_matrix
 			}
-			if(is.null(self$env_data)){
-				stop("The env_data is NULL! Please check the data input when creating the object !")
+			if(is.null(self$data_env)){
+				stop("The data_env is NULL! Please check the data input when creating the object !")
 			}else{
-				env_data <- self$env_data
+				env_data <- self$data_env
 			}
 			# if no selection, automatically select the numeric columns
 			if(is.null(select_env_data)){
@@ -580,7 +764,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#'
 		#' @param use_data default "Genus"; "Genus", "all" or "other"; "Genus" or other taxonomic name: use genus or other taxonomic abundance table in taxa_abund; 
 		#'    "all": use all merged taxa abundance table; "other": provide additional taxa name with other_taxa parameter which is necessary.
-		#' @param select_env_data default NULL; numeric or character vector to select columns in env_data; if not provided, automatically select the columns with numeric attributes.
+		#' @param select_env_data default NULL; numeric or character vector to select columns in data_env; if not provided, automatically select the columns with numeric attributes.
 		#' @param cor_method default "pearson"; "pearson", "spearman" or "kendall"; correlation method.
 		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of p.adjust function for available options.
 		#' @param p_adjust_type default "Env"; "Type", "Taxa" or "Env"; p.adjust type; Env: environmental data; Taxa: taxa data; Type: group used.
@@ -598,7 +782,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' \donttest{
 		#' t2 <- trans_diff$new(dataset = dataset, method = "rf", group = "Group", rf_taxa_level = "Genus")
 		#' t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S[, 4:11])
-		#' t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_rf$Taxa[1:40])
+		#' t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_diff$Taxa[1:40])
 		#' }
 		cal_cor = function(
 			use_data = c("Genus", "all", "other")[1],
@@ -614,10 +798,10 @@ trans_env <- R6Class(classname = "trans_env",
 			group_select = NULL,
 			taxa_name_full = TRUE
 			){
-			if(is.null(self$env_data)){
-				stop("The env_data is NULL! Please check the data input when creating the object !")
+			if(is.null(self$data_env)){
+				stop("The data_env is NULL! Please check the data input when creating the object !")
 			}else{
-				env_data <- self$env_data
+				env_data <- self$data_env
 			}
 			if(is.null(select_env_data)){
 				env_data <- env_data[, unlist(lapply(env_data, is.numeric)), drop = FALSE]
@@ -922,44 +1106,80 @@ trans_env <- R6Class(classname = "trans_env",
 		#' Scatter plot and add fitted line. The most important thing is to make sure that the input x and y
 		#'  have correponding sample orders. If one of x and y is a matrix, the other will be also transformed to matrix with Euclidean distance.
 		#'  Then, both of them are transformed to be vectors. If x or y is a vector with a single value, x or y will be
-		#'  assigned according to the column selection of the env_data inside.
+		#'  assigned according to the column selection of the data_env inside.
 		#'
 		#' @param x default NULL; a single numeric or character value or a vector or a distance matrix used for the x axis.
-		#'     If x is a single value, it will be used to select the column of env_data inside.
+		#'     If x is a single value, it will be used to select the column of data_env inside.
 		#'     If x is a distance matrix, it will be transformed to be a vector.
 		#' @param y default NULL; a single numeric or character value or a vector or a distance matrix used for the y axis.
-		#'     If y is a single value, it will be used to select the column of env_data inside.
+		#'     If y is a single value, it will be used to select the column of data_env inside.
 		#'     If y is a distance matrix, it will be transformed to be a vector.
-		#' @param use_cor default TRUE; TRUE for correlation; FALSE for regression.
-		#' @param cor_method default "pearson"; one of "pearson", "kendall" and "spearman".
-		#' @param add_line default TRUE; whether add the fitted line in the plot.
-		#' @param use_se default TRUE; Whether show the confidence interval for the fitting.
-		#' @param text_x_pos default NULL; the central x axis position of the fitting text.
-		#' @param text_y_pos default NULL; the central y axis position of the fitting text.
+		#' @param group default NULL; a character vector; if length is 1, must be a colname of dataset$sample_table;
+		#'    Otherwise, group should be a vector with same length of x/y (for vector) or ncol of x/y (for matrix).
+		#' @param group_order default NULL; a vector to order groups, i.e. reorder the legend and colors in plot when group is not NULL; 
+		#' 	  If group_order is NULL and group is provided, the function can first check whether the group column of dataset$sample_table is factor. 
+		#' 	  If provided, overlook the levels in the group of dataset$sample_table.
+		#' @param color_values default RColorBrewer::brewer.pal(8, "Dark2"); color pallete for different groups.
+		#' @param shape_values default NULL; a numeric vector for point shape types of groups when group is not NULL, see ggplot2 tutorial.
+		#' @param type default c("cor", "lm")[1]; "cor": correlation; "lm" for regression.
+		#' @param cor_method default "pearson"; one of "pearson", "kendall" and "spearman"; correlation method.
+		#' @param label_sep default ";"; the separator string between different label parts.
+		#' @param label.x.npc default "left"; can be numeric or character vector of the same length as the number of groups and/or panels. If too short they will be recycled.
+		#' \describe{
+		#'   \item{numeric}{value should be between 0 and 1. Coordinates to be used for positioning the label, expressed in "normalized parent coordinates"}
+		#'   \item{character}{allowed values include: i) one of c('right', 'left', 'center', 'centre', 'middle') for x-axis; ii) and one of 
+		#'      c( 'bottom', 'top', 'center', 'centre', 'middle') for y-axis.}
+		#' }
+		#' @param label.y.npc default "top"; same usage with label.x.npc; see also label.y.npc parameter of stat_cor of ggpubr package.
+		#' @param label.x default NULL; x axis absolute position for adding the statictic label.
+		#' @param label.y default NULL; x axis absolute position for adding the statictic label.
 		#' @param x_axis_title default ""; the title of x axis.
 		#' @param y_axis_title default ""; the title of y axis.
+		#' @param point_size default 5; point size value.
+		#' @param point_alpha default 0.6; alpha value for the point color transparency.
+		#' @param line_size default 0.8; line size value.
+		#' @param line_se default TRUE; Whether show the confidence interval for the fitting.
+		#' @param line_se_color default "grey70"; the color to fill the confidence interval when line_se = TRUE.
+		#' @param line_alpha default 1; alpha value for the line color transparency.
+		#' @param line_color default "black"; fitted line color only useful when group = NULL.
 		#' @param pvalue_trim default 4; trim the decimal places of p value.
 		#' @param cor_coef_trim default 3; trim the decimal places of correlation coefficient.
 		#' @param lm_fir_trim default 2; trim the decimal places of regression first coefficient.
 		#' @param lm_sec_trim default 2; trim the decimal places of regression second coefficient.
 		#' @param lm_squ_trim default 2; trim the decimal places of regression R square.
-		#' @param ... the parameters passing to ggplot2::geom_point function.
+		#' @param ... other arguments to pass to geom_text or geom_label.
 		#' @return plot.
 		#' @examples
 		#' \donttest{
-		#' t1$plot_scatterfit(x = 1, y = 2, alpha = .5)
+		#' t1$plot_scatterfit(x = 1, y = 2, type = "cor")
+		#' t1$plot_scatterfit(x = 1, y = 2, type = "lm", point_alpha = .3)
+		#' t1$plot_scatterfit(x = "pH", y = "TOC", type = "lm", group = "Group", line_se = FALSE)
+		#' t1$plot_scatterfit(x = 
+		#' 	 dataset$beta_diversity$bray[rownames(t1$data_env), rownames(t1$data_env)], y = "pH")
 		#' }
 		plot_scatterfit = function(
 			x = NULL, 
 			y = NULL, 
-			use_cor = TRUE,
+			group = NULL,
+			group_order = NULL,
+			color_values = RColorBrewer::brewer.pal(8, "Dark2"),
+			shape_values = NULL,
+			type = c("cor", "lm")[1],
 			cor_method = "pearson",
-			add_line = TRUE,
-			use_se = TRUE,
-			text_x_pos = NULL, 
-			text_y_pos = NULL, 
+			label_sep = ";",
+			label.x.npc = "left", 
+			label.y.npc = "top",
+			label.x = NULL, 
+			label.y = NULL, 
 			x_axis_title = "", 
 			y_axis_title = "",
+			point_size = 5,
+			point_alpha = 0.6,
+			line_size = 0.8,
+			line_alpha = 1,
+			line_color = "black",
+			line_se = TRUE,
+			line_se_color = "grey70",
 			pvalue_trim = 4, 
 			cor_coef_trim = 3,
 			lm_fir_trim = 2,
@@ -973,81 +1193,137 @@ trans_env <- R6Class(classname = "trans_env",
 			if(!(is.vector(y) | is.matrix(y))){
 				stop("The input y is neither a vector nor a matrix !")
 			}
+			type <- match.arg(type, c("cor", "lm"))
+
 			if(length(x) == 1){
-				x <- self$env_data[, x]
+				x <- self$data_env[, x]
 			}
 			if(length(y) == 1){
-				y <- self$env_data[, y]
+				y <- self$data_env[, y]
 			}
-			# Matrix is transformed to be a vector
-			if(is.matrix(x) | is.matrix(y)){
-				if(is.matrix(x) & is.matrix(y)){
-					x <- as.vector(as.dist(x))
-					y <- as.vector(as.dist(y))
-				}else{
-					if(is.matrix(x)){
-						x <- as.vector(as.dist(x))
-						y1 <- as.data.frame(as.numeric(as.character(y)))
-						y <- as.vector(vegdist(y1, "euclidean"))
+			# first get the raw data length according to x
+			x_raw_length <- ifelse(is.vector(x), length(x), ncol(x))
+			if(is.null(group)){
+				group_vector <- rep("all", x_raw_length)
+			}else{
+				if(length(group) == 1){
+					if(is.null(self$dataset)){
+						stop("No dataset$sample_table found! Please check the dataset input when creading the object!")
 					}else{
-						y <- as.vector(as.dist(y))
-						x1 <- as.data.frame(as.numeric(as.character(x)))
-						x <- as.vector(vegdist(x1, "euclidean"))
+						if(! group %in% colnames(self$dataset$sample_table)){
+							stop("The group must be one of colnames of dataset$sample_table!")
+						}
+						# the sample_table names have been same with data_env when creading the object
+						group_vector <- self$dataset$sample_table[, group] %>% as.character
 					}
 				}
 			}
-			if(length(x) != length(y)){
-				stop("The length of x axis vector is not equal to the length of y axis vector!")
+			if(length(group_vector) != x_raw_length){
+				stop("The group length is not same with x data length! Please check the input!")
 			}
-			use_data <- data.frame(x, y)
-			if(use_cor == T){
-				fit <- cor.test(x, y, method = cor_method)
+			if(is.vector(x) & is.vector(y)){
+				if(length(x) != length(y)){
+					stop("x length is not equal to y length!")
+				}
+				use_data <- data.frame(x = x, y = y, Group = group_vector)
+			}
+			# Matrix is transformed to be a vector
+			if(is.matrix(x) | is.matrix(y)){
+				if(is.vector(x)){
+					x1 <- as.data.frame(as.numeric(as.character(x)))
+					x <- as.matrix(vegdist(x1, "euclidean"))
+				}
+				# has make sure x is a matrix
+				x <- lapply(unique(group_vector), function(i){
+						data.frame("x" = as.vector(as.dist(x[group_vector == i, group_vector == i])), "Group" = i)
+					}) %>% 
+					do.call(rbind, .)
+				if(is.vector(y)){
+					y1 <- as.data.frame(as.numeric(as.character(y)))
+					y <- as.matrix(vegdist(y1, "euclidean"))
+				}
+				y <- lapply(unique(group_vector), function(i){
+						data.frame("y" = as.vector(as.dist(y[group_vector == i, group_vector == i])), "Group" = i)
+					}) %>% 
+					do.call(rbind, .)
+				if(nrow(x) != nrow(y)){
+					stop("Converted x length is not equal to y length! Please check the input vector or matrix !")
+				}else{
+					use_data <- data.frame(x = x[, "x"], y = y[, "y"], Group = x[, "Group"])
+				}
+			}
+			if(!is.null(group_order)){
+				if(!all(unique(as.character(use_data$Group)) %in% group_order)){
+					stop("Please check the group_order input! Part of group(s) not found in group_order!")
+				}
+			}
+			if(!is.null(group)){
+				if(length(group) == 1){
+					if(is.null(group_order)){
+						if(is.factor(self$dataset$sample_table[, group])){
+							use_data$Group %<>% factor(., levels = levels(self$dataset$sample_table[, group]))
+						}else{
+							use_data$Group %<>% as.character %>% as.factor
+						}
+					}else{
+						use_data$Group %<>% factor(., levels = group_order)
+					}
+				}else{
+					if(is.null(group_order)){
+						use_data$Group %<>% as.character %>% as.factor
+					}else{
+						use_data$Group %<>% factor(., levels = group_order)
+					}
+				}
+			}
+			if(!is.null(shape_values)){
+				plot_shape <- "Group"
 			}else{
-				fit <- lm(y ~ x)
+				plot_shape <- NULL
 			}
-			# default position max * .8
-			if(is.null(text_x_pos)){
-				text_x_pos <- max(use_data$x) * 0.8
+			if(is.null(group)){
+				p <- ggplot(use_data, aes_string(x = "x", y = "y"))
+			}else{
+				p <- ggplot(use_data, aes_string(x = "x", y = "y", color = "Group", shape = plot_shape))
 			}
-			if(is.null(text_y_pos)){
-				text_y_pos <- max(use_data$y) * 0.8
+			p <- p + geom_point(size = point_size, alpha = point_alpha)
+			if(is.null(group)){
+				p <- p + geom_smooth(method = "lm", size = line_size, color = line_color, alpha = line_alpha, se = line_se, fill = line_se_color)
+			}else{
+				p <- p + geom_smooth(method = "lm", size = line_size, alpha = line_alpha, se = line_se, fill = line_se_color)
 			}
-
-			p <- ggplot(use_data, aes(x = x, y = y)) + 
-				theme_bw() + 
-				geom_point(shape = 20, ...) +
-				theme(panel.grid = element_blank())
-			if(add_line == T){
-				p <- p + geom_smooth(method = "lm", size = .8, colour = "black", se = use_se)
+			p <- p + stat_corlm(
+				type = type, 
+				cor_method = cor_method, 
+				label_sep = label_sep, 
+				pvalue_trim = pvalue_trim,
+				cor_coef_trim = cor_coef_trim,
+				lm_fir_trim = lm_fir_trim, 
+				lm_sec_trim = lm_sec_trim,
+				lm_squ_trim = lm_squ_trim,
+				label.x.npc = label.x.npc, 
+				label.y.npc = label.y.npc, 
+				label.x = label.x, 
+				label.y = label.y,
+				...
+				)
+			p <- p + xlab(x_axis_title) + ylab(y_axis_title)
+			if(!is.null(group)){
+				p <- p + scale_color_manual(values = color_values)
+				if(!is.null(shape_values)){
+					p <- p + scale_shape_manual(values = shape_values)
+				}
 			}
-			p <- p + annotate("text", 
-					x = text_x_pos, 
-					y = text_y_pos, 
-					label = private$fit_equat(
-						fit, 
-						use_cor = use_cor, 
-						pvalue_trim = pvalue_trim, 
-						cor_coef_trim = cor_coef_trim, 
-						lm_fir_trim = lm_fir_trim, 
-						lm_sec_trim = lm_sec_trim, 
-						lm_squ_trim = lm_squ_trim
-						), 
-					parse = TRUE) +
-#				scale_x_continuous(limits = c(min(x2) - 0.2 * (range(x2)[2] - range(x2)[1]), NA)) +
-				xlab(x_axis_title) + 
-				ylab(y_axis_title) +
-				theme(axis.text=element_text(size=13), axis.title=element_text(size=15))
-			
 			p
 		},
 		#' @description
 		#' Print the trans_env object.
 		print = function(){
 			cat("trans_env class:\n")
-			if(!is.null(self$env_data)){
-				cat(paste0("Env table have ", ncol(self$env_data), " variables: ", paste0(colnames(self$env_data), collapse = ","), "\n"))
+			if(!is.null(self$data_env)){
+				cat(paste0("Env table have ", ncol(self$data_env), " variables: ", paste0(colnames(self$data_env), collapse = ","), "\n"))
 			}else{
-				cat("No env table stored in the object.\n")
+				cat("No environmental variable table stored in the object.\n")
 			}
 		}
 	),
@@ -1076,38 +1352,6 @@ trans_env <- R6Class(classname = "trans_env",
 			res <- data.frame(newx, newy)
 			colnames(res) <- colnames(arr)
 			res
-		},
-		# parse the equation and add the statistics
-		fit_equat = function(
-			equat, 
-			use_cor = TRUE, 
-			pvalue_trim = 4, 
-			cor_coef_trim = 3, 
-			lm_fir_trim = 2, 
-			lm_sec_trim = 2, 
-			lm_squ_trim = 2
-			){
-			if(inherits(equat, "lm") & use_cor == T){
-				stop("Input is lm class, but use_cor is TRUE! Please check the use_cor parameter!")
-			}
-			pvalue <- ifelse(use_cor == T, equat$p.value, anova(equat)$`Pr(>F)`[1])
-			if(use_cor == T){
-				estimate = equat$estimate
-				all_coef <- list(
-					R1 = unname(round(estimate, digits = cor_coef_trim)), 
-					P1 = ifelse(pvalue < 0.0001, " < 0.0001", paste0(" = ", round(pvalue, digits = pvalue_trim)))
-					)
-				res <- substitute(italic(R)~"="~R1*";"~~italic(P)*P1, all_coef)
-			}else{
-				inte <- round(unname(coef(equat))[1], digits = lm_sec_trim)
-				lm_coef <- list(a = ifelse(inte < 0, paste0(" - ", abs(inte)), paste0(" + ", as.character(inte))),
-							  b = round(unname(coef(equat))[2], digits = lm_fir_trim),
-							  r2 = round(summary(equat)$r.squared, digits = lm_squ_trim),
-							  p1 = ifelse(pvalue < 0.0001, " < 0.0001", paste0(" = ", round(pvalue, digits = pvalue_trim)))
-							  )
-				res <- substitute(italic(y) == b %.% italic(x)*a*","~~italic(R)^2~"="~r2*","~~italic(P)*p1, lm_coef)
-			}
-			as.character(as.expression(res))
 		}
 	),
 	lock_class = FALSE,

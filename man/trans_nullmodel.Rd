@@ -49,7 +49,6 @@ t1$cal_betampd(abundance.weighted = TRUE)
 
 \donttest{
 t1$cal_betamntd(abundance.weighted = TRUE)
-t1$cal_betamntd(abundance.weighted = TRUE, use_iCAMP = TRUE)
 }
 
 ## ------------------------------------------------
@@ -57,7 +56,8 @@ t1$cal_betamntd(abundance.weighted = TRUE, use_iCAMP = TRUE)
 ## ------------------------------------------------
 
 \donttest{
-t1$cal_ses_betampd(runs = 500, abundance.weighted = TRUE)
+# run 50 times for the example; default 1000
+t1$cal_ses_betampd(runs = 50, abundance.weighted = TRUE)
 }
 
 ## ------------------------------------------------
@@ -65,7 +65,8 @@ t1$cal_ses_betampd(runs = 500, abundance.weighted = TRUE)
 ## ------------------------------------------------
 
 \donttest{
-t1$cal_ses_betamntd(runs = 500, abundance.weighted = TRUE, exclude.conspecifics = FALSE)
+# run 50 times for the example; default 1000
+t1$cal_ses_betamntd(runs = 50, abundance.weighted = TRUE, exclude.conspecifics = FALSE)
 }
 
 ## ------------------------------------------------
@@ -73,7 +74,8 @@ t1$cal_ses_betamntd(runs = 500, abundance.weighted = TRUE, exclude.conspecifics 
 ## ------------------------------------------------
 
 \donttest{
-t1$cal_rcbray(runs = 500)
+# run 50 times for the example; default 1000
+t1$cal_rcbray(runs = 50)
 }
 
 ## ------------------------------------------------
@@ -88,7 +90,7 @@ t1$cal_process(use_betamntd = TRUE)
 ## Method `trans_nullmodel$cal_NRI`
 ## ------------------------------------------------
 
-\dontrun{
+\donttest{
 t1$cal_NRI()
 }
 
@@ -96,7 +98,7 @@ t1$cal_NRI()
 ## Method `trans_nullmodel$cal_NTI`
 ## ------------------------------------------------
 
-\dontrun{
+\donttest{
 t1$cal_NTI(null.model = "taxa.labels", abundance.weighted = TRUE)
 }
 
@@ -104,8 +106,24 @@ t1$cal_NTI(null.model = "taxa.labels", abundance.weighted = TRUE)
 ## Method `trans_nullmodel$cal_Cscore`
 ## ------------------------------------------------
 
-\dontrun{
+\donttest{
 t1$cal_Cscore()
+}
+
+## ------------------------------------------------
+## Method `trans_nullmodel$cal_tNST`
+## ------------------------------------------------
+
+\donttest{
+t1$cal_tNST(group = "Group", dist.method = "bray", output.rand = TRUE, SES = TRUE)
+}
+
+## ------------------------------------------------
+## Method `trans_nullmodel$cal_tNST_test`
+## ------------------------------------------------
+
+\donttest{
+t1$cal_tNST_test()
 }
 }
 \section{Methods}{
@@ -123,6 +141,8 @@ t1$cal_Cscore()
 \item \href{#method-cal_NRI}{\code{trans_nullmodel$cal_NRI()}}
 \item \href{#method-cal_NTI}{\code{trans_nullmodel$cal_NTI()}}
 \item \href{#method-cal_Cscore}{\code{trans_nullmodel$cal_Cscore()}}
+\item \href{#method-cal_tNST}{\code{trans_nullmodel$cal_tNST()}}
+\item \href{#method-cal_tNST_test}{\code{trans_nullmodel$cal_tNST_test()}}
 \item \href{#method-clone}{\code{trans_nullmodel$clone()}}
 }
 }
@@ -154,7 +174,7 @@ t1$cal_Cscore()
 
 \item{\code{group}}{default NULL; which group column name in sample_table is selected.}
 
-\item{\code{select_group}}{default NULL; the group name, used following the group parameter to filter samples.}
+\item{\code{select_group}}{default NULL; the group name, used following the group to filter samples.}
 
 \item{\code{env_cols}}{default NULL; number or name vector to select the environmental data in dataset$sample_table.}
 
@@ -165,7 +185,7 @@ t1$cal_Cscore()
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-comm and phylo_tree in object.
+data_comm and data_tree in object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -323,7 +343,6 @@ res_betamntd in object.
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
 t1$cal_betamntd(abundance.weighted = TRUE)
-t1$cal_betamntd(abundance.weighted = TRUE, use_iCAMP = TRUE)
 }
 }
 \if{html}{\out{</div>}}
@@ -366,7 +385,8 @@ res_ses_betampd in object.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$cal_ses_betampd(runs = 500, abundance.weighted = TRUE)
+# run 50 times for the example; default 1000
+t1$cal_ses_betampd(runs = 50, abundance.weighted = TRUE)
 }
 }
 \if{html}{\out{</div>}}
@@ -425,7 +445,8 @@ res_ses_betamntd in object.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$cal_ses_betamntd(runs = 500, abundance.weighted = TRUE, exclude.conspecifics = FALSE)
+# run 50 times for the example; default 1000
+t1$cal_ses_betamntd(runs = 50, abundance.weighted = TRUE, exclude.conspecifics = FALSE)
 }
 }
 \if{html}{\out{</div>}}
@@ -463,7 +484,8 @@ res_rcbray in object.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$cal_rcbray(runs = 500)
+# run 50 times for the example; default 1000
+t1$cal_rcbray(runs = 50)
 }
 }
 \if{html}{\out{</div>}}
@@ -533,7 +555,7 @@ res_NRI in object, equivalent to -1 times ses.mpd.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
+\preformatted{\donttest{
 t1$cal_NRI()
 }
 }
@@ -574,7 +596,7 @@ res_NTI in object, equivalent to -1 times ses.mntd.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
+\preformatted{\donttest{
 t1$cal_NTI(null.model = "taxa.labels", abundance.weighted = TRUE)
 }
 }
@@ -606,8 +628,73 @@ results directly.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\dontrun{
+\preformatted{\donttest{
 t1$cal_Cscore()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-cal_tNST"></a>}}
+\if{latex}{\out{\hypertarget{method-cal_tNST}{}}}
+\subsection{Method \code{cal_tNST()}}{
+Calculate normalized stochasticity ratio (NST) based on the tNST function of NST package.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_nullmodel$cal_tNST(group, ...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{group}}{a colname of sample_table; 
+the function can select the data from sample_table to generate a one-column (n x 1) matrix and provide it to the group parameter of tNST function.}
+
+\item{\code{...}}{paremeters pass to tNST function of NST package; see the documents of tNST function for more details.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+t1$cal_tNST(group = "Group", dist.method = "bray", output.rand = TRUE, SES = TRUE)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-cal_tNST_test"></a>}}
+\if{latex}{\out{\hypertarget{method-cal_tNST_test}{}}}
+\subsection{Method \code{cal_tNST_test()}}{
+Test the significance of NST difference between each pair of groups.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_nullmodel$cal_tNST_test(method = "nst.boot", ...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{method}}{default "nst.boot"; "nst.boot" or "nst.panova"; see NST::nst.boot function or NST::nst.panova function for the details.}
+
+\item{\code{...}}{paremeters pass to NST::nst.boot when method = "nst.boot" or NST::nst.panova when method = "nst.panova"}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+t1$cal_tNST_test()
 }
 }
 \if{html}{\out{</div>}}

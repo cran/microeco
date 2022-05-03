@@ -45,7 +45,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @description
 		#' Ordination based on An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035>.
 		#'
-		#' @param ordination default "PCoA"; "PCA", "PCoA" or "NMDS".
+		#' @param ordination default "PCoA"; "PCA", "PCoA" or "NMDS". PCA: principal component analysis; 
+		#' 	  PCoA: principal coordinates analysis; NMDS: non-metric multidimensional scaling.
 		#' @param ncomp default 3; the returned dimensions.
 		#' @param trans_otu default FALSE; whether species abundance will be square transformed, used for PCA.
 		#' @param scale_species default FALSE; whether species loading in PCA will be scaled.
@@ -124,98 +125,133 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @description
 		#' Plotting the ordination result based on An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035>.
 		#'
-		#' @param color_values default RColorBrewer::brewer.pal(8, "Dark2"); colors for presentation.
-		#' @param shape_values default c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14); a vector used in the shape type, see ggplot2 tutorial.
-		#' @param plot_color default NULL; the sample group name used for color in plot.
-		#' @param plot_shape default NULL; the sample group name used for shape in plot.
+		#' @param plot_type default "point"; one or more elements of "point", "ellipse", "chull" and "centroid".
+		#'   \describe{
+		#'     \item{\strong{'point'}}{add point}
+		#'     \item{\strong{'ellipse'}}{add confidence ellipse for points of each group}
+		#'     \item{\strong{'chull'}}{add convex hull for points of each group}
+		#'     \item{\strong{'centroid'}}{add centroid line of each group}
+		#'   }
+		#' @param color_values default RColorBrewer::brewer.pal(8, "Dark2"); colors palette for different groups.
+		#' @param shape_values default c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14); a vector for point shape types of groups, see ggplot2 tutorial.
+		#' @param plot_color default NULL; a colname of sample_table to assign colors to different groups in plot.
+		#' @param plot_shape default NULL; a colname of sample_table to assign shapes to different groups in plot.
 		#' @param plot_group_order default NULL; a vector used to order the groups in the legend of plot.
-		#' @param plot_point_size default 3; point size in plot.
-		#' @param plot_point_alpha default .9; point transparency in plot.
-		#' @param plot_sample_label default NULL; the column name in sample table, if provided, show the point name in plot.
-		#' @param plot_group_centroid default FALSE; whether show the centroid in each group of plot.
-		#' @param plot_group default NULL; the column name in sample table, generally used with plot_group_centroid and plot_group_ellipse.
-		#' @param segment_alpha default .6; segment transparency in plot.
-		#' @param centroid_linetype default 3; the line type related with centroid in plot.
-		#' @param plot_group_ellipse default FALSE; whether show the confidence ellipse in each group of plot.
-		#' @param ellipse_level default .9; confidence level of ellipse.
-		#' @param ellipse_alpha default .1; color transparency in the ellipse.
-		#' @param ellipse_type default t; see type in \code{\link{stat_ellipse}}.
+		#' @param add_sample_label default NULL; the column name in sample table, if provided, show the point name in plot.
+		#' @param point_size default 3; point size in plot when "point" is in plot_type.
+		#' @param point_alpha default .8; point transparency in plot when "point" is in plot_type.
+		#' @param centroid_segment_alpha default 0.6; segment transparency in plot when "centroid" is in plot_type.
+		#' @param centroid_segment_size default 1; segment size in plot when "centroid" is in plot_type.
+		#' @param centroid_segment_linetype default 3; the line type related with centroid in plot when "centroid" is in plot_type.
+		#' @param ellipse_chull_fill default TRUE; whether fill colors to the area of ellipse or chull.
+		#' @param ellipse_chull_alpha default 0.1; color transparency in the ellipse or convex hull depending on whether "ellipse" or "centroid" is in plot_type.
+		#' @param ellipse_level default .9; confidence level of ellipse when "ellipse" is in plot_type.
+		#' @param ellipse_type default "t"; ellipse type when "ellipse" is in plot_type; see type in \code{\link{stat_ellipse}}.
 		#' @return ggplot.
 		#' @examples
-		#' t1$plot_ordination(plot_color = "Group", plot_shape = "Group", plot_group_ellipse = TRUE)
+		#' t1$plot_ordination(plot_type = "point")
+		#' t1$plot_ordination(plot_color = "Group", plot_shape = "Group", plot_type = "point")
+		#' t1$plot_ordination(plot_color = "Group", plot_type = c("point", "ellipse"))
+		#' t1$plot_ordination(plot_color = "Group", plot_type = c("point", "chull"))
+		#' t1$plot_ordination(plot_color = "Group", plot_type = c("point", "centroid"), 
+		#' 	  centroid_segment_linetype = 1)
 		plot_ordination = function(
+			plot_type = "point",
 			color_values = RColorBrewer::brewer.pal(8, "Dark2"), 
 			shape_values = c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14),
 			plot_color = NULL,
 			plot_shape = NULL,
 			plot_group_order = NULL,
-			plot_point_size = 3,
-			plot_point_alpha = .9,
-			plot_sample_label = NULL,
-			plot_group_centroid = FALSE,
-			plot_group = NULL,
-			segment_alpha = .6,
-			centroid_linetype = 3,
-			plot_group_ellipse = FALSE,
+			add_sample_label = NULL,
+			point_size = 3,
+			point_alpha = 0.8,
+			centroid_segment_alpha = 0.6,
+			centroid_segment_size = 1,
+			centroid_segment_linetype = 3,
+			ellipse_chull_fill = TRUE,
+			ellipse_chull_alpha = 0.1,
 			ellipse_level = 0.9,
-			ellipse_alpha = 0.1,
 			ellipse_type = "t"
 			){
 			ordination <- self$ordination
 			if(is.null(ordination)){
 				stop("Please first run cal_ordination function !")
 			}
-			
+			if(is.null(plot_color)){
+				if(any(c("ellipse", "chull", "centroid") %in% plot_type)){
+					stop("Plot ellipse or chull or centroid need groups! Please provide plot_color parameter!")
+				}
+			}
+			if(! all(plot_type %in% c("point", "ellipse", "chull", "centroid"))){
+				message("There maybe a typo in your plot_type input! plot_type should be one or more from 'point', 'ellipse', 'chull' and 'centroid'!")
+			}
 			combined <- self$res_ordination$scores
 			eig <- self$res_ordination$eig
 			model <- self$res_ordination$model
 			plot_x <- colnames(self$res_ordination$scores)[1]
 			plot_y <- colnames(self$res_ordination$scores)[2]
 			
-			if (!is.null(plot_group_order)) {
+			if(!is.null(plot_group_order)){
 				combined[, plot_color] %<>% factor(., levels = plot_group_order)
 			}
 			
 			p <- ggplot(combined, aes_string(x = plot_x, y = plot_y, color = plot_color, shape = plot_shape))
-			p <- p + geom_point(alpha = plot_point_alpha, size = plot_point_size)
+			if("point" %in% plot_type){
+				p <- p + geom_point(alpha = point_alpha, size = point_size)
+			}
 			if(ordination %in% c("PCA", "PCoA")){
 				p <- p + xlab(paste(plot_x, " [", eig[plot_x],"%]", sep = "")) + 
 					ylab(paste(plot_y, " [", eig[plot_y],"%]", sep = ""))
 			}
 			if(ordination == "NMDS"){
-				p <- p + annotate("text",x= max(combined[,1]),y=max(combined[,2]) + 0.05,label = round(model$stress, 2), parse=TRUE)
+				p <- p + annotate("text", x = max(combined[,1]), y = max(combined[,2]) + 0.05, label = round(model$stress, 2), parse=TRUE)
 			}
-			if (plot_group_centroid == T){
-				if(is.null(plot_group)){
-					plot_group <- plot_color
-				}
-				os <- data.frame(group = combined[, plot_group], x = combined[, plot_x], y = combined[, plot_y]) %>%
+			if("centroid" %in% plot_type){
+				centroid_xy <- data.frame(group = combined[, plot_color], x = combined[, plot_x], y = combined[, plot_y]) %>%
 					dplyr::group_by(group) %>%
 					dplyr::summarise(cx = mean(x), cy = mean(y)) %>%
 					as.data.frame()
-				os2 <- merge(combined, os, by.x= plot_group, by.y = "group")
+				combined_centroid_xy <- merge(combined, centroid_xy, by.x = plot_color, by.y = "group")
 				p <- p + geom_segment(
-					data=os2, 
-					aes_string(x = plot_x, xend = "cx", y = plot_y, yend = "cy", color = plot_group),
-					alpha = segment_alpha, 
-					size = 0.5, 
-					linetype = centroid_linetype
+					data = combined_centroid_xy, 
+					aes_string(x = plot_x, xend = "cx", y = plot_y, yend = "cy", color = plot_color),
+					alpha = centroid_segment_alpha, 
+					size = centroid_segment_size, 
+					linetype = centroid_segment_linetype
 				)
 			}
-			if (plot_group_ellipse == T) {
-				if(is.null(plot_group)){
-					plot_group <- plot_color
+			if(any(c("ellipse", "chull") %in% plot_type)){
+				if(ellipse_chull_fill){
+					ellipse_chull_fill_color <- plot_color
+				}else{
+					ellipse_chull_fill_color <- NULL
+					ellipse_chull_alpha <- 0
 				}
-				mapping <- aes_string(x = plot_x, y = plot_y, group = plot_group, fill = plot_group)
-				p <- p + ggplot2::stat_ellipse(
-					mapping = mapping, 
-					data = combined, 
-					level = ellipse_level, 
-					type = ellipse_type, 
-					alpha = ellipse_alpha, 
-					geom = "polygon"
-					) + 
-					scale_fill_manual(values = color_values)
+				mapping <- aes_string(x = plot_x, y = plot_y, group = plot_color, color = plot_color, fill = ellipse_chull_fill_color)
+				if("ellipse" %in% plot_type){
+					p <- p + ggplot2::stat_ellipse(
+						mapping = mapping, 
+						data = combined, 
+						level = ellipse_level, 
+						type = ellipse_type, 
+						alpha = ellipse_chull_alpha, 
+						geom = "polygon"
+						)
+				}
+				if("chull" %in% plot_type){
+					p <- p + ggpubr::stat_chull(
+						mapping = mapping, 
+						data = combined, 
+						alpha = ellipse_chull_alpha,
+						geom = "polygon"
+						)
+				}
+				if(ellipse_chull_fill){
+					p <- p + scale_fill_manual(values = color_values)
+				}
+			}
+			if(!is.null(add_sample_label)){
+				p <- p + ggrepel::geom_text_repel(aes_string(label = add_sample_label))
 			}
 			if(!is.null(plot_color)){
 				p <- p + scale_color_manual(values = color_values)
@@ -223,26 +259,24 @@ trans_beta <- R6Class(classname = "trans_beta",
 			if(!is.null(plot_shape)){
 				p <- p + scale_shape_manual(values = shape_values)
 			}
-			if(!is.null(plot_sample_label)){
-				p <- p + ggrepel::geom_text_repel(aes_string(label = plot_sample_label))
-			}
 			p
 		},
 		#' @description
-		#' Calculate perMANOVA based on Anderson al. (2008) <doi:10.1111/j.1442-9993.2001.01070.pp.x> and R vegan adonis function.
+		#' Calculate perMANOVA based on Anderson al. (2008) <doi:10.1111/j.1442-9993.2001.01070.pp.x> and R vegan adonis2 function.
 		#'
-		#' @param cal_manova_all default TRUE; whether manova is only used for all the groups.
-		#' @param cal_manova_paired default FALSE; whether manova is used for all the paired groups.
-		#' @param cal_manova_set default NULL; specified group set for manova, such as cal_manova_set = ""Group + Type""; see \code{\link{adonis2}}.
-		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of p.adjust function for available options.
+		#' @param manova_all default TRUE; TRUE represents test for all the groups, i.e. the overall test;
+		#'    FALSE represents test for all the paired groups.
+		#' @param manova_set default NULL; other specified group set for manova, such as "Group + Type" and "Group*Type"; see also \code{\link{adonis2}}.
+		#' @param group default NULL; a column name of sample_table used for manova. If NULL, search group stored in the object.
+		#' @param p_adjust_method default "fdr"; p.adjust method when manova_all = FALSE; see method parameter of p.adjust function for available options.
 		#' @param ... parameters passed to \code{\link{adonis2}} function of vegan package.
 		#' @return res_manova stored in object.
 		#' @examples
 		#' t1$cal_manova(cal_manova_all = TRUE)
 		cal_manova = function(
-			cal_manova_all = TRUE, 
-			cal_manova_paired = FALSE, 
-			cal_manova_set = NULL, 
+			manova_all = TRUE,
+			manova_set = NULL,
+			group = NULL,
 			p_adjust_method = "fdr",
 			...
 			){
@@ -251,23 +285,30 @@ trans_beta <- R6Class(classname = "trans_beta",
 			}
 			use_matrix <- self$use_matrix
 			metadata <- self$sample_table
-			if(!is.null(cal_manova_set)){
-				use_formula <- reformulate(cal_manova_set, substitute(as.dist(use_matrix)))
+			if(!is.null(manova_set)){
+				use_formula <- reformulate(manova_set, substitute(as.dist(use_matrix)))
 				self$res_manova <- adonis2(use_formula, data = metadata, ...)
-			}
-			if(cal_manova_all == T){
-				use_formula <- reformulate(self$group, substitute(as.dist(use_matrix)))
-				self$res_manova <- adonis2(use_formula, data = metadata, ...)
-			}
-			if(cal_manova_paired == T){
-				self$res_manova <- private$paired_group_manova(
-					sample_info_use = metadata, 
-					use_matrix = use_matrix, 
-					group = self$group, 
-					measure = self$measure, 
-					p_adjust_method = p_adjust_method,
-					...
-				)
+			}else{
+				if(is.null(group)){
+					if(is.null(self$group)){
+						stop("Please provide the group parameter!")
+					}else{
+						group <- self$group
+					}
+				}
+				if(manova_all){
+					use_formula <- reformulate(group, substitute(as.dist(use_matrix)))
+					self$res_manova <- adonis2(use_formula, data = metadata, ...)
+				}else{
+					self$res_manova <- private$paired_group_manova(
+						sample_info_use = metadata, 
+						use_matrix = use_matrix, 
+						group = group, 
+						measure = self$measure, 
+						p_adjust_method = p_adjust_method,
+						...
+					)
+				}
 			}
 			message('The result is stored in object$res_manova ...')
 		},
@@ -490,14 +531,6 @@ trans_beta <- R6Class(classname = "trans_beta",
 					  panel.border = element_blank()) +
 				theme(axis.line.x = element_line(color = "black", linetype = "solid", lineend = "square"))
 			g1
-		},
-		#' @description
-		#' Print the trans_beta object.
-		print = function() {
-			cat("trans_beta class:\n")
-			if(!is.null(self$ordination)) cat(paste(self$ordination, "is used for ordination \n"))
-			if(!is.null(self$res_manova)) cat("PerMANOVA is used for finding significance \n")
-			invisible(self)
 		}
 		),
 	private = list(

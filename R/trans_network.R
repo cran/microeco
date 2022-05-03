@@ -67,7 +67,7 @@ trans_network <- R6Class(classname = "trans_network",
 				dataset1 <- dataset1$merge_taxa(taxa = taxa_level)
 			}
 			# transform each object
-			sampleinfo <- dataset1$sample_table
+			self$use_sampleinfo <- dataset1$sample_table
 			# store taxonomic table for the following analysis
 			self$use_tax <- dataset1$tax_table
 			use_abund <- dataset1$otu_table %>% 
@@ -107,7 +107,6 @@ trans_network <- R6Class(classname = "trans_network",
 			}
 			
 			self$use_abund <- use_abund
-			self$use_sampleinfo <- sampleinfo
 			self$taxa_level <- taxa_level
 		},
 		#' @description
@@ -159,9 +158,9 @@ trans_network <- R6Class(classname = "trans_network",
 		#' t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
 		#' 		taxa_level = "OTU", filter_thres = 0.0001)
 		#' t1$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
-		#' t1 <- trans_network$new(dataset = dataset, cal_cor = NA)
+		#' t1 <- trans_network$new(dataset = dataset, cal_cor = NA, filter_thres = 0.0001)
 		#' t1$cal_network(network_method = "SpiecEasi")
-		#' t1$cal_network(network_method = "beemStatic")
+		#' t1 <- trans_network$new(dataset = dataset, cal_cor = NA, filter_thres = 0.0001)
 		#' t1$cal_network(network_method = "FlashWeave")
 		#' }
 		cal_network = function(
@@ -198,6 +197,7 @@ trans_network <- R6Class(classname = "trans_network",
 					stop("Correlation table and p value table have different column numbers !")
 				}
 				raw_vector_p <- raw_p %>% as.dist %>% as.numeric
+				message("Perform p value adjustment with ", COR_p_adjust, " method ...")
 				adp_raw <- p.adjust(raw_vector_p, method = COR_p_adjust)
 				# to matrix
 				use_names <- colnames(raw_p)
@@ -210,6 +210,7 @@ trans_network <- R6Class(classname = "trans_network",
 				}
 				if(COR_optimization == T) {
 					#find out threshold of correlation 
+					message("Start COR optimizing ...")
 					tc1 <- private$rmt(cortable)
 					tc1 <- ifelse(tc1 > COR_low_threshold, tc1, COR_low_threshold)
 					message("The optimized COR threshold: ", tc1, "...\n")
@@ -367,10 +368,14 @@ trans_network <- R6Class(classname = "trans_network",
 		#' @return res_network with modules, stored in object.
 		#' @examples
 		#' \donttest{
+		#' t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
+		#' 		taxa_level = "OTU", filter_thres = 0.0001)
+		#' t1$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
 		#' t1$cal_module(method = "cluster_fast_greedy")
 		#' }
 		cal_module = function(method = "cluster_fast_greedy", module_name_prefix = "M"){
 			private$check_igraph()
+			private$check_network()
 			# add modules
 			network <- self$res_network
 			if(!is.character(method)){
@@ -403,6 +408,7 @@ trans_network <- R6Class(classname = "trans_network",
 				stop("Please first install rgexf package with command: install.packages('rgexf') !")
 			}
 			private$check_igraph()
+			private$check_network()
 			private$saveAsGEXF(network = self$res_network, filepath = filepath)
 		},
 		#' @description
@@ -415,6 +421,7 @@ trans_network <- R6Class(classname = "trans_network",
 		#' }
 		cal_network_attr = function(){
 			private$check_igraph()
+			private$check_network()
 			self$res_network_attr <- private$network_attribute(self$res_network)
 			message('Result is stored in object$res_network_attr ...')
 		},
@@ -441,9 +448,9 @@ trans_network <- R6Class(classname = "trans_network",
 		#' }
 		get_node_table = function(node_roles = TRUE){
 			private$check_igraph()
+			private$check_network()
 			network <- self$res_network
 			use_abund <- self$use_abund
-
 			node_table <- data.frame(name = V(network)$name) %>% `rownames<-`(.[, 1])
 			node_table$degree <- igraph::degree(network)[rownames(node_table)]
 			node_table$betweenness <- betweenness(network)[rownames(node_table)]
@@ -487,6 +494,7 @@ trans_network <- R6Class(classname = "trans_network",
 		#' }
 		get_edge_table = function(){
 			private$check_igraph()
+			private$check_network()
 			network <- self$res_network
 			# another way:
 			# res_edge_table <- as_data_frame(network, what = "edges")
@@ -501,6 +509,22 @@ trans_network <- R6Class(classname = "trans_network",
 			colnames(res_edge_table) <- c("node1", "node2", "label", "weight")
 			self$res_edge_table <- res_edge_table
 			message('Result is stored in object$res_edge_table ...')
+		},
+		#' @description
+		#' Get the adjacency matrix from the network graph.
+		#'
+		#' @param ... parameters passed to as_adjacency_matrix function of igraph package.
+		#' @return res_adjacency_matrix in object.
+		#' @examples
+		#' \donttest{
+		#' t1$get_adjacency_matrix(attr = "weight")
+		#' }
+		get_adjacency_matrix = function(...){
+			private$check_igraph()
+			private$check_network()
+			network <- self$res_network
+			self$res_adjacency_matrix <- as_adjacency_matrix(network, ...) %>% as.matrix
+			message('Result is stored in object$res_adjacency_matrix ...')
 		},
 		#' @description
 		#' Plot the network based on a series of methods from other packages, such as igraph, ggraph and networkD3. 
@@ -546,9 +570,7 @@ trans_network <- R6Class(classname = "trans_network",
 			networkD3_zoom = TRUE, 
 			...
 			){
-			if(is.null(self$res_network)){
-				stop("No res_network found in the object! Please first run cal_network function!")
-			}
+			private$check_network()
 			method <- match.arg(method, c("igraph", "ggraph", "networkD3"))
 			if(method == "igraph"){
 				network <- self$res_network
@@ -625,7 +647,12 @@ trans_network <- R6Class(classname = "trans_network",
 		#' }
 		cal_eigen = function(){
 			private$check_igraph()
+			private$check_network()
 			use_abund <- self$use_abund
+			if(is.null(self$res_node_table)){
+				message("Run get_node_table function to get the node property table ...")
+				self$get_node_table()
+			}
 			node_table <- self$res_node_table
 			# calculate eigengene for each module
 			res_eigen <- list()
@@ -692,6 +719,10 @@ trans_network <- R6Class(classname = "trans_network",
 			shape_values = c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14),
 			...
 			){
+			if(is.null(self$res_node_table)){
+				message("Run get_node_table function to get the node property table ...")
+				self$get_node_table()
+			}
 			if(use_type == 1){
 				res <- private$plot_roles_1(node_roles = self$res_node_table, 
 					roles_color_background = roles_color_background,
@@ -731,6 +762,7 @@ trans_network <- R6Class(classname = "trans_network",
 		#' }
 		subset_network = function(node = NULL, edge = NULL, rm_single = TRUE){
 			private$check_igraph()
+			private$check_network()
 			network <- self$res_network
 			if(!is.null(node)){
 				nodes_raw <- V(network)$name
@@ -756,16 +788,18 @@ trans_network <- R6Class(classname = "trans_network",
 			sub_network
 		},
 		#' @description
-		#' Perform a bootstrapping hypothesis test to determine whether degrees follows a power law distribution;
-		#' a significant p represents the distribution does not follow power law.
+		#' Fit degrees to a power law distribution. First, perform a bootstrapping hypothesis test to determine whether degrees follow a power law distribution.
+		#' If the distribution follows power law, then fit degrees to power law distribution and return the parameters.
 		#'
-		#' @param ... paremeters pass to bootstrap_p in poweRlaw package.
-		#' @return two lists stored in object; see estimate_xmin and bootstrap_p in poweRlaw package for the details.
+		#' @param ... paremeters pass to fit_power_law function in igraph package.
+		#' @return res_powerlaw_p and res_powerlaw_fit; see bootstrap_p function in poweRlaw package for the bootstrapping p value details;
+		#'   see fit_power_law function in igraph package for the power law fit return details.
 		#' @examples
 		#' \donttest{
-		#' t1$cal_powerlaw_p()
+		#' t1$cal_powerlaw()
 		#' }
-		cal_powerlaw_p = function(...){
+		cal_powerlaw = function(...){
+			private$check_network()
 			network <- self$res_network
 			degree_dis <- igraph::degree(network)
 			if(!require("poweRlaw")){
@@ -773,29 +807,67 @@ trans_network <- R6Class(classname = "trans_network",
 			}
 			resdispl <- poweRlaw::displ$new(degree_dis + 1)
 			est_xmin <- poweRlaw::estimate_xmin(resdispl)
+			message('Estimated lower bound of degree: ', est_xmin$xmin)
 			resdispl$setXmin(est_xmin)
-			res <- poweRlaw::bootstrap_p(resdispl, ...)
-			self$res_powerlaw_min <- est_xmin
-			message('Estimated lower bound result is stored in object$res_powerlaw_min ...')
-			self$res_powerlaw_p <- res
-			message('Bootstrap p value is stored in object$res_powerlaw_p ...')			
+			message('Perform bootstrapping ...')
+			bootstrap_res <- poweRlaw::bootstrap_p(resdispl)
+			self$res_powerlaw_p <- bootstrap_res
+			message('Bootstrap result is stored in object$res_powerlaw_p ...')
+			message('Bootstrap p value: ', bootstrap_res$p)
+			if(bootstrap_res$p < 0.05){
+				message("The p value < 0.05; Degrees do not follow power law distribution ...")
+			}else{
+				message("Degrees follow power law distribution ...")
+				res_powerlaw_fit <- fit_power_law(degree_dis + 1, xmin = est_xmin$xmin, ...)
+				message("The estimated alpha: ", res_powerlaw_fit$alpha)
+				self$res_powerlaw_fit <- res_powerlaw_fit
+				message('Powerlaw fitting result is stored in object$res_powerlaw_fit ...')
+			}
 		},
 		#' @description
-		#' Fit degrees to a power law distribution.
+		#' Transform classifed features to community-like microtable object for further analysis, such as module-taxa table.
 		#'
-		#' @param xmin default NULL; See xmin in fit_power_law function; suggest using the result res_powerlaw_min from cal_powerlaw_p function.
-		#' @param ... paremeters pass to fit_power_law function in igraph package.
-		#' @return res_powerlaw_fit stored in object; see fit_power_law function for the details explanation.
+		#' @param use_col default "module"; which column to use as the 'community'; must be one of the name of res_node_table from function get_node_table.
+		#' @param abundance default TRUE; whether sum abundance of taxa. TRUE: sum the abundance for a taxon across all samples; 
+		#' 	  FALSE: sum the frequency for a taxon across all samples.
+		#' @return a new \code{\link{microtable}} class.
 		#' @examples
 		#' \donttest{
-		#' t1$cal_powerlaw_fit()
+		#' t2 <- t1$trans_comm(use_col = "module")
 		#' }
-		cal_powerlaw_fit = function(xmin = NULL, ...){
-			private$check_igraph()
-			network <- self$res_network
-			degree_dis <- igraph::degree(network, mode="in")
-			self$res_powerlaw_fit <- fit_power_law(degree_dis + 1, xmin = xmin, ...)
-			message('Powerlaw fitting result is stored in object$res_powerlaw_fit ...')
+		trans_comm = function(use_col = "module", abundance = TRUE){
+			if(use_col == "module"){
+				if(is.null(V(self$res_network)$module)){
+					stop("Please first run cal_module function to get node modules!")
+				}
+			}
+			if(is.null(self$res_node_table)){
+				message("Run get_node_table function to get the node property table ...")
+				self$get_node_table()
+			}
+			if(!use_col %in% colnames(self$res_node_table)){
+				stop("Provided use_col must be one of the colnames of object$res_node_table !")
+			}
+			if(inherits(self$res_node_table[, use_col], "numeric")){
+				stop("The selected column-", use_col, " must not be numeric! Please check it!")
+			}
+			res_node_table <- self$res_node_table
+			if(any(is.na(res_node_table[, use_col]))){
+				message("Filter the taxa with NA in ", use_col, " ...")
+				res_node_table %<>% .[!is.na(.[, use_col]), ]
+			}
+			abund_table <- self$use_abund
+			if(abundance == F){
+				abund_table[abund_table > 1] <- 1
+			}
+			tax_table <- self$use_tax
+			feature_abund <- apply(abund_table, 2, sum)
+			tm1 <- cbind.data.frame(res_node_table[, c("name", use_col)], abund = feature_abund[res_node_table$name])
+			tm2 <- reshape2::dcast(tm1, reformulate(use_col, "name"), value.var = "abund")
+			tm2[is.na(tm2)] <- 0
+			rownames(tm2) <- tm2[, 1]
+			tm2 %<>% .[, -1]
+			microtable$new(otu_table = tm2, tax_table = tax_table, auto_tidy = TRUE)
 		},
 		#' @description
 		#' Print the trans_network object.
@@ -820,6 +892,11 @@ trans_network <- R6Class(classname = "trans_network",
 		check_igraph = function(){
 			if(!require("igraph")){
 				stop("Please first install igraph package with the command: install.packages('igraph') !")
+			}
+		},
+		check_network = function(){
+			if(is.null(self$res_network)){
+				stop("No network found! Please first run cal_network function!")
 			}
 		},
 		# convert long format to symmetrical matrix
@@ -872,6 +949,9 @@ trans_network <- R6Class(classname = "trans_network",
 				nnsdpois <- density(private$nnsd(pois))
 				chival1 <- sum((nnsd1$y - nnsdpois$y)^2/nnsdpois$y/512)
 				ps <- rbind(ps, chival1)
+				if((i*100) %% 5 == 0){
+					print(i)
+				}
 			}
 			ps <- cbind(ps, c(seq(lcor, hcor, 0.01)))
 			tc <- ps[ps[,1] == min(ps[,1]), 2]
