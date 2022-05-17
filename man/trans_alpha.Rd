@@ -110,7 +110,8 @@ Test the difference of alpha diversity across groups.
 \item{\code{measure}}{default NULL; a vector; if null, all indexes will be calculated; see names of microtable$alpha_diversity, 
 e.g. Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage, PD.}
 
-\item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of p.adjust function for available options.}
+\item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of p.adjust function for available options; 
+NULL can disuse the p value adjustment.}
 
 \item{\code{anova_set}}{default NULL; specified group set for anova, such as 'block + N*P*K', see \code{\link{aov}}.}
 
@@ -154,7 +155,7 @@ Plotting the alpha diveristy.
   boxplot_add = "jitter",
   order_x_mean = FALSE,
   y_start = 1.01,
-  y_increae = 0.05,
+  y_increase = 0.05,
   xtext_angle = NULL,
   xtext_size = 15,
   ytitle_size = 17,
@@ -187,8 +188,8 @@ e.g., Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage, PD.}
 
 \item{\code{y_start}}{default 1.01; the y axis value from which to add the label; the default 1.01 means 1.01 * max(values).}
 
-\item{\code{y_increae}}{default 0.05; the increasing y axia space to add label; the default 0.05 means 0.05 * y_start; 
-this parameter is also used to label the letters of anova result with the fixed (1 + y_increae) * y_start space.}
+\item{\code{y_increase}}{default 0.05; the increasing y axia space to add label; the default 0.05 means 0.05 * y_start; 
+this parameter is also used to label the letters of anova result with the fixed (1 + y_increase) * y_start space.}
 
 \item{\code{xtext_angle}}{default NULL; number (e.g. 30) used to make x axis text generate angle.}
 

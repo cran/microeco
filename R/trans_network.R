@@ -61,15 +61,15 @@ trans_network <- R6Class(classname = "trans_network",
 					dropallfactors(unfac2num = TRUE)
 				env_data[] <- lapply(env_data, function(x){if(is.character(x)) as.factor(x) else x})
 				env_data[] <- lapply(env_data, as.numeric)
-				self$env_data <- env_data
+				self$data_env <- env_data
 			}
 			if(taxa_level != "OTU"){
 				dataset1 <- dataset1$merge_taxa(taxa = taxa_level)
 			}
 			# transform each object
-			self$use_sampleinfo <- dataset1$sample_table
+			self$sample_table <- dataset1$sample_table
 			# store taxonomic table for the following analysis
-			self$use_tax <- dataset1$tax_table
+			self$tax_table <- dataset1$tax_table
 			use_abund <- dataset1$otu_table %>% 
 				{.[apply(., 1, sum)/sum(.) > filter_thres, ]} %>%
 				t %>%
@@ -106,7 +106,7 @@ trans_network <- R6Class(classname = "trans_network",
 				self$res_cor_p <- NULL
 			}
 			
-			self$use_abund <- use_abund
+			self$data_abund <- use_abund
 			self$taxa_level <- taxa_level
 		},
 		#' @description
@@ -134,8 +134,9 @@ trans_network <- R6Class(classname = "trans_network",
 		#' @param COR_p_adjust default "fdr"; p value adjustment method, see method of p.adjust function for available options.
 		#' @param COR_weight default TRUE; whether use correlation coefficient as the weight of edges; FALSE represents weight = 1 for all edges.
 		#' @param COR_cut default 0.6; correlation coefficient threshold for the correlation network.
-		#' @param COR_optimization default FALSE; whether use random matrix theory to optimize the choice of correlation coefficient, see https://doi.org/10.1186/1471-2105-13-113
-		#' @param COR_low_threshold default 0.4; the lowest correlation coefficient threshold, only useful when COR_optimization = TRUE.
+		#' @param COR_optimization default FALSE; whether use random matrix theory (RMT) based method to determine the correlation coefficient; 
+		#' 	  see https://doi.org/10.1186/1471-2105-13-113
+		#' @param COR_optimization_low_high default c(0.4, 0.8); the low and high value threshold used for the RMT optimization; only useful when COR_optimization = TRUE.
 		#' @param SpiecEasi_method default "mb"; either 'glasso' or 'mb';see spiec.easi function in package SpiecEasi and https://github.com/zdk123/SpiecEasi.
 		#' @param FlashWeave_tempdir default NULL; The temporary directory used to save the temporary files for running FlashWeave; If not assigned, use the system user temp.
 		#' @param FlashWeave_meta_data default FALSE; whether use env data for the optimization, If TRUE, the function automatically find the object$env_data in the object and
@@ -147,7 +148,7 @@ trans_network <- R6Class(classname = "trans_network",
 		#'   same with the t.strength parameter in showInteraction function of beemStatic package.
 		#' @param beemStatic_t_stab default 0.8; for network_method = "beemStatic"; 
 		#'   the threshold used to limit the number of interactions (stability); same with the t.stab parameter in showInteraction function of beemStatic package.
-		#' @param add_taxa_name default "Phylum"; NULL or a taxonomic rank name; used to add taxonomic rank name to network node properties.
+		#' @param add_taxa_name default "Phylum"; one or more taxonomic rank name; used to add taxonomic rank name to network node properties.
 		#' @param usename_rawtaxa_when_taxalevel_notOTU default FALSE; whether replace the name of nodes using the taxonomic information.
 		#' @param ... paremeters pass to spiec.easi function of SpiecEasi package when network_method = "SpiecEasi" or 
 		#'   func.EM function of beemStatic package when network_method = "beemStatic".
@@ -170,7 +171,7 @@ trans_network <- R6Class(classname = "trans_network",
 			COR_weight = TRUE,
 			COR_cut = 0.6,
 			COR_optimization = FALSE,
-			COR_low_threshold = 0.4,
+			COR_optimization_low_high = c(0.4, 0.8),
 			SpiecEasi_method = "mb",
 			FlashWeave_tempdir = NULL,
 			FlashWeave_meta_data = FALSE,
@@ -182,9 +183,9 @@ trans_network <- R6Class(classname = "trans_network",
 			...
 			){
 			private$check_igraph()
-			sampleinfo <- self$use_sampleinfo
+			sampleinfo <- self$sample_table
 			taxa_level <- self$taxa_level
-			taxa_table <- self$use_tax
+			taxa_table <- self$tax_table
 			
 			network_method <- match.arg(network_method, c("COR", "SpiecEasi", "FlashWeave", "beemStatic"))
 			
@@ -211,8 +212,7 @@ trans_network <- R6Class(classname = "trans_network",
 				if(COR_optimization == T) {
 					#find out threshold of correlation 
 					message("Start COR optimizing ...")
-					tc1 <- private$rmt(cortable)
-					tc1 <- ifelse(tc1 > COR_low_threshold, tc1, COR_low_threshold)
+					tc1 <- private$rmt(cortable, low_thres = COR_optimization_low_high[1], high_thres = COR_optimization_low_high[2])
 					message("The optimized COR threshold: ", tc1, "...\n")
 				}
 				else {
@@ -236,15 +236,15 @@ trans_network <- R6Class(classname = "trans_network",
 				if(!require("SpiecEasi")){
 					stop("SpiecEasi package is not installed! See https://github.com/zdk123/SpiecEasi ")
 				}
-				use_abund <- self$use_abund %>% as.matrix
+				use_abund <- self$data_abund %>% as.matrix
 				# calculate SpiecEasi network, reference https://github.com/zdk123/SpiecEasi
 				network <- spiec.easi(use_abund, method = SpiecEasi_method, ...)
 				network <- adj2igraph(getRefit(network))
 				V(network)$name <- colnames(use_abund)
 				E(network)$label <- unlist(lapply(E(network)$weight, function(x) ifelse(x > 0, "+", "-")))
 			}
-			if(grepl("FlashWeave", network_method, ignore.case = TRUE)){
-				use_abund <- self$use_abund
+			if(network_method == "FlashWeave"){
+				use_abund <- self$data_abund
 				oldwd <- getwd()
 				# make sure working directory can not be changed by the function when quit.
 				on.exit(setwd(oldwd))
@@ -263,11 +263,11 @@ trans_network <- R6Class(classname = "trans_network",
 				L1 <- "using FlashWeave\n"
 				L2 <- 'data_path = "taxa_table_FlashWeave.tsv"\n'
 				if(FlashWeave_meta_data == T){
-					if(is.null(self$env_data)){
+					if(is.null(self$data_env)){
 						stop("FlashWeave_meta_data is TRUE, but object$env_data not found! 
 							Please use env_cols or add_data parameter of trans_network$new to provide the metadata when creating the object!")
 					}
-					meta_data <- self$env_data
+					meta_data <- self$data_env
 					write.table(meta_data, "meta_table_FlashWeave.tsv", sep = "\t", quote = FALSE, row.names = FALSE)
 					L3 <- 'meta_data_path = "meta_table_FlashWeave.tsv"\n'
 				}else{
@@ -284,6 +284,11 @@ trans_network <- R6Class(classname = "trans_network",
 				write(L, file = openfile)
 				close(openfile)
 				message("The temporary files are in ", tem_dir, " ...")
+				message("Check Julia ...")
+				check_out <- system(command = "julia -help", intern = TRUE)
+				if(length(check_out) == 0){
+					stop("Julia language not found in the system path! Install it from https://julialang.org/downloads/ and add bin directory to the path!")
+				}
 				message("Run the FlashWeave ...")
 				system("julia calculate_network.jl")
 				network <- read_graph("network_FlashWeave.gml", format = "gml")
@@ -295,7 +300,7 @@ trans_network <- R6Class(classname = "trans_network",
 				if(!require("beemStatic")){
 					stop("beemStatic package is not installed! See https://github.com/CSB5/BEEM-static ")
 				}
-				use_abund <- self$use_abund %>% t %>% as.data.frame
+				use_abund <- self$data_abund %>% t %>% as.data.frame
 				taxa_low <- apply(use_abund, 1, function(x) sum(x != 0)) %>% .[which.min(.)]
 				message("The feature table have ", nrow(use_abund), " taxa. The taxa with the lowest occurrence frequency was ", names(taxa_low)[1], 
 					", found in ", taxa_low[1], " samples of total ", ncol(use_abund), " samples. If an error occurs because of low frequency, ",
@@ -334,9 +339,19 @@ trans_network <- R6Class(classname = "trans_network",
 			network %<>% delete_vertices(delete_nodes)
 			V(network)$taxa <- V(network)$name
 			if(!is.null(add_taxa_name)){
-				network <- set_vertex_attr(network, add_taxa_name, value = V(network)$name %>% 
-					taxa_table[., add_taxa_name] %>% 
-					gsub("^.__", "", .))
+				if(!is.null(taxa_table)){
+					for(i in add_taxa_name){
+						if(i %in% colnames(taxa_table)){
+							network <- set_vertex_attr(network, i, value = V(network)$name %>% 
+								taxa_table[., i] %>% 
+								gsub("^.__", "", .))
+						}else{
+							message("Skip adding taxonomy: ", i, " to node as it is not in colnames of tax_table ...")
+						}
+					}
+				}else{
+					message('Skip adding taxonomy to node as tax_table is not found ...')
+				}
 			}
 			if(taxa_level != "OTU"){
 				if(usename_rawtaxa_when_taxalevel_notOTU == T){
@@ -450,7 +465,7 @@ trans_network <- R6Class(classname = "trans_network",
 			private$check_igraph()
 			private$check_network()
 			network <- self$res_network
-			use_abund <- self$use_abund
+			use_abund <- self$data_abund
 			node_table <- data.frame(name = V(network)$name) %>% `rownames<-`(.[, 1])
 			node_table$degree <- igraph::degree(network)[rownames(node_table)]
 			node_table$betweenness <- betweenness(network)[rownames(node_table)]
@@ -476,9 +491,9 @@ trans_network <- R6Class(classname = "trans_network",
 			}
 			if(self$taxa_level != "OTU"){
 				node_table %<>% cbind.data.frame(., 
-					self$use_tax[replace_table[rownames(.), 2], 1:which(colnames(self$use_tax) %in% self$taxa_level), drop = FALSE])
+					self$tax_table[replace_table[rownames(.), 2], 1:which(colnames(self$tax_table) %in% self$taxa_level), drop = FALSE])
 			}else{
-				node_table %<>% cbind.data.frame(., self$use_tax[rownames(.), ])
+				node_table %<>% cbind.data.frame(., self$tax_table[rownames(.), ])
 			}
 			
 			self$res_node_table <- node_table
@@ -576,8 +591,10 @@ trans_network <- R6Class(classname = "trans_network",
 				network <- self$res_network
 				g <- igraph::plot.igraph(network, ...)
 			}else{
-				message("Run get_node_table function to get or update the node property table ...")
-				self$get_node_table()
+				if(is.null(self$res_node_table)){
+					message("Run get_node_table function to obtain the node property table ...")
+					self$get_node_table()
+				}
 				node_table <- self$res_node_table
 				if(!is.null(node_color)){
 					if(node_color == "module"){
@@ -648,7 +665,7 @@ trans_network <- R6Class(classname = "trans_network",
 		cal_eigen = function(){
 			private$check_igraph()
 			private$check_network()
-			use_abund <- self$use_abund
+			use_abund <- self$data_abund
 			if(is.null(self$res_node_table)){
 				message("Run get_node_table function to get the node property table ...")
 				self$get_node_table()
@@ -756,7 +773,7 @@ trans_network <- R6Class(classname = "trans_network",
 		#' @return a new network
 		#' @examples
 		#' \donttest{
-		#' t1$subset_network(node = t1$res_node_table %>% .[.$module == "M1", ] %>% 
+		#' t1$subset_network(node = t1$res_node_table %>% base::subset(module == "M1") %>% 
 		#'   rownames, rm_single = TRUE)
 		#' # return a sub network that contains all nodes of module M1
 		#' }
@@ -856,11 +873,11 @@ trans_network <- R6Class(classname = "trans_network",
 				message("Filter the taxa with NA in ", use_col, " ...")
 				res_node_table %<>% .[!is.na(.[, use_col]), ]
 			}
-			abund_table <- self$use_abund
+			abund_table <- self$data_abund
 			if(abundance == F){
 				abund_table[abund_table > 1] <- 1
 			}
-			tax_table <- self$use_tax
+			tax_table <- self$tax_table
 			feature_abund <- apply(abund_table, 2, sum)
 			tm1 <- cbind.data.frame(res_node_table[, c("name", use_col)], abund = feature_abund[res_node_table$name])
 			tm2 <- reshape2::dcast(tm1, reformulate(use_col, "name"), value.var = "abund")
@@ -936,25 +953,30 @@ trans_network <- R6Class(classname = "trans_network",
 			res
 		},
 		# RMT optimization
-		rmt = function(cormat, lcor = 0.4, hcor = 0.8){
+		rmt = function(cormat, low_thres = 0.4, high_thres = 0.8){
 			s <- seq(0, 3, 0.1)
 			pois <- exp(-s)
-			ps <- NULL  
-			for(i in seq(lcor, hcor, 0.01)){
+			ps <- c()
+			seq_value <- c()
+			for(i in seq(low_thres, high_thres, 0.01)){
 				cormat1 <- abs(cormat)
 				cormat1[cormat1 < i] <- 0  
 				eigen_res <- sort(eigen(cormat1)$value)
-				ssp <- smooth.spline(eigen_res, control.spar = list(low = 0, high = 3)) 
+				check_res <- tryCatch(ssp <- smooth.spline(eigen_res, control.spar = list(low = 0, high = 3)), error = function(e) { skip_to_next <- TRUE})
+				if(rlang::is_true(check_res)) {
+					next
+				}
 				nnsd1 <- density(private$nnsd(ssp$y))
 				nnsdpois <- density(private$nnsd(pois))
 				chival1 <- sum((nnsd1$y - nnsdpois$y)^2/nnsdpois$y/512)
-				ps <- rbind(ps, chival1)
+				ps <- c(ps, chival1)
+				seq_value <- c(seq_value, i)
 				if((i*100) %% 5 == 0){
 					print(i)
 				}
 			}
-			ps <- cbind(ps, c(seq(lcor, hcor, 0.01)))
-			tc <- ps[ps[,1] == min(ps[,1]), 2]
+			res <- data.frame(ps, seq_value)
+			tc <- res[which.min(res[, 1]), 2]
 			tc
 		},
 		nnsd = function(x){

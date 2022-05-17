@@ -67,7 +67,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#'   }
 		#' @param measure default NULL; a vector; if null, all indexes will be calculated; see names of microtable$alpha_diversity, 
 		#' 	 e.g. Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage, PD.
-		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of p.adjust function for available options.
+		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of p.adjust function for available options; 
+		#'    NULL can disuse the p value adjustment.
 		#' @param anova_set default NULL; specified group set for anova, such as 'block + N*P*K', see \code{\link{aov}}.
 		#' @param ... parameters passed to kruskal.test or wilcox.test function (method = "KW") or dunnTest function of FSA package (method = "KW_dunn") or
 		#'   agricolae::duncan.test (method = "anova").
@@ -148,7 +149,11 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 						}
 					}
 				}
-				p_value_adjust <- p.adjust(p_value, method = p_adjust_method)
+				if(is.null(p_adjust_method)){
+					p_value_adjust <- p_value
+				}else{
+					p_value_adjust <- p.adjust(p_value, method = p_adjust_method)
+				}
 				compare_result <- data.frame(comnames, measure_use, test_method, max_group, p_value, p_value_adjust)
 				colnames(compare_result) <- c("Comparison", "Measure", "Test_method", "Group", "P.unadj", "P.adj")
 				compare_result$Significance <- cut(compare_result$P.adj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", "ns"))
@@ -225,8 +230,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @param boxplot_add default "jitter"; points type, see the add parameter in ggpubr::ggboxplot.
 		#' @param order_x_mean default FALSE; whether order x axis by the means of groups from large to small.
 		#' @param y_start default 1.01; the y axis value from which to add the label; the default 1.01 means 1.01 * max(values).
-		#' @param y_increae default 0.05; the increasing y axia space to add label; the default 0.05 means 0.05 * y_start; 
-		#' 	  this parameter is also used to label the letters of anova result with the fixed (1 + y_increae) * y_start space.
+		#' @param y_increase default 0.05; the increasing y axia space to add label; the default 0.05 means 0.05 * y_start; 
+		#' 	  this parameter is also used to label the letters of anova result with the fixed (1 + y_increase) * y_start space.
 		#' @param xtext_angle default NULL; number (e.g. 30) used to make x axis text generate angle.
 		#' @param xtext_size default 15; x axis text size.
 		#' @param ytitle_size default 17; y axis title size.
@@ -247,7 +252,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			boxplot_add = "jitter",
 			order_x_mean = FALSE,
 			y_start = 1.01,
-			y_increae = 0.05,
+			y_increase = 0.05,
 			xtext_angle = NULL,
 			xtext_size = 15,
 			ytitle_size = 17,
@@ -319,7 +324,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 						use_diff_data <- self$res_diff %>% .[.$Measure == measure, ]
 						add_letter_text <- self$res_diff[x_axis_order, measure]
 						group_position <- tapply(use_data$Value, use_data[, group], function(x) {res <- max(x); ifelse(is.na(res), x, res)}) %>% 
-							{. + max(.) * y_increae}
+							{. + max(.) * y_increase}
 						textdata <- data.frame(
 							x = x_axis_order, 
 							y = group_position[x_axis_order], 
@@ -346,7 +351,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 						for(i in seq_len(nrow(use_diff_data))){
 							x_min %<>% c(., match(gsub("(.*)\\s-\\s(.*)", "\\1", use_diff_data[i, "Comparison"]), x_axis_order))
 							x_max %<>% c(., match(gsub("(.*)\\s-\\s(.*)", "\\2", use_diff_data[i, "Comparison"]), x_axis_order))
-							y_position %<>% c(., y_start * (1 + i * y_increae))
+							y_position %<>% c(., y_start * (1 + i * y_increase))
 						}
 						p <- p + ggsignif::geom_signif(
 							annotations = annotations,

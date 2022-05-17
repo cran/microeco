@@ -32,7 +32,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' 	  'mseq' method is performed on the feature abudance, i.e. microtable$otu_table.
 		#' @param filter_thres default 0; the relative abundance threshold used for method != "metastat" or "mseq". 
 		#' @param alpha default 0.05; differential significance threshold for method = "lefse" or "rf"; used to select taxa with significance across groups.
-		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of p.adjust function for other available options.
+		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of p.adjust function for other available options; 
+		#'    NULL can disuse the p value adjustment.
 		#' @param lefse_subgroup default NULL; sample sub group used for sub-comparision in lefse; Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>.
 		#' @param lefse_min_subsam default 10; sample numbers required in the subgroup test.
 		#' @param lefse_norm default 1000000; scale value in lefse.
@@ -136,6 +137,9 @@ trans_diff <- R6Class(classname = "trans_diff",
 				res <- tem_data1$res_diff
 				if(method != "anova"){
 					colnames(res)[colnames(res) == "Measure"] <- "Taxa"
+				}else{
+					res <- rownames_to_column(res, var = "Group")
+					res <- reshape2::melt(res, id.vars = "Group", variable.name = "Taxa", value.name = "Significance")
 				}
 				self$res_diff <- res
 				message('The result is stored in object$res_diff ...')
@@ -143,13 +147,20 @@ trans_diff <- R6Class(classname = "trans_diff",
 			if(method %in% c("lefse", "rf")){
 				# differential test
 				group_vec <- sampleinfo[, group] %>% as.factor
+				comparisions <- paste0(levels(group_vec), collapse = " - ")
+
 				message("Start differential test for ", group, " ...")
-				res_class <- lapply(seq_len(nrow(abund_table)), function(x) private$test_mark(abund_table[x, ], group_vec))
+				res_class <- suppressWarnings(lapply(seq_len(nrow(abund_table)), function(x) private$test_mark(abund_table[x, ], group_vec, method = "kruskal.test")))
+				
 				pvalue_raw <- unlist(lapply(res_class, function(x) x$p_value))
 				names(pvalue_raw) <- rownames(abund_table)
 				pvalue_raw[is.nan(pvalue_raw)] <- 1
 				message(sum(pvalue_raw < alpha), " taxa found significant ...")
-				pvalue <- p.adjust(pvalue_raw, method = p_adjust_method)
+				if(is.null(p_adjust_method)){
+					pvalue <- pvalue_raw
+				}else{
+					pvalue <- p.adjust(pvalue_raw, method = p_adjust_method)
+				}
 				# select significant taxa
 				sel_taxa <- pvalue < alpha
 				message("After P value adjustment, ", sum(sel_taxa), " taxa found significant ...")
@@ -199,7 +210,9 @@ trans_diff <- R6Class(classname = "trans_diff",
 				res <- apply(res, 1, mean) %>% as.data.frame
 				use_method <- ifelse(length(levels(group_vec)) > 2, "Kruskal-Wallis rank sum test & Random Forest", "Wilcoxon rank sum test & Random Forest")
 				Taxa_name <- nametable[rownames(res), "name"]
-				res <- data.frame(Taxa = Taxa_name, 
+				res <- data.frame(
+					Comparison = comparisions,
+					Taxa = Taxa_name,
 					Group = apply(class_taxa_median_sub, 2, function(x) rownames(class_taxa_median_sub)[which.max(x)])[Taxa_name], 
 					Method = use_method,
 					MeanDecreaseGini = res[, 1], 
@@ -208,6 +221,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				rownames(imp_sort) <- imp_sort$Taxa
 				imp_sort$P.unadj <- pvalue_raw[as.character(imp_sort$Taxa)]
 				imp_sort$P.adj <- pvalue_sub[as.character(imp_sort$Taxa)]
+				imp_sort$Significance <- cut(imp_sort$P.adj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", "ns"))
 				self$res_diff <- imp_sort
 				message('The rf result is stored in object$res_diff ...')
 			}
@@ -353,8 +367,9 @@ trans_diff <- R6Class(classname = "trans_diff",
 					P.unadj = pvalue_raw[names(pvalue_sub)],
 					P.adj = pvalue_sub)
 				res1 %<>% .[order(.$LDA, decreasing = TRUE), ]
-				res1 <- cbind.data.frame(Taxa = rownames(res1), Method = "LEfSe", res1)
+				res1 <- cbind.data.frame(Comparison = comparisions, Taxa = rownames(res1), Method = "LEfSe", res1)
 				message("Minimum LDA score: ", range(res1$LDA)[1], " maximum LDA score: ", range(res1$LDA)[2])
+				res1$Significance <- cut(res1$P.adj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", "ns"))
 				self$res_diff <- res1
 				message('The lefse result is stored in object$res_diff ...')
 			}
@@ -423,6 +438,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 					group_select <- unlist(strsplit(output[x, "Comparison"], split = " - "))
 					ifelse(output[x, "mean(group1)"] > output[x, "mean(group2)"], group_select[1], group_select[2])
 				}) %>% unlist
+				output$Significance <- cut(output$qvalue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", "ns"))
 				output <- data.frame(output, Group = max_group)
 				self$res_diff <- output
 				message('The metastat result is stored in object$res_diff ...')
@@ -452,10 +468,14 @@ trans_diff <- R6Class(classname = "trans_diff",
 					# extract the result
 					tb <- data.frame(logFC = objres1@fitZeroLogNormal$logFC, se = objres1@fitZeroLogNormal$se)
 					p <- objres1@pvalues
-					if (p_adjust_method == "ihw-ubiquity" | p_adjust_method == "ihw-abundance") {
-						padj <- MRihw(objres1, p, p_adjust_method, 0.1)
-					} else {
-						padj <- p.adjust(p, method = p_adjust_method)
+					if(is.null(p_adjust_method)){
+						padj <- p
+					}else{
+						if (p_adjust_method == "ihw-ubiquity" | p_adjust_method == "ihw-abundance") {
+							padj <- MRihw(objres1, p, p_adjust_method, 0.1)
+						} else {
+							padj <- p.adjust(p, method = p_adjust_method)
+						}
 					}
 					srt <- order(p, decreasing = FALSE)
 					valid <- 1:length(padj)
@@ -500,12 +520,30 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' 	  If provided, overlook the levels in the group of sample_table.
 		#' @param barwidth default 0.9; the bar width in plot.
 		#' @param use_se default TRUE; whether use SE in plot, if FALSE, use SD.
+		#' @param add_sig default FALSE; whether add the significance label to the plot.
+		#' @param add_sig_label default "Significance"; select a colname of object$res_diff for the label text, such as 'P.adj' or 'Significance'.
+		#' @param add_sig_label_color default "black"; the color for the label text when add_sig = TRUE.
+		#' @param add_sig_tip_length default 0.01; the tip length for the added line when add_sig = TRUE.
+		#' @param y_start default 1.01; the y axis position from which to add the label; the default 1.01 means 1.01 * Value;
+		#'   For method != "anova", all the start positions are same, i.e. Value = max(Mean+SD or Mean+SE); 
+		#'   For method = "anova"; the stat position is calculated for each point, i.e. Value = Mean+SD or Mean+SE.
+		#' @param y_increase default 0.05; the increasing y axia space to add label for paired groups; the default 0.05 means 0.05 * y_start * Value; 
+		#' 	  In addition, this parameter is also used to label the letters of anova result with the fixed (1 + y_increase) * y_start * Value.
 		#' @param text_y_size default 10; the size for the y axis text.
+		#' @param coord_flip default TRUE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical, horizontal.
+		#' @param ... parameters passed to ggsignif::stat_signif when add_sig = TRUE.
 		#' @return ggplot.
 		#' @examples
 		#' \donttest{
+		#' t1 <- trans_diff$new(dataset = dataset, method = "anova", group = "Group", taxa_level = "Genus")
+		#' t1$plot_diff_abund(use_number = 1:10)
+		#' t1$plot_diff_abund(use_number = 1:10, add_sig = TRUE)
+		#' t1 <- trans_diff$new(dataset = dataset, method = "wilcox", group = "Group")
+		#' t1$plot_diff_abund(use_number = 1:20)
+		#' t1$plot_diff_abund(use_number = 1:20, add_sig = TRUE)
 		#' t1 <- trans_diff$new(dataset = dataset, method = "lefse", group = "Group")
 		#' t1$plot_diff_abund(use_number = 1:20)
+		#' t1$plot_diff_abund(use_number = 1:20, add_sig = TRUE)
 		#' }
 		plot_diff_abund = function(
 			use_number = 1:20,
@@ -517,32 +555,37 @@ trans_diff <- R6Class(classname = "trans_diff",
 			group_order = NULL,
 			barwidth = 0.9,
 			use_se = TRUE,
-			text_y_size = 10
+			add_sig = FALSE,
+			add_sig_label = "Significance",
+			add_sig_label_color = "black",
+			add_sig_tip_length = 0.01,
+			y_start = 1.01,
+			y_increase = 0.05,
+			text_y_size = 10,
+			coord_flip = TRUE,
+			...
 			){
 			abund_data <- self$res_abund
 			method <- self$method
 			diff_data <- self$res_diff
 
-			if(method == "anova"){
-				stop("This function can not be applied to 'anova' method currently!")
+			if(method == "mseq"){
+				stop("This function can not be applied to 'mseq' method currently!")
 			}else{
-				if(method == "mseq"){
-					stop("This function can not be applied to 'mseq' method currently!")
+				if(method == "metastat"){
+					message('Reorder taxa according to qvalue in res_diff from low to high ...')
+					diff_data %<>% .[order(.$qvalue, decreasing = FALSE), ]
+					# diff_data %<>% .[.$qvalue < 0.05, ]
 				}else{
-					if(method == "metastat"){
-						message('Reorder taxa according to qvalue in res_diff from low to high ...')
-						diff_data %<>% .[order(.$qvalue, decreasing = FALSE), ]
-						diff_data %<>% .[.$qvalue < 0.05, ]
-					}else{
-						# lefse and rf are ordered
-						if(! method %in% c("lefse", "rf")){
-							message('Reorder taxa according to P.adj in res_diff from low to high ...')
-							diff_data %<>% .[order(.$P.adj, decreasing = FALSE), ]
-							diff_data %<>% .[.$P.adj < 0.05, ]
-						}
+					# lefse and rf are ordered
+					if(! method %in% c("lefse", "rf", "anova")){
+						message('Reorder taxa according to P.adj in res_diff from low to high ...')
+						diff_data %<>% .[order(.$P.adj, decreasing = FALSE), ]
+						# diff_data %<>% .[.$P.adj < 0.05, ]
 					}
 				}
 			}
+
 			if(!is.null(select_group)){
 				if(length(select_group) > 1){
 					stop("The select_group parameter should only have one element! Please check the input!")
@@ -566,10 +609,11 @@ trans_diff <- R6Class(classname = "trans_diff",
 				abund_data$Taxa %<>% gsub(".__", "", .)
 			}
 			if(is.null(select_taxa)){
-				if(length(use_number) > nrow(diff_data)){
-					use_number <- 1:nrow(diff_data)
+				if(length(use_number) > length(unique(as.character(diff_data$Taxa)))){
+					message("The length of use_number is larger than taxa number in object$diff_data. Use all taxa ...")
+					use_number <- 1:length(unique(as.character(diff_data$Taxa)))
 				}
-				diff_data %<>% .[use_number, ]
+				diff_data %<>% .[.$Taxa %in% unique(as.character(diff_data$Taxa))[use_number], ]
 				diff_data$Taxa %<>% factor(., levels = rev(unique(as.character(.))))
 			}else{
 				diff_data %<>% .[.$Taxa %in% select_taxa, ]
@@ -594,26 +638,143 @@ trans_diff <- R6Class(classname = "trans_diff",
 			}else{
 				color_values %<>% .[1:length(levels(abund_data$Group))] %>% rev
 			}
+			if(!coord_flip){
+				abund_data$Group %<>% factor(., levels = rev(levels(.)))
+				abund_data$Taxa %<>% factor(., levels = rev(levels(.)))
+				diff_data$Taxa %<>% factor(., levels = rev(levels(.)))
+				color_values %<>% rev
+			}
 			
-			p <- ggplot(abund_data, aes(x = Taxa, y = Mean, color = Group, fill = Group, group = Group)) +
+			# get labels info
+			if(add_sig){
+				# assign labels by factor orders
+				x_axis_order <- levels(abund_data$Group)
+				if(! add_sig_label %in% colnames(diff_data)){
+					stop("add_sig_label parameter must be one of colnames of object$res_diff!")
+				}
+				if(is.factor(diff_data[, add_sig_label])){
+					diff_data[, add_sig_label] %<>% as.character
+				}else{
+					if(is.numeric(diff_data[, add_sig_label])){
+						diff_data[, add_sig_label] %<>% round(., 4)
+					}
+				}
+				if(use_se){
+					y_start_use <- max((abund_data$Mean + abund_data$SE)) * y_start
+				}else{
+					y_start_use <- max((abund_data$Mean + abund_data$SD)) * y_start
+				}
+				all_taxa <- levels(abund_data$Taxa)
+
+				if(length(levels(abund_data$Group)) > 2 & method %in% c("lefse", "rf", "KW")){
+					add_letter_text <- diff_data[match(all_taxa, diff_data$Taxa), add_sig_label]
+					textdf <- data.frame(
+						x = all_taxa, 
+						y = y_start_use, 
+						add = add_letter_text, 
+						stringsAsFactors = FALSE
+						)
+				}else{
+					if(method != "anova"){
+						annotations <- c()
+						x_min <- c()
+						x_max <- c()
+						y_position <- c()
+
+						start_bar_mid <- 1 - (barwidth/2 - barwidth/(length(x_axis_order) * 2))
+						increase_bar_mid <- barwidth/length(x_axis_order)
+
+						for(j in all_taxa){
+							select_use_diff_data <- diff_data %>% dropallfactors %>% .[.$Taxa == j, ]
+							for(i in seq_len(nrow(select_use_diff_data))){
+								# first determine the bar range
+								mid_num <- match(j, all_taxa) - 1
+								annotations %<>% c(., select_use_diff_data[i, add_sig_label])
+								x_min %<>% c(., mid_num + 
+									(start_bar_mid + (match(gsub("(.*)\\s-\\s(.*)", "\\1", select_use_diff_data[i, "Comparison"]), x_axis_order) - 1) * increase_bar_mid))
+								x_max %<>% c(., mid_num + 
+									(start_bar_mid + (match(gsub("(.*)\\s-\\s(.*)", "\\2", select_use_diff_data[i, "Comparison"]), x_axis_order) - 1) * increase_bar_mid))
+								y_position %<>% c(., y_start_use * (1 + i * y_increase))
+							}
+						}
+					}else{
+						x_mid <- c()
+						annotations <- c()
+						y_position <- c()
+
+						start_bar_mid <- 1 - (barwidth/2 - barwidth/(length(x_axis_order) * 2))
+						increase_bar_mid <- barwidth/length(x_axis_order)
+
+						for(j in all_taxa){
+							select_use_diff_data <- diff_data %>% dropallfactors %>% .[.$Taxa == j, ]
+							for(i in seq_len(nrow(select_use_diff_data))){
+								# first determine the bar range
+								mid_num <- match(j, all_taxa) - 1
+								annotations %<>% c(., select_use_diff_data[i, add_sig_label])
+								x_mid %<>% c(., mid_num + (start_bar_mid + (match(select_use_diff_data[i, "Group"], x_axis_order) - 1) * increase_bar_mid))
+								abund_data_select <- abund_data[abund_data$Group == select_use_diff_data[i, "Group"] & abund_data$Taxa == j, ]
+								if(use_se){
+									y_position %<>% c(., y_start * (abund_data_select$Mean + abund_data_select$SE) + y_increase * max(abund_data$Mean))						
+								}else{
+									y_position %<>% c(., y_start * (abund_data_select$Mean + abund_data_select$SD) + y_increase * max(abund_data$Mean))
+								}
+							}
+						}
+						textdf <- data.frame(
+							x = x_mid, 
+							y = y_position, 
+							add = annotations, 
+							stringsAsFactors = FALSE
+							)
+					}
+				}
+			}
+			
+			p <- ggplot(abund_data, aes(x = Taxa, y = Mean, color = Group, fill = Group)) +
+				theme_bw() +
 				geom_bar(stat="identity", position = position_dodge(), width = barwidth)
 			if(use_se == T){
 				p <- p + geom_errorbar(aes(ymin=Mean-SE, ymax=Mean+SE), width=.45, position=position_dodge(barwidth), color = "black")
 			}else{
 				p <- p + geom_errorbar(aes(ymin=Mean-SD, ymax=Mean+SD), width=.45, position=position_dodge(barwidth), color = "black")
 			}
-			p <- p + theme_bw() +
-				coord_flip() +
+			if(add_sig){
+				if(length(levels(abund_data$Group)) > 2 & method %in% c("lefse", "rf", "KW")){
+					p <- p + geom_text(aes(x = x, y = y, label = add), data = textdf, inherit.aes = FALSE)
+				}else{
+					if(method != "anova"){
+						p <- p + ggsignif::geom_signif(
+							annotations = annotations,
+							y_position = y_position, 
+							xmin = x_min, 
+							xmax = x_max,
+							color = add_sig_label_color,
+							tip_length = add_sig_tip_length,
+							...
+							)
+					}else{
+						p <- p + geom_text(aes(x = x, y = y, label = add), data = textdf, inherit.aes = FALSE)
+					}
+				}
+			}
+			p <- p +
 				scale_color_manual(values = color_values) +
 				scale_fill_manual(values = color_values) +
 				ylab("Relative abundance") +
 				theme(legend.position = "right") +
-				theme(panel.grid.minor.y = element_blank(), panel.grid.major.y = element_blank(), 
-					panel.border = element_blank(), panel.background=element_rect(fill="white")) +
-				theme(axis.title = element_text(size = 17)) +
-				guides(fill=guide_legend(reverse = TRUE, ncol=1), color = "none") + 
-				theme(axis.title.y=element_blank(), axis.text.y = element_text(size = text_y_size, color = "black"))
-				#theme(plot.margin = unit(c(.1, 0, .1, 0), "cm"))
+				theme(panel.border = element_blank(), panel.background=element_rect(fill="white")) +
+				theme(axis.title = element_text(size = 17))
+				
+			if(coord_flip){
+				p <- p + coord_flip() + guides(fill = guide_legend(reverse = TRUE, ncol = 1), color = "none") +
+					theme(panel.grid.minor.y = element_blank(), panel.grid.major.y = element_blank()) +
+					theme(axis.title.y = element_blank(), axis.text.y = element_text(size = text_y_size, color = "black"))
+			}else{
+				p <- p + guides(fill = guide_legend(reverse = FALSE, ncol=1), color = "none") +
+					theme(axis.text.x = element_text(angle = 45, colour = "black", vjust = 1, hjust = 1, size = text_y_size)) +
+					theme(axis.title.x = element_blank(), axis.text.x = element_text(size = text_y_size, color = "black")) +
+					theme(plot.margin = unit(c(.1, .1, .1, 1), "cm"))
+			}
 			p
 		},
 		#' @description
@@ -1010,47 +1171,36 @@ trans_diff <- R6Class(classname = "trans_diff",
 		}
 		),
 	private = list(
-		# group test in lefse or rf
-		test_mark = function(dataframe, group, nonpara = TRUE, para = "anova", min_num_nonpara = 1){
+		# group test for lefse or rf
+		test_mark = function(dataframe, group, min_num_nonpara = 1, method = NULL){
 			d1 <- as.data.frame(t(dataframe))
-			# check normality for parametric test
-			if(nonpara == F){
-				num_vals <- as.numeric(d1[,1])
-				#shapiro test function
-				if(length(unique((num_vals[!is.na(num_vals)]))) > 3 & length(unique((num_vals[!is.na(num_vals)]))) < 5000 ){
-					d1.shapiro <- shapiro.test(num_vals)$p.value
-					if(d1.shapiro > 0.05){
-						nonpara = F
+			taxaname <- colnames(d1)[1]
+			d1$Group <- group
+			colnames(d1)[1] <- "Value"
+			formu <- reformulate("Group", "Value")
+			if(any(table(as.character(group))) < min_num_nonpara){
+				list(p_value = NA, med = NA)
+			}else{
+				if(! is.null(method)){
+					method <- match.arg(method, c("wilcox.test", "kruskal.test"))
+					if(method == "wilcox.test"){
+						res1 <- wilcox.test(formula = formu, data = d1)
+					}else{
+						res1 <- kruskal.test(formula = formu, data = d1)
 					}
-				}else{
-					message("It was impossible to verify the normality of the taxa ", colnames(d1)[1], " !")
-				}
-			}
-			if(nonpara == T){
-				if(any(table(as.character(group))) < min_num_nonpara){
-					list(p_value = NA, med = NA)
 				}else{
 					if(length(unique(as.character(group))) == 2){
-						res1 <- wilcox.test(d1[,1], g = group)
+						res1 <- wilcox.test(formula = formu, data = d1)
 					}else{
-						res1 <- kruskal.test(d1[,1], g = group)
+						res1 <- kruskal.test(formula = formu, data = d1)
 					}
-					if(is.nan(res1$p.value)){
-						res1$p.value <- 1
-					}
-					med <- tapply(d1[,1], group, median) %>% as.data.frame
-					colnames(med) <- colnames(d1)
-					list(p_value = res1$p.value, med = med)
 				}
-			}else{
-				# Currently, anova is not used in the whole class
-				if(para == "anova"){
-					colnames(d1)[1] <- "Abundance"
-					d2 <- cbind.data.frame(d1, Group = group)
-					res1 <- aov(Abundance ~ Group, d2)
-					pvalue <- as.numeric(unlist(summary(res1))[9])
-					list(p_value = pvalue)
+				if(is.nan(res1$p.value)){
+					res1$p.value <- 1
 				}
+				med <- tapply(d1[,1], group, median) %>% as.data.frame
+				colnames(med) <- taxaname
+				list(p_value = res1$p.value, med = med)
 			}
 		},
 		# generate the cladogram annotation table
