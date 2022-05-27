@@ -6,8 +6,7 @@
 #' including the microtable object creation, data reduction, data rarefaction based on Paul et al. (2013) <doi:10.1371/journal.pone.0061217>, taxa abundance calculation, 
 #' alpha and beta diversity calculation based on the An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035> and 
 #' Lozupone et al. (2005) <doi:10.1128/AEM.71.12.8228–8235.2005> and other basic operations.\cr
-#' The tutorial website: \href{https://chiliubio.github.io/microeco_tutorial/}{https://chiliubio.github.io/microeco_tutorial/} or
-#' \href{http://chiliubio.gitee.io/microeco_tutorial/}{http://chiliubio.gitee.io/microeco_tutorial/}
+#' The tutorial website: \href{https://chiliubio.github.io/microeco_tutorial/}{https://chiliubio.github.io/microeco_tutorial/}
 #' 
 #' @export
 microtable <- R6Class(classname = "microtable",
@@ -73,20 +72,6 @@ microtable <- R6Class(classname = "microtable",
 			self$beta_diversity <- NULL
 			self$auto_tidy <- auto_tidy
 			if(self$auto_tidy) self$tidy_dataset()
-		},
-		#' @description
-		#' Print the microtable object.
-		print = function(){
-			cat("microtable class:\n")
-			cat(paste("sample_table have", nrow(self$sample_table), "rows and", ncol(self$sample_table), "columns\n"))
-			cat(paste("otu_table have", nrow(self$otu_table), "rows and", ncol(self$otu_table), "columns\n"))
-			if(!is.null(self$tax_table)) cat(paste("tax_table have", nrow(self$tax_table), "rows and", ncol(self$tax_table), "columns\n"))
-			if(!is.null(self$phylo_tree)) cat(paste("phylo_tree have", length(self$phylo_tree$tip.label), "tips\n"))
-			if(!is.null(self$rep_fasta)) cat(paste("rep_fasta have", length(self$rep_fasta), "sequences\n"))
-			if(!is.null(self$taxa_abund)) cat(paste("Taxa abundance: calculated for", paste0(names(self$taxa_abund), collapse = ","), "\n"))
-			if(!is.null(self$alpha_diversity)) cat(paste("Alpha diversity: calculated for", paste0(colnames(self$alpha_diversity), collapse = ","), "\n"))
-			if(!is.null(self$beta_diversity)) cat(paste("Beta diversity: calculated for", paste0(names(self$beta_diversity), collapse = ","), "\n"))
-			invisible(self)
 		},
 		#' @description
 		#' Filter the taxa considered as pollution from tax_table.
@@ -493,7 +478,8 @@ microtable <- R6Class(classname = "microtable",
 		#' Calculate alpha diversity in microtable object.
 		#'
 		#' @param measures default NULL; one or more indexes from "Observed", "Coverage", "Chao1", "ACE", "Shannon", "Simpson", "InvSimpson", "Fisher", "PD"; 
-		#'   If null, use all those measures.
+		#'   If null, use all those measures. 'Shannon', 'Simpson' and 'InvSimpson' are calculated based on vegan::diversity function;
+		#'   'Chao1' and 'ACE' depend on the function vegan::estimateR; 'PD' depends on the function picante::pd.
 		#' @param PD TRUE or FALSE, whether phylogenetic tree should be calculated, default FALSE.
 		#' @return alpha_diversity stored in object.
 		#' @examples
@@ -630,6 +616,20 @@ microtable <- R6Class(classname = "microtable",
 			for(i in names(self$beta_diversity)){
 				write.csv(self$beta_diversity[[i]], file = paste0(dirpath, "/", i, ".csv"), row.names = TRUE)
 			}
+		},
+		#' @description
+		#' Print the microtable object.
+		print = function(){
+			cat("microtable-class object:\n")
+			cat(paste("sample_table have", nrow(self$sample_table), "rows and", ncol(self$sample_table), "columns\n"))
+			cat(paste("otu_table have", nrow(self$otu_table), "rows and", ncol(self$otu_table), "columns\n"))
+			if(!is.null(self$tax_table)) cat(paste("tax_table have", nrow(self$tax_table), "rows and", ncol(self$tax_table), "columns\n"))
+			if(!is.null(self$phylo_tree)) cat(paste("phylo_tree have", length(self$phylo_tree$tip.label), "tips\n"))
+			if(!is.null(self$rep_fasta)) cat(paste("rep_fasta have", length(self$rep_fasta), "sequences\n"))
+			if(!is.null(self$taxa_abund)) cat(paste("Taxa abundance: calculated for", paste0(names(self$taxa_abund), collapse = ","), "\n"))
+			if(!is.null(self$alpha_diversity)) cat(paste("Alpha diversity: calculated for", paste0(colnames(self$alpha_diversity), collapse = ","), "\n"))
+			if(!is.null(self$beta_diversity)) cat(paste("Beta diversity: calculated for", paste0(names(self$beta_diversity), collapse = ","), "\n"))
+			invisible(self)
 		}
 		),
 	private = list(

@@ -66,6 +66,7 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
 \item \href{#method-plot_diff_abund}{\code{trans_diff$plot_diff_abund()}}
 \item \href{#method-plot_diff_bar}{\code{trans_diff$plot_diff_bar()}}
 \item \href{#method-plot_diff_cladogram}{\code{trans_diff$plot_diff_cladogram()}}
+\item \href{#method-print}{\code{trans_diff$print()}}
 \item \href{#method-clone}{\code{trans_diff$clone()}}
 }
 }
@@ -124,7 +125,7 @@ For testing at a specific rank, provide taxonomic rank name, such as "Genus"; th
 \item{\code{alpha}}{default 0.05; differential significance threshold for method = "lefse" or "rf"; used to select taxa with significance across groups.}
 
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of p.adjust function for other available options; 
-NULL can disuse the p value adjustment.}
+NULL mean disuse the p value adjustment; So when p_adjust_method = NULL, P.adj is same with P.unadj.}
 
 \item{\code{lefse_subgroup}}{default NULL; sample sub group used for sub-comparision in lefse; Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>.}
 
@@ -423,6 +424,16 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
 }
 \if{html}{\out{</div>}}
 
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-print"></a>}}
+\if{latex}{\out{\hypertarget{method-print}{}}}
+\subsection{Method \code{print()}}{
+Print the trans_alpha object.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_diff$print()}\if{html}{\out{</div>}}
 }
 
 }

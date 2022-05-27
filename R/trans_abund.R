@@ -500,6 +500,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' @param plot_SE default TRUE; TRUE: plot the errorbar with mean±se; FALSE: plot the errorbar with mean±sd.
 		#' @param position default position_dodge(0.1); Position adjustment, either as a string (such as "identity"), or the result of a call to a position adjustment function.
 		#' @param errorbar_size default 1; errorbar size.
+		#' @param errorbar_width default 0.1; errorbar width.
 		#' @param point_size default 3; point size for taxa.
 		#' @param point_alpha default 0.8; point transparency.
 		#' @param line_size default 0.8; line size.
@@ -521,6 +522,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 			plot_SE = TRUE,
 			position = position_dodge(0.1),
 			errorbar_size = 1,
+			errorbar_width = 0.1,
 			point_size = 3,
 			point_alpha = 0.8,
 			line_size = 0.8, 
@@ -538,10 +540,10 @@ trans_abund <- R6Class(classname = "trans_abund",
 						
 			p <- ggplot(plot_data, aes_string(x = "Sample", y = "Abundance", color = "Taxonomy", group = "Taxonomy"))
 			if(("SE" %in% colnames(plot_data)) & plot_SE){
-				p <- p + geom_errorbar(aes(ymin = Abundance - SE, ymax = Abundance + SE), width = .1, position = position, size = errorbar_size)
+				p <- p + geom_errorbar(aes(ymin = Abundance - SE, ymax = Abundance + SE), width = errorbar_width, position = position, size = errorbar_size)
 			}else{
 				if(("SD" %in% colnames(plot_data)) & plot_SE){
-					p <- p + geom_errorbar(aes(ymin = Abundance - SD, ymax = Abundance + SD), width = .1, position = position, size = errorbar_size)
+					p <- p + geom_errorbar(aes(ymin = Abundance - SD, ymax = Abundance + SD), width = errorbar_width, position = position, size = errorbar_size)
 				}
 			}
 			p <- p + geom_point(size = point_size, alpha = point_alpha, position = position)
@@ -595,14 +597,15 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' @description
 		#' Print the trans_abund object.
 		print = function(){
-			cat("trans_abund class:\n")
+			cat("trans_abund object:\n")
 			cat(paste("data_abund have", ncol(self$data_abund), "columns: ", paste0(colnames(self$data_abund), collapse = ", "), "\n"))
-			cat(paste("data_abund have", nrow(self$data_abund), "rows\n"))
+			cat(paste("data_abund have total", length(unique(as.character(self$data_abund$Taxonomy))), "taxa\n"))
+			cat(paste("taxrank: ", self$taxrank, "\n"))
 			if(!is.null(self$data_taxanames)){
-				if(length(self$data_taxanames) > 20){
-					cat(paste("Filtered taxa: ", length(self$data_taxanames), "\n"))
+				if(length(self$data_taxanames) > 50){
+					cat(paste("data_taxanames: ", length(self$data_taxanames), "taxa\n"))
 				}else{
-					cat(paste("Filtered taxa names: ", paste0(self$data_taxanames, collapse = ", "), "\n"))
+					cat(paste("data_taxanames: ", paste0(self$data_taxanames, collapse = ", "), "\n"))
 				}
 			}
 			invisible(self)

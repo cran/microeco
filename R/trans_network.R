@@ -15,9 +15,9 @@ trans_network <- R6Class(classname = "trans_network",
 		#' 
 		#' @param dataset the object of \code{\link{microtable}} Class.
 		#' @param cor_method default "pearson"; "pearson", "spearman" or "kendall"; correlation algorithm, only use for correlation-based network.
-		#' @param cal_cor default "base"; "base", "WGCNA", "SparCC" or NA; correlation method; NA represents no correlation calculation, 
+		#' @param cal_cor default "base"; "base", "WGCNA", "SparCC" or NULL; correlation method; NULL denote no correlation calculation, 
 		#' 	  used for non-correlation based network, such as SpiecEasi and FlashWeave methods.
-		#' @param taxa_level default "OTU"; taxonomic rank; 'OTU' represents using feature table directly; 
+		#' @param taxa_level default "OTU"; taxonomic rank; 'OTU' denotes using feature table directly; 
 		#' 	  other available options should be one of the colnames of microtable$tax_table.
 		#' @param filter_thres default 0; the relative abundance threshold.
 		#' @param nThreads default 1; the thread number used for "WGCNA" and SparCC.
@@ -33,12 +33,12 @@ trans_network <- R6Class(classname = "trans_network",
 		#' t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
 		#' 		taxa_level = "OTU", filter_thres = 0.0001)
 		#' # for other network
-		#' t1 <- trans_network$new(dataset = dataset, cal_cor = NA)
+		#' t1 <- trans_network$new(dataset = dataset, cal_cor = NULL)
 		#' }
 		initialize = function(
 			dataset = NULL,
 			cor_method = c("pearson", "spearman", "kendall")[1],
-			cal_cor = c("base", "WGCNA", "SparCC", NA)[1],
+			cal_cor = c("base", "WGCNA", "SparCC", NULL)[1],
 			taxa_level = "OTU",
 			filter_thres = 0,
 			nThreads = 1,
@@ -75,10 +75,11 @@ trans_network <- R6Class(classname = "trans_network",
 				t %>%
 				as.data.frame
 			
-			if( (!is.na(cal_cor)) & (!is.null(env_cols) | !is.null(add_data))){
+			if( (!is.null(cal_cor)) & (!is.null(env_cols) | !is.null(add_data))){
 				use_abund <- cbind.data.frame(use_abund, env_data)
 			}
-			if(!is.na(cal_cor)){
+			if(!is.null(cal_cor)){
+				cal_cor <- match.arg(cal_cor, c("base", "WGCNA", "SparCC"))
 				if(cal_cor == "base"){
 					cor_result <- private$cal_corr(inputtable = use_abund, cor_method = cor_method)
 				}
@@ -157,11 +158,13 @@ trans_network <- R6Class(classname = "trans_network",
 		#' \donttest{
 		#' # for correlation network
 		#' t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
-		#' 		taxa_level = "OTU", filter_thres = 0.0001)
-		#' t1$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
-		#' t1 <- trans_network$new(dataset = dataset, cal_cor = NA, filter_thres = 0.0001)
-		#' t1$cal_network(network_method = "SpiecEasi")
-		#' t1 <- trans_network$new(dataset = dataset, cal_cor = NA, filter_thres = 0.0001)
+		#' 		taxa_level = "OTU", filter_thres = 0.001)
+		#' t1$cal_network(COR_p_thres = 0.05, COR_cut = 0.6)
+		#' t1 <- trans_network$new(dataset = dataset, cal_cor = NULL, filter_thres = 0.003)
+		#' t1$cal_network(network_method = "SpiecEasi", SpiecEasi_method = "mb")
+		#' t1 <- trans_network$new(dataset = dataset, cal_cor = NULL, taxa_level = "OTU", filter_thres = 0.005)
+		#' t1$cal_network(network_method = "beemStatic")
+		#' t1 <- trans_network$new(dataset = dataset, cal_cor = NULL, filter_thres = 0.001)
 		#' t1$cal_network(network_method = "FlashWeave")
 		#' }
 		cal_network = function(
@@ -236,10 +239,18 @@ trans_network <- R6Class(classname = "trans_network",
 				if(!require("SpiecEasi")){
 					stop("SpiecEasi package is not installed! See https://github.com/zdk123/SpiecEasi ")
 				}
+				SpiecEasi_method <- match.arg(SpiecEasi_method, c("glasso", "mb"))
 				use_abund <- self$data_abund %>% as.matrix
 				# calculate SpiecEasi network, reference https://github.com/zdk123/SpiecEasi
-				network <- spiec.easi(use_abund, method = SpiecEasi_method, ...)
-				network <- adj2igraph(getRefit(network))
+				spieceasi_fit <- SpiecEasi::spiec.easi(use_abund, method = SpiecEasi_method, ...)
+				# use the way from NetCoMi package
+				if(SpiecEasi_method == "glasso"){
+					assoMat <- stats::cov2cor(as.matrix(getOptCov(spieceasi_fit))) * SpiecEasi::getRefit(spieceasi_fit)
+				}else{
+					assoMat <- SpiecEasi::symBeta(SpiecEasi::getOptBeta(spieceasi_fit), mode = "ave")
+				}
+				assoMat %<>% as.matrix
+				network <- adj2igraph(assoMat)
 				V(network)$name <- colnames(use_abund)
 				E(network)$label <- unlist(lapply(E(network)$weight, function(x) ifelse(x > 0, "+", "-")))
 			}
@@ -294,7 +305,6 @@ trans_network <- R6Class(classname = "trans_network",
 				network <- read_graph("network_FlashWeave.gml", format = "gml")
 				network <- set_vertex_attr(network, "name", value = V(network)$label)
 				E(network)$label <- unlist(lapply(E(network)$weight, function(x) ifelse(x > 0, "+", "-")))
-				E(network)$weight <- abs(E(network)$weight)
 			}
 			if(network_method == "beemStatic"){
 				if(!require("beemStatic")){
@@ -319,8 +329,8 @@ trans_network <- R6Class(classname = "trans_network",
 				V(network)$name <- rownames(use_abund)
 				V(network)$RelativeAbundance <- rowMeans(beemStatic:::tss(use_abund))
 				E(network)$label <- ifelse(E(network)$weight > 0, '+', '-')
-				E(network)$weight <- abs(E(network)$weight)
 			}
+			E(network)$weight <- abs(E(network)$weight)
 			message("---------------- ", Sys.time()," : Finish ----------------")
 			
 			nodes_raw <- data.frame(cbind(V(network), V(network)$name))
@@ -384,7 +394,7 @@ trans_network <- R6Class(classname = "trans_network",
 		#' @examples
 		#' \donttest{
 		#' t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
-		#' 		taxa_level = "OTU", filter_thres = 0.0001)
+		#' 		taxa_level = "OTU", filter_thres = 0.0002)
 		#' t1$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
 		#' t1$cal_module(method = "cluster_fast_greedy")
 		#' }
@@ -455,8 +465,8 @@ trans_network <- R6Class(classname = "trans_network",
 		#' Authors: Chi Liu, Umer Zeeshan Ijaz
 		#'
 		#' @param node_roles default TRUE; whether calculate node roles, i.e. Module hubs, Network hubs, Connectors and Peripherals <doi:10.1016/j.geoderma.2022.115866>.
-		#' @return res_node_table in object; Abundance expressed as a percentage; z represents within-module connectivity;
-		#'   p represents among-module connectivity.		
+		#' @return res_node_table in object; Abundance expressed as a percentage; z denotes within-module connectivity;
+		#'   p denotes among-module connectivity.
 		#' @examples
 		#' \donttest{
 		#' t1$get_node_table(node_roles = TRUE)
@@ -889,18 +899,13 @@ trans_network <- R6Class(classname = "trans_network",
 		#' @description
 		#' Print the trans_network object.
 		print = function() {
-			cat("trans_network class:\n")
+			cat("trans_network object:\n")
 			if(!is.null(self$res_network)){
-				cat("network object: \n")
-				print.igraph(self$res_network)
+				cat("res_network: \n")
+				igraph::print.igraph(self$res_network)
 				cat("\n")
 			}else{
-				cat("network object: NULL\n")
-			}
-			if(!is.null(self$res_network_attr)){
-				cat("res_network_attr object: finished\n")
-			}else{
-				cat("res_network_attr object: NULL\n")
+				cat("res_network: NULL\n")
 			}
 			invisible(self)
 		}

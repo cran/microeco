@@ -11,8 +11,7 @@ This class is a wrapper for a series of operations on the original files and the
 including the microtable object creation, data reduction, data rarefaction based on Paul et al. (2013) <doi:10.1371/journal.pone.0061217>, taxa abundance calculation, 
 alpha and beta diversity calculation based on the An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035> and 
 Lozupone et al. (2005) <doi:10.1128/AEM.71.12.8228–8235.2005> and other basic operations.\cr
-The tutorial website: \href{https://chiliubio.github.io/microeco_tutorial/}{https://chiliubio.github.io/microeco_tutorial/} or
-\href{http://chiliubio.gitee.io/microeco_tutorial/}{http://chiliubio.gitee.io/microeco_tutorial/}
+The tutorial website: \href{https://chiliubio.github.io/microeco_tutorial/}{https://chiliubio.github.io/microeco_tutorial/}
 }
 \examples{
 
@@ -152,7 +151,6 @@ class(dataset$beta_diversity)
 \subsection{Public methods}{
 \itemize{
 \item \href{#method-new}{\code{microtable$new()}}
-\item \href{#method-print}{\code{microtable$print()}}
 \item \href{#method-filter_pollution}{\code{microtable$filter_pollution()}}
 \item \href{#method-rarefy_samples}{\code{microtable$rarefy_samples()}}
 \item \href{#method-tidy_dataset}{\code{microtable$tidy_dataset()}}
@@ -170,6 +168,7 @@ class(dataset$beta_diversity)
 \item \href{#method-save_alphadiv}{\code{microtable$save_alphadiv()}}
 \item \href{#method-cal_betadiv}{\code{microtable$cal_betadiv()}}
 \item \href{#method-save_betadiv}{\code{microtable$save_betadiv()}}
+\item \href{#method-print}{\code{microtable$print()}}
 \item \href{#method-clone}{\code{microtable$clone()}}
 }
 }
@@ -235,16 +234,6 @@ dataset$tidy_dataset()
 }
 \if{html}{\out{</div>}}
 
-}
-
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-print"></a>}}
-\if{latex}{\out{\hypertarget{method-print}{}}}
-\subsection{Method \code{print()}}{
-Print the microtable object.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{microtable$print()}\if{html}{\out{</div>}}
 }
 
 }
@@ -641,7 +630,8 @@ Calculate alpha diversity in microtable object.
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{measures}}{default NULL; one or more indexes from "Observed", "Coverage", "Chao1", "ACE", "Shannon", "Simpson", "InvSimpson", "Fisher", "PD"; 
-If null, use all those measures.}
+If null, use all those measures. 'Shannon', 'Simpson' and 'InvSimpson' are calculated based on vegan::diversity function;
+'Chao1' and 'ACE' depend on the function vegan::estimateR; 'PD' depends on the function picante::pd.}
 
 \item{\code{PD}}{TRUE or FALSE, whether phylogenetic tree should be calculated, default FALSE.}
 }
@@ -734,6 +724,16 @@ Save beta diversity matrix to the computer.
 }
 \if{html}{\out{</div>}}
 }
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-print"></a>}}
+\if{latex}{\out{\hypertarget{method-print}{}}}
+\subsection{Method \code{print()}}{
+Print the microtable object.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{microtable$print()}\if{html}{\out{</div>}}
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-clone"></a>}}
