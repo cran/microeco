@@ -27,7 +27,7 @@ t1 <- trans_network$new(dataset = dataset, cal_cor = NULL)
 ## Method `trans_network$cal_network`
 ## ------------------------------------------------
 
-\donttest{
+\dontrun{
 # for correlation network
 t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
 		taxa_level = "OTU", filter_thres = 0.001)
@@ -151,7 +151,6 @@ t2 <- t1$trans_comm(use_col = "module")
 \item \href{#method-cal_module}{\code{trans_network$cal_module()}}
 \item \href{#method-save_network}{\code{trans_network$save_network()}}
 \item \href{#method-cal_network_attr}{\code{trans_network$cal_network_attr()}}
-\item \href{#method-cal_node_type}{\code{trans_network$cal_node_type()}}
 \item \href{#method-get_node_table}{\code{trans_network$get_node_table()}}
 \item \href{#method-get_edge_table}{\code{trans_network$get_edge_table()}}
 \item \href{#method-get_adjacency_matrix}{\code{trans_network$get_adjacency_matrix()}}
@@ -237,7 +236,7 @@ t1 <- trans_network$new(dataset = dataset, cal_cor = NULL)
 Calculate network based on the correlation method or SpiecEasi package or julia FlashWeave package or beemStatic package.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_network(
-  network_method = c("COR", "SpiecEasi", "FlashWeave", "beemStatic")[1],
+  network_method = c("COR", "SpiecEasi", "gcoda", "FlashWeave", "beemStatic")[1],
   COR_p_thres = 0.01,
   COR_p_adjust = "fdr",
   COR_weight = TRUE,
@@ -259,7 +258,7 @@ Calculate network based on the correlation method or SpiecEasi package or julia 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{network_method}}{default "COR"; "COR", "SpiecEasi", "FlashWeave" or "beemStatic"; The option details: 
+\item{\code{network_method}}{default "COR"; "COR", "SpiecEasi", "gcoda", "FlashWeave" or "beemStatic"; The option details: 
 \describe{
   \item{\strong{'COR'}}{correlation-based network; use the correlation and p value matrixes in object$res_cor_p returned from trans_network$new; 
         See Deng et al. (2012) <doi:10.1186/1471-2105-13-113> for other details}
@@ -267,6 +266,12 @@ Calculate network based on the correlation method or SpiecEasi package or julia 
         belong to the category of conditional dependence and graphical models;
         see \href{https://github.com/zdk123/SpiecEasi}{https://github.com/zdk123/SpiecEasi} for installing the R package; 
         see Kurtz et al. (2015) <doi:10.1371/journal.pcbi.1004226> for the algorithm details}
+  \item{\strong{'gcoda'}}{hypothesize the logistic normal distribution of microbiome data; use penalized maximum likelihood method to estimate
+        the sparse structure of inverse covariance for latent normal variables to address the high
+        dimensionality of the microbiome data;
+        belong to the category of conditional dependence and graphical models;
+        depend on the R NetCoMi package \href{https://github.com/stefpeschel/NetCoMi}{https://github.com/stefpeschel/NetCoMi}; 
+        see FANG et al. (2017) <doi:10.1089/cmb.2017.0054> for the algorithm details}
   \item{\strong{'FlashWeave'}}{FlashWeave network; Local-to-global learning framework; belong to the category of conditional dependence and graphical models;
      good performance on heterogenous datasets to find direct associations among taxa;
      see \href{https://github.com/meringlab/FlashWeave.jl}{https://github.com/meringlab/FlashWeave.jl} for installing julia language and FlashWeave package;
@@ -312,8 +317,9 @@ the threshold used to limit the number of interactions (stability); same with th
 
 \item{\code{usename_rawtaxa_when_taxalevel_notOTU}}{default FALSE; whether replace the name of nodes using the taxonomic information.}
 
-\item{\code{...}}{paremeters pass to spiec.easi function of SpiecEasi package when network_method = "SpiecEasi" or 
-func.EM function of beemStatic package when network_method = "beemStatic".}
+\item{\code{...}}{paremeters pass to SpiecEasi::spiec.easi when network_method = "SpiecEasi";
+pass to NetCoMi::netConstruct when network_method = "gcoda"; 
+pass to beemStatic::func.EM when network_method = "beemStatic".}
 }
 \if{html}{\out{</div>}}
 }
@@ -322,7 +328,7 @@ res_network stored in object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\donttest{
+\preformatted{\dontrun{
 # for correlation network
 t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
 		taxa_level = "OTU", filter_thres = 0.001)
@@ -438,19 +444,6 @@ t1$cal_network_attr()
 
 }
 
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-cal_node_type"></a>}}
-\if{latex}{\out{\hypertarget{method-cal_node_type}{}}}
-\subsection{Method \code{cal_node_type()}}{
-Calculate node properties. This function will be deprecated in the next release! Please use get_node_table function!
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_node_type()}\if{html}{\out{</div>}}
-}
-
-\subsection{Returns}{
-see the Return part in function get_node_table.
-}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-get_node_table"></a>}}
