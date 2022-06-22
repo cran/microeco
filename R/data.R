@@ -39,7 +39,6 @@ NULL
 NULL
 
 
-
 #' The OTU table of the ITS dataset in the microeco package
 #'
 #'
@@ -120,7 +119,6 @@ NULL
 NULL
 
 
-
 #' The sample information of ITS dataset in the microeco package
 #'
 #'
@@ -141,7 +139,6 @@ NULL
 NULL
 
 
-
 #' The taxonomic information of ITS dataset in the microeco package
 #'
 #'
@@ -150,4 +147,3 @@ NULL
 #' @name taxonomy_table_ITS
 #' @usage data(taxonomy_table_ITS)
 NULL
-

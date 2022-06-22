@@ -17,10 +17,10 @@ eigengene analysis, network subsetting, node and edge properties extraction, net
 \donttest{
 data(dataset)
 # for correlation network
-t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
-		taxa_level = "OTU", filter_thres = 0.0001)
-# for other network
-t1 <- trans_network$new(dataset = dataset, cal_cor = NULL)
+t1 <- trans_network$new(dataset = dataset, cor_method = "pearson", 
+		taxa_level = "OTU", filter_thres = 0.0002)
+# for non-correlation network
+t1 <- trans_network$new(dataset = dataset, cor_method = NULL)
 }
 
 ## ------------------------------------------------
@@ -29,14 +29,14 @@ t1 <- trans_network$new(dataset = dataset, cal_cor = NULL)
 
 \dontrun{
 # for correlation network
-t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
+t1 <- trans_network$new(dataset = dataset, cor_method = "pearson", 
 		taxa_level = "OTU", filter_thres = 0.001)
 t1$cal_network(COR_p_thres = 0.05, COR_cut = 0.6)
-t1 <- trans_network$new(dataset = dataset, cal_cor = NULL, filter_thres = 0.003)
+t1 <- trans_network$new(dataset = dataset, cor_method = NULL, filter_thres = 0.003)
 t1$cal_network(network_method = "SpiecEasi", SpiecEasi_method = "mb")
-t1 <- trans_network$new(dataset = dataset, cal_cor = NULL, taxa_level = "OTU", filter_thres = 0.005)
+t1 <- trans_network$new(dataset = dataset, cor_method = NULL, filter_thres = 0.005)
 t1$cal_network(network_method = "beemStatic")
-t1 <- trans_network$new(dataset = dataset, cal_cor = NULL, filter_thres = 0.001)
+t1 <- trans_network$new(dataset = dataset, cor_method = NULL, filter_thres = 0.001)
 t1$cal_network(network_method = "FlashWeave")
 }
 
@@ -45,7 +45,7 @@ t1$cal_network(network_method = "FlashWeave")
 ## ------------------------------------------------
 
 \donttest{
-t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
+t1 <- trans_network$new(dataset = dataset, cor_method = "pearson", 
 		taxa_level = "OTU", filter_thres = 0.0002)
 t1$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
 t1$cal_module(method = "cluster_fast_greedy")
@@ -136,6 +136,22 @@ t1$cal_powerlaw()
 }
 
 ## ------------------------------------------------
+## Method `trans_network$cal_sum_links`
+## ------------------------------------------------
+
+\donttest{
+t1$cal_sum_links(taxa_level = "Phylum")
+}
+
+## ------------------------------------------------
+## Method `trans_network$plot_sum_links`
+## ------------------------------------------------
+
+\dontrun{
+test1$plot_sum_links(plot_pos = TRUE, plot_num = 10)
+}
+
+## ------------------------------------------------
 ## Method `trans_network$trans_comm`
 ## ------------------------------------------------
 
@@ -159,6 +175,8 @@ t2 <- t1$trans_comm(use_col = "module")
 \item \href{#method-plot_taxa_roles}{\code{trans_network$plot_taxa_roles()}}
 \item \href{#method-subset_network}{\code{trans_network$subset_network()}}
 \item \href{#method-cal_powerlaw}{\code{trans_network$cal_powerlaw()}}
+\item \href{#method-cal_sum_links}{\code{trans_network$cal_sum_links()}}
+\item \href{#method-plot_sum_links}{\code{trans_network$plot_sum_links()}}
 \item \href{#method-trans_comm}{\code{trans_network$trans_comm()}}
 \item \href{#method-print}{\code{trans_network$print()}}
 \item \href{#method-clone}{\code{trans_network$clone()}}
@@ -169,18 +187,21 @@ t2 <- t1$trans_comm(use_col = "module")
 \if{latex}{\out{\hypertarget{method-new}{}}}
 \subsection{Method \code{new()}}{
 This function is used to create the trans_network object, store the important intermediate data 
-  and calculate correlations if cal_cor parameter is selected.
+  and calculate correlations if cor_method parameter is not NULL.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$new(
   dataset = NULL,
-  cor_method = c("pearson", "spearman", "kendall")[1],
-  cal_cor = c("base", "WGCNA", "SparCC", NULL)[1],
+  cor_method = NULL,
+  use_WGCNA_pearson_spearman = FALSE,
+  use_NetCoMi_pearson_spearman = FALSE,
+  use_sparcc_method = c("NetCoMi", "SpiecEasi")[1],
   taxa_level = "OTU",
   filter_thres = 0,
   nThreads = 1,
   SparCC_simu_num = 100,
   env_cols = NULL,
-  add_data = NULL
+  add_data = NULL,
+  ...
 )}\if{html}{\out{</div>}}
 }
 
@@ -189,39 +210,66 @@ This function is used to create the trans_network object, store the important in
 \describe{
 \item{\code{dataset}}{the object of \code{\link{microtable}} Class.}
 
-\item{\code{cor_method}}{default "pearson"; "pearson", "spearman" or "kendall"; correlation algorithm, only use for correlation-based network.}
+\item{\code{cor_method}}{default NULL; NULL or one of "bray", "pearson", "spearman", "bicor", "sparcc", "cclasso" and "ccrepe";
+All the methods refered to NetCoMi package are performed based on netConstruct function of NetCoMi package and require
+NetCoMi installed from Github (\href{https://github.com/stefpeschel/NetCoMi}{https://github.com/stefpeschel/NetCoMi});
+For the algorithm details, please see Peschel et al. 2020 Brief. Bioinform <doi: 10.1093/bib/bbaa290>;
+\describe{
+  \item{\strong{NULL}}{denote using non-correlation based network, such as SpiecEasi network construction approaches in cal_network function.}
+  \item{\strong{'bray'}}{1-B, where B is Bray–Curtis dissimilarity; based on vegan::vegdist function}
+  \item{\strong{'pearson'}}{Pearson correlation; If use_WGCNA_pearson_spearman and use_NetCoMi_pearson_spearman are both FALSE, use the function cor.test in R base;
+    use_WGCNA_pearson_spearman = TRUE invoke corAndPvalue function of WGCNA package; 
+    use_NetCoMi_pearson_spearman = TRUE invoke netConstruct function of NetCoMi package}
+  \item{\strong{'spearman'}}{Spearman correlation; other details are same with the 'pearson' option}
+  \item{\strong{'bicor'}}{Calculate biweight midcorrelation efficiently for matrices based on WGCNA::bicor function; require NetCoMi package installed}
+  \item{\strong{'sparcc'}}{SparCC algorithm (Friedman & Alm, PLoS Comp Biol, 2012, <doi:10.1371/journal.pcbi.1002687>);
+       use NetCoMi package when use_sparcc_method = "NetCoMi"; use SpiecEasi package when use_sparcc_method = "SpiecEasi" and require SpiecEasi installed from Github
+       (\href{https://github.com/zdk123/SpiecEasi}{https://github.com/zdk123/SpiecEasi})}
+  \item{\strong{'cclasso'}}{Correlation inference of Composition data through Lasso method based on netConstruct function of NetCoMi package; 
+       for details, see NetCoMi::cclasso function}
+  \item{\strong{'ccrepe'}}{Calculates compositionality-corrected p-values and q-values for compositional data 
+       using an arbitrary distance metric based on netConstruct function of NetCoMi package; also see NetCoMi::ccrepe function}
+}}
 
-\item{\code{cal_cor}}{default "base"; "base", "WGCNA", "SparCC" or NULL; correlation method; NULL denote no correlation calculation, 
-used for non-correlation based network, such as SpiecEasi and FlashWeave methods.}
+\item{\code{use_WGCNA_pearson_spearman}}{default FALSE; whether use WGCNA package to calculate correlation when cor_method = "pearson" or "spearman".}
+
+\item{\code{use_NetCoMi_pearson_spearman}}{default FALSE; whether use NetCoMi package to calculate correlation when cor_method = "pearson" or "spearman".
+The important difference between NetCoMi and others is the features of zero handling and data normalization; See <doi: 10.1093/bib/bbaa290>.}
+
+\item{\code{use_sparcc_method}}{default c("NetCoMi", "SpiecEasi")[1]; use NetCoMi package or SpiecEasi package to perform SparCC when cor_method == "sparcc".}
 
 \item{\code{taxa_level}}{default "OTU"; taxonomic rank; 'OTU' denotes using feature table directly; 
 other available options should be one of the colnames of microtable$tax_table.}
 
 \item{\code{filter_thres}}{default 0; the relative abundance threshold.}
 
-\item{\code{nThreads}}{default 1; the thread number used for "WGCNA" and SparCC.}
+\item{\code{nThreads}}{default 1; the CPU thread number; available when use_WGCNA_pearson_spearman = TRUE or use_sparcc_method = "SpiecEasi".}
 
-\item{\code{SparCC_simu_num}}{default 100; SparCC simulation number for bootstrap.}
+\item{\code{SparCC_simu_num}}{default 100; SparCC simulation number for bootstrap when use_sparcc_method = "SpiecEasi".}
 
 \item{\code{env_cols}}{default NULL; numeric or character vector to select the column names of environmental data in dataset$sample_table;
 the environmental data can be used in the correlation network (as the nodes) or FlashWeave network.}
 
 \item{\code{add_data}}{default NULL; provide environmental table additionally instead of env_cols parameter; rownames must be sample names.}
+
+\item{\code{...}}{parameters pass to NetCoMi::netConstruct for other operations, such as zero handling and/or data normalization 
+when cor_method and other parameters refer to NetCoMi package.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-res_cor_p list; include the correlation matrix and p value matrix.
+res_cor_p list; include the correlation (association) matrix and p value matrix. Note that when cor_method and other parameters refer to NetCoMi package,
+  the p value table are all zero as the significant associations have been selected.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
 data(dataset)
 # for correlation network
-t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
-		taxa_level = "OTU", filter_thres = 0.0001)
-# for other network
-t1 <- trans_network$new(dataset = dataset, cal_cor = NULL)
+t1 <- trans_network$new(dataset = dataset, cor_method = "pearson", 
+		taxa_level = "OTU", filter_thres = 0.0002)
+# for non-correlation network
+t1 <- trans_network$new(dataset = dataset, cor_method = NULL)
 }
 }
 \if{html}{\out{</div>}}
@@ -242,7 +290,8 @@ Calculate network based on the correlation method or SpiecEasi package or julia 
   COR_weight = TRUE,
   COR_cut = 0.6,
   COR_optimization = FALSE,
-  COR_optimization_low_high = c(0.4, 0.8),
+  COR_optimization_low_high = c(0.01, 0.8),
+  COR_optimization_seq = 0.01,
   SpiecEasi_method = "mb",
   FlashWeave_tempdir = NULL,
   FlashWeave_meta_data = FALSE,
@@ -294,7 +343,9 @@ Calculate network based on the correlation method or SpiecEasi package or julia 
 \item{\code{COR_optimization}}{default FALSE; whether use random matrix theory (RMT) based method to determine the correlation coefficient; 
 see https://doi.org/10.1186/1471-2105-13-113}
 
-\item{\code{COR_optimization_low_high}}{default c(0.4, 0.8); the low and high value threshold used for the RMT optimization; only useful when COR_optimization = TRUE.}
+\item{\code{COR_optimization_low_high}}{default c(0.01, 0.8); the low and high value threshold used for the RMT optimization; only useful when COR_optimization = TRUE.}
+
+\item{\code{COR_optimization_seq}}{default 0.01; the interval of correlation coefficient used for RMT optimization; only useful when COR_optimization = TRUE.}
 
 \item{\code{SpiecEasi_method}}{default "mb"; either 'glasso' or 'mb';see spiec.easi function in package SpiecEasi and https://github.com/zdk123/SpiecEasi.}
 
@@ -317,7 +368,7 @@ the threshold used to limit the number of interactions (stability); same with th
 
 \item{\code{usename_rawtaxa_when_taxalevel_notOTU}}{default FALSE; whether replace the name of nodes using the taxonomic information.}
 
-\item{\code{...}}{paremeters pass to SpiecEasi::spiec.easi when network_method = "SpiecEasi";
+\item{\code{...}}{parameters pass to SpiecEasi::spiec.easi when network_method = "SpiecEasi";
 pass to NetCoMi::netConstruct when network_method = "gcoda"; 
 pass to beemStatic::func.EM when network_method = "beemStatic".}
 }
@@ -330,14 +381,14 @@ res_network stored in object.
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
 # for correlation network
-t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
+t1 <- trans_network$new(dataset = dataset, cor_method = "pearson", 
 		taxa_level = "OTU", filter_thres = 0.001)
 t1$cal_network(COR_p_thres = 0.05, COR_cut = 0.6)
-t1 <- trans_network$new(dataset = dataset, cal_cor = NULL, filter_thres = 0.003)
+t1 <- trans_network$new(dataset = dataset, cor_method = NULL, filter_thres = 0.003)
 t1$cal_network(network_method = "SpiecEasi", SpiecEasi_method = "mb")
-t1 <- trans_network$new(dataset = dataset, cal_cor = NULL, taxa_level = "OTU", filter_thres = 0.005)
+t1 <- trans_network$new(dataset = dataset, cor_method = NULL, filter_thres = 0.005)
 t1$cal_network(network_method = "beemStatic")
-t1 <- trans_network$new(dataset = dataset, cal_cor = NULL, filter_thres = 0.001)
+t1 <- trans_network$new(dataset = dataset, cor_method = NULL, filter_thres = 0.001)
 t1$cal_network(network_method = "FlashWeave")
 }
 }
@@ -381,7 +432,7 @@ res_network with modules, stored in object.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1 <- trans_network$new(dataset = dataset, cal_cor = "base", 
+t1 <- trans_network$new(dataset = dataset, cor_method = "pearson", 
 		taxa_level = "OTU", filter_thres = 0.0002)
 t1$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
 t1$cal_module(method = "cluster_fast_greedy")
@@ -639,6 +690,12 @@ Plot the classification and importance of nodes, see object$res_node_table for t
   use_type = c(1, 2)[1],
   roles_color_background = FALSE,
   roles_color_values = NULL,
+  add_label = FALSE,
+  add_label_group = "Network hubs",
+  add_label_text = "name",
+  label_text_size = 4,
+  label_text_color = "grey50",
+  label_text_italic = FALSE,
   plot_module = FALSE,
   x_lim = c(0, 1),
   use_level = "Phylum",
@@ -662,6 +719,18 @@ Plot the classification and importance of nodes, see object$res_node_table for t
 
 \item{\code{roles_color_values}}{default NULL; for use_type=1; color palette for background or points.}
 
+\item{\code{add_label}}{default FALSE; for use_type = 1; whether add labels for the points.}
+
+\item{\code{add_label_group}}{default "Network hubs"; If add_label = TRUE; which part of tax_roles is used to show labels; character vectors.}
+
+\item{\code{add_label_text}}{default "name"; If add_label = TRUE; which column of object$res_node_table is used to label the text.}
+
+\item{\code{label_text_size}}{default 4; The text size of the label.}
+
+\item{\code{label_text_color}}{default "grey50"; The text color of the label.}
+
+\item{\code{label_text_italic}}{default FALSE; whether use italic style for the label text.}
+
 \item{\code{plot_module}}{default FALSE; for use_type=1; whether plot the modules information.}
 
 \item{\code{x_lim}}{default c(0, 1); for use_type=1; x axis range when roles_color_background = FALSE.}
@@ -682,7 +751,7 @@ Plot the classification and importance of nodes, see object$res_node_table for t
 
 \item{\code{shape_values}}{default c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14); for use_type=2; shape vector, see ggplot2 tutorial for the shape meaning.}
 
-\item{\code{...}}{paremeters pass to geom_point.}
+\item{\code{...}}{parameters pass to geom_point.}
 }
 \if{html}{\out{</div>}}
 }
@@ -749,7 +818,7 @@ If the distribution follows power law, then fit degrees to power law distributio
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{...}}{paremeters pass to fit_power_law function in igraph package.}
+\item{\code{...}}{parameters pass to fit_power_law function in igraph package.}
 }
 \if{html}{\out{</div>}}
 }
@@ -761,6 +830,78 @@ res_powerlaw_p and res_powerlaw_fit; see bootstrap_p function in poweRlaw packag
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
 t1$cal_powerlaw()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-cal_sum_links"></a>}}
+\if{latex}{\out{\hypertarget{method-cal_sum_links}{}}}
+\subsection{Method \code{cal_sum_links()}}{
+This function is used to sum the links number from one taxa to another or in the same taxa, for example, at Phylum level.
+This is very useful to fast see how many nodes are connected between different taxa or within the taxa.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_network$cal_sum_links(taxa_level = "Phylum")}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{taxa_level}}{default "Phylum"; taxonomic rank.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+res_sum_links_pos and res_sum_links_neg in object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+t1$cal_sum_links(taxa_level = "Phylum")
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-plot_sum_links"></a>}}
+\if{latex}{\out{\hypertarget{method-plot_sum_links}{}}}
+\subsection{Method \code{plot_sum_links()}}{
+Plot the summed linkages among taxa using chorddiag package <https://github.com/mattflor/chorddiag>.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_network$plot_sum_links(
+  plot_pos = TRUE,
+  plot_num = NULL,
+  color_values = NULL,
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{plot_pos}}{default TRUE; If TRUE, plot the summed positive linkages; If FALSE, plot the summed negative linkages.}
+
+\item{\code{plot_num}}{default NULL; number of taxa presented in the plot.}
+
+\item{\code{color_values}}{default NULL; If not provided, use microeco::color_palette_20 or randomcoloR package to generate random colors (for taxa > 20).}
+
+\item{\code{...}}{parameters pass to chorddiag::chorddiag function.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+chorddiag plot
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+test1$plot_sum_links(plot_pos = TRUE, plot_num = 10)
 }
 }
 \if{html}{\out{</div>}}
