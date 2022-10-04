@@ -2,10 +2,10 @@
 % Please edit documentation in R/trans_abund.R
 \name{trans_abund}
 \alias{trans_abund}
-\title{Create trans_abund object to transform taxonomic abundance for plotting.}
+\title{Create \code{trans_abund} object for plotting taxonomic abundance.}
 \description{
 This class is a wrapper for the taxonomic abundance transformations and plotting. 
-The transformed data style is the long-format for ggplot2 plotting.
+The transformed data style is the long-format for \code{ggplot2} plotting.
 The plotting methods include bar plot, boxplot, heatmap and pie chart.
 }
 \examples{
@@ -67,19 +67,19 @@ t1$plot_pie(facet_nrow = 1)
 \section{Methods}{
 \subsection{Public methods}{
 \itemize{
-\item \href{#method-new}{\code{trans_abund$new()}}
-\item \href{#method-plot_bar}{\code{trans_abund$plot_bar()}}
-\item \href{#method-plot_heatmap}{\code{trans_abund$plot_heatmap()}}
-\item \href{#method-plot_box}{\code{trans_abund$plot_box()}}
-\item \href{#method-plot_line}{\code{trans_abund$plot_line()}}
-\item \href{#method-plot_pie}{\code{trans_abund$plot_pie()}}
-\item \href{#method-print}{\code{trans_abund$print()}}
-\item \href{#method-clone}{\code{trans_abund$clone()}}
+\item \href{#method-trans_abund-new}{\code{trans_abund$new()}}
+\item \href{#method-trans_abund-plot_bar}{\code{trans_abund$plot_bar()}}
+\item \href{#method-trans_abund-plot_heatmap}{\code{trans_abund$plot_heatmap()}}
+\item \href{#method-trans_abund-plot_box}{\code{trans_abund$plot_box()}}
+\item \href{#method-trans_abund-plot_line}{\code{trans_abund$plot_line()}}
+\item \href{#method-trans_abund-plot_pie}{\code{trans_abund$plot_pie()}}
+\item \href{#method-trans_abund-print}{\code{trans_abund$print()}}
+\item \href{#method-trans_abund-clone}{\code{trans_abund$clone()}}
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-new"></a>}}
-\if{latex}{\out{\hypertarget{method-new}{}}}
+\if{html}{\out{<a id="method-trans_abund-new"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_abund-new}{}}}
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_abund$new(
@@ -108,13 +108,13 @@ t1$plot_pie(facet_nrow = 1)
 \item{\code{ntaxa}}{default 10; how many taxa will be used, ordered by abundance from high to low; 
 this parameter does not conflict with the parameter show; both can be used.}
 
-\item{\code{groupmean}}{default NULL; calculating mean abundance for each group; select a group column name in sample_table.}
+\item{\code{groupmean}}{default NULL; calculating mean abundance for each group; select a group column name in \code{microtable$sample_table}.}
 
 \item{\code{delete_full_prefix}}{default TRUE; whether delete both the prefix of taxonomy and the character in front of them.}
 
 \item{\code{delete_part_prefix}}{default FALSE; whether only delete the prefix of taxonomy.}
 
-\item{\code{prefix}}{default NULL; character string; can be used when delete_full_prefix = T or delete_part_prefix = T; 
+\item{\code{prefix}}{default NULL; character string; can be used when \code{delete_full_prefix = T} or \code{delete_part_prefix = T}; 
  default NULL reprensents using the "letter+__", e.g. "k__" for Phylum level;
 Please alter this parameter when the prefix is not standard.}
 
@@ -125,7 +125,7 @@ Please alter this parameter when the prefix is not standard.}
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-data_abund stored in the object for plotting.
+\code{data_abund} stored in the object for plotting.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -140,8 +140,8 @@ t1 <- trans_abund$new(dataset = dataset, taxrank = "Phylum", ntaxa = 10)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_bar"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_bar}{}}}
+\if{html}{\out{<a id="method-trans_abund-plot_bar"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_abund-plot_bar}{}}}
 \subsection{Method \code{plot_bar()}}{
 Bar plot.
 \subsection{Usage}{
@@ -151,9 +151,11 @@ Bar plot.
   others_color = "grey90",
   facet = NULL,
   facet2 = NULL,
+  facet3 = NULL,
+  facet4 = NULL,
   order_facet = NULL,
-  x_axis_name = NULL,
   order_x = NULL,
+  x_axis_name = NULL,
   barwidth = NULL,
   use_alluvium = FALSE,
   clustering = FALSE,
@@ -172,7 +174,7 @@ Bar plot.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{color_values}}{default RColorBrewer::brewer.pal(12, "Paired"); colors palette for the plotting.}
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(12, "Paired"); colors palette for the plotting.}
 
 \item{\code{bar_type}}{default "full"; "full" or "notfull"; if full, the total abundance sum to 1 or 100 percentage.}
 
@@ -181,13 +183,18 @@ Bar plot.
 \item{\code{facet}}{default NULL; if using facet, providing a group column name of sample_table, such as, "Group".}
 
 \item{\code{facet2}}{default NULL; the second facet, used with facet parameter together; facet2 should have a finer scale;
-use this parameter, please first install package ggh4x using install.packages("ggh4x")}
+use this parameter, please first install package \code{ggh4x} using \code{install.packages("ggh4x")}.}
 
-\item{\code{order_facet}}{NULL; vector; used to order the facet, such as, c("Group1", "Group3", "Group2").}
+\item{\code{facet3}}{default NULL; the third facet, used with \code{facet} and \code{facet2} parameter together.}
 
-\item{\code{x_axis_name}}{NULL; a character string; a column name of sample_table used to show the sample names in x axis.}
+\item{\code{facet4}}{default NULL; the fourth facet, used with facet, facet2 and facet3 parameter together.}
+
+\item{\code{order_facet}}{NULL; vector; used to order the facet, such as, c("Group1", "Group3", "Group2"); 
+If multiple facets are used, please manually assign factors in sample_table of microtable object.}
 
 \item{\code{order_x}}{default NULL; vector; used to order the sample names in x axis; must be the samples vector, such as, c("S1", "S3", "S2").}
+
+\item{\code{x_axis_name}}{NULL; a character string; a column name of sample_table in dataset; used to show the sample names in x axis.}
 
 \item{\code{barwidth}}{default NULL; bar width, see width in \code{\link{geom_bar}}.}
 
@@ -230,14 +237,17 @@ t1$plot_bar(facet = "Group", xtext_keep = FALSE)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_heatmap"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_heatmap}{}}}
+\if{html}{\out{<a id="method-trans_abund-plot_heatmap"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_abund-plot_heatmap}{}}}
 \subsection{Method \code{plot_heatmap()}}{
 Plot the heatmap.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_heatmap(
   color_values = rev(RColorBrewer::brewer.pal(n = 11, name = "RdYlBu")),
   facet = NULL,
+  facet2 = NULL,
+  facet3 = NULL,
+  facet4 = NULL,
   order_facet = NULL,
   x_axis_name = NULL,
   order_x = NULL,
@@ -256,6 +266,7 @@ Plot the heatmap.
   xtitle_keep = TRUE,
   grid_clean = TRUE,
   xtext_type_hor = TRUE,
+  legend_title = "\% Relative\\nAbundance",
   pheatmap = FALSE,
   ...
 )}\if{html}{\out{</div>}}
@@ -268,6 +279,13 @@ Plot the heatmap.
 colors palette for the plotting.}
 
 \item{\code{facet}}{default NULL; a character string; if using facet, provide a column name in sample_table, such as "Group".}
+
+\item{\code{facet2}}{default NULL; the second facet, used with facet parameter together; \code{facet2} should have a finer scale;
+use this parameter, please first install package \code{ggh4x}.}
+
+\item{\code{facet3}}{default NULL; the third facet, used with \code{facet} and \code{facet2} parameter together.}
+
+\item{\code{facet4}}{default NULL; the fourth facet, used with facet, facet2 and facet3 parameter together.}
 
 \item{\code{order_facet}}{NULL; vector; used to order the facet, such as, c("Group1", "Group3", "Group2").}
 
@@ -305,6 +323,8 @@ colors palette for the plotting.}
 
 \item{\code{xtext_type_hor}}{default TRUE; x axis text horizontal, if FALSE; text slant.}
 
+\item{\code{legend_title}}{default "\% Relative\\nAbundance"; legend title text.}
+
 \item{\code{pheatmap}}{default FALSE; whether use pheatmap package to plot the heatmap.}
 
 \item{\code{...}}{paremeters pass to pheatmap when pheatmap = TRUE.}
@@ -327,8 +347,8 @@ t1$plot_heatmap(facet = "Group", xtext_keep = FALSE, withmargin = FALSE)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_box"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_box}{}}}
+\if{html}{\out{<a id="method-trans_abund-plot_box"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_abund-plot_box}{}}}
 \subsection{Method \code{plot_box()}}{
 Box plot.
 \subsection{Usage}{
@@ -355,7 +375,7 @@ Box plot.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{color_values}}{default RColorBrewer::brewer.pal(8, "Dark2"); colors palette for the plotting.}
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the plotting.}
 
 \item{\code{group}}{default NULL; a column name of sample table to show abundance across groups.}
 
@@ -404,8 +424,8 @@ t1$plot_box(group = "Group")
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_line"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_line}{}}}
+\if{html}{\out{<a id="method-trans_abund-plot_line"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_abund-plot_line}{}}}
 \subsection{Method \code{plot_line()}}{
 Plot the line chart.
 \subsection{Usage}{
@@ -429,7 +449,7 @@ Plot the line chart.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{color_values}}{default RColorBrewer::brewer.pal(8, "Dark2"); colors palette for the plotting.}
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the plotting.}
 
 \item{\code{plot_SE}}{default TRUE; TRUE: plot the errorbar with mean±se; FALSE: plot the errorbar with mean±sd.}
 
@@ -475,8 +495,8 @@ t1$plot_line(point_size = 5, errorbar_size = 1, xtext_type_hor = TRUE)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_pie"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_pie}{}}}
+\if{html}{\out{<a id="method-trans_abund-plot_pie"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_abund-plot_pie}{}}}
 \subsection{Method \code{plot_pie()}}{
 Plot pie chart.
 \subsection{Usage}{
@@ -491,7 +511,7 @@ Plot pie chart.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{color_values}}{default RColorBrewer::brewer.pal(8, "Dark2"); colors palette for the plotting.}
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the plotting.}
 
 \item{\code{facet_nrow}}{default 1; how many rows in the plot.}
 
@@ -517,8 +537,8 @@ t1$plot_pie(facet_nrow = 1)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-print"></a>}}
-\if{latex}{\out{\hypertarget{method-print}{}}}
+\if{html}{\out{<a id="method-trans_abund-print"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_abund-print}{}}}
 \subsection{Method \code{print()}}{
 Print the trans_abund object.
 \subsection{Usage}{
@@ -527,8 +547,8 @@ Print the trans_abund object.
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-clone}{}}}
+\if{html}{\out{<a id="method-trans_abund-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_abund-clone}{}}}
 \subsection{Method \code{clone()}}{
 The objects of this class are cloneable with this method.
 \subsection{Usage}{

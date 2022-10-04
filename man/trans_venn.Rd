@@ -2,7 +2,7 @@
 % Please edit documentation in R/trans_venn.R
 \name{trans_venn}
 \alias{trans_venn}
-\title{Create trans_venn object.}
+\title{Create \code{trans_venn} object.}
 \description{
 This class is a wrapper for a series of venn analysis related methods, including venn result, 2- to 5-way venn diagram, 
 more than 5-way petal plot and venn result transformations based on David et al. (2012) <doi:10.1128/AEM.01459-12>.
@@ -46,17 +46,17 @@ t2 <- t1$trans_comm(use_frequency = TRUE)
 \section{Methods}{
 \subsection{Public methods}{
 \itemize{
-\item \href{#method-new}{\code{trans_venn$new()}}
-\item \href{#method-plot_venn}{\code{trans_venn$plot_venn()}}
-\item \href{#method-plot_bar}{\code{trans_venn$plot_bar()}}
-\item \href{#method-trans_comm}{\code{trans_venn$trans_comm()}}
-\item \href{#method-print}{\code{trans_venn$print()}}
-\item \href{#method-clone}{\code{trans_venn$clone()}}
+\item \href{#method-trans_venn-new}{\code{trans_venn$new()}}
+\item \href{#method-trans_venn-plot_venn}{\code{trans_venn$plot_venn()}}
+\item \href{#method-trans_venn-plot_bar}{\code{trans_venn$plot_bar()}}
+\item \href{#method-trans_venn-trans_comm}{\code{trans_venn$trans_comm()}}
+\item \href{#method-trans_venn-print}{\code{trans_venn$print()}}
+\item \href{#method-trans_venn-clone}{\code{trans_venn$clone()}}
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-new"></a>}}
-\if{latex}{\out{\hypertarget{method-new}{}}}
+\if{html}{\out{<a id="method-trans_venn-new"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_venn-new}{}}}
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_venn$new(
@@ -86,7 +86,7 @@ Features must be rows.}
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-data_details and data_summary stored in trans_venn object.
+\code{data_details} and \code{data_summary} stored in trans_venn object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -102,8 +102,8 @@ t1 <- trans_venn$new(dataset = t1, ratio = "numratio")
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_venn"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_venn}{}}}
+\if{html}{\out{<a id="method-trans_venn-plot_venn"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_venn-plot_venn}{}}}
 \subsection{Method \code{plot_venn()}}{
 Plot venn diagram.
 \subsection{Usage}{
@@ -135,7 +135,7 @@ Plot venn diagram.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{color_circle}}{default RColorBrewer::brewer.pal(8, "Dark2"); color pallete}
+\item{\code{color_circle}}{default \code{RColorBrewer::brewer.pal(8, "Dark2")}; color pallete}
 
 \item{\code{fill_color}}{default TRUE; whether fill the area color}
 
@@ -173,9 +173,9 @@ Plot venn diagram.
 
 \item{\code{other_text_show}}{default NULL; other characters used to show in the plot}
 
-\item{\code{other_text_position}}{default c(1, 1); the text position for text in other_text_show}
+\item{\code{other_text_position}}{default c(1, 1); the text position for text in \code{other_text_show}}
 
-\item{\code{other_text_size}}{default 5; the text size for text in other_text_show}
+\item{\code{other_text_size}}{default 5; the text size for text in \code{other_text_show}}
 }
 \if{html}{\out{</div>}}
 }
@@ -194,8 +194,8 @@ t1$plot_venn()
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_bar"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_bar}{}}}
+\if{html}{\out{<a id="method-trans_venn-plot_bar"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_venn-plot_bar}{}}}
 \subsection{Method \code{plot_bar()}}{
 Plot the intersections using histogram. Especially useful when samples > 5.
 \subsection{Usage}{
@@ -250,8 +250,8 @@ t2 <- t1$plot_bar()
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-trans_comm"></a>}}
-\if{latex}{\out{\hypertarget{method-trans_comm}{}}}
+\if{html}{\out{<a id="method-trans_venn-trans_comm"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_venn-trans_comm}{}}}
 \subsection{Method \code{trans_comm()}}{
 Transform venn result to community-like microtable object for further composition analysis.
 \subsection{Usage}{
@@ -280,8 +280,8 @@ t2 <- t1$trans_comm(use_frequency = TRUE)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-print"></a>}}
-\if{latex}{\out{\hypertarget{method-print}{}}}
+\if{html}{\out{<a id="method-trans_venn-print"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_venn-print}{}}}
 \subsection{Method \code{print()}}{
 Print the trans_venn object.
 \subsection{Usage}{
@@ -290,8 +290,8 @@ Print the trans_venn object.
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-clone}{}}}
+\if{html}{\out{<a id="method-trans_venn-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_venn-clone}{}}}
 \subsection{Method \code{clone()}}{
 The objects of this class are cloneable with this method.
 \subsection{Usage}{

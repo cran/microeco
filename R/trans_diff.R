@@ -1,14 +1,14 @@
 #' @title 
-#' Create trans_diff object for the differential analysis on the taxonomic abundance.
+#' Create \code{trans_diff} object for the differential analysis on the taxonomic abundance
 #'
 #' @description
 #' This class is a wrapper for a series of differential abundance test and indicator analysis methods, including 
 #'  LEfSe based on the Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>,
 #'  random forest <doi:10.1016/j.geoderma.2018.09.035>, metastat based on White et al. (2009) <doi:10.1371/journal.pcbi.1000352>,
-#'  the method in R package metagenomeSeq Paulson et al. (2013) <doi:10.1038/nmeth.2658>, non-parametric Kruskal-Wallis Rank Sum Test,
-#'  Dunn's Kruskal-Wallis Multiple Comparisons based on the FSA package, Wilcoxon Rank Sum and Signed Rank Tests, t test and anova.
-#' 
-#' Authors: Chi Liu, Yang Cao, Chenhao Li
+#'  non-parametric Kruskal-Wallis Rank Sum Test,
+#'  Dunn's Kruskal-Wallis Multiple Comparisons based on the \code{FSA} package, Wilcoxon Rank Sum and Signed Rank Tests, t test, anova, 
+#'  R package \code{metagenomeSeq} Paulson et al. (2013) <doi:10.1038/nmeth.2658>, 
+#'  R package \code{ANCOMBC} <doi:10.1038/s41467-020-17041-7> and R package \code{ALDEx2} <doi:10.1371/journal.pone.0067019; 10.1186/2049-2618-2-15>.
 #' 
 #' @export
 trans_diff <- R6Class(classname = "trans_diff",
@@ -19,30 +19,49 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'     \item{\strong{'lefse'}}{LEfSe method based on Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>}
 		#'     \item{\strong{'rf'}}{random forest and non-parametric test method based on An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035>}
 		#'     \item{\strong{'metastat'}}{Metastat method for all paired groups based on White et al. (2009) <doi:10.1371/journal.pcbi.1000352>}
-		#'     \item{\strong{'mseq'}}{zero-inflated log-normal model-based differential test method from metagenomeSeq package.}
+		#'     \item{\strong{'metagenomeSeq'}}{zero-inflated log-normal model-based differential test method from \code{metagenomeSeq} package.}
 		#'     \item{\strong{'KW'}}{KW: Kruskal-Wallis Rank Sum Test for all groups (>= 2)}
-		#'     \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons when group number > 2; see dunnTest function in FSA package}
+		#'     \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons when group number > 2; see dunnTest function in \code{FSA} package}
 		#'     \item{\strong{'wilcox'}}{Wilcoxon Rank Sum and Signed Rank Tests for all paired groups }
 		#'     \item{\strong{'t.test'}}{Student's t-Test for all paired groups}
 		#'     \item{\strong{'anova'}}{Duncan's multiple range test for anova}
+		#'     \item{\strong{'ANCOMBC'}}{Analysis of Compositions of Microbiomes with Bias Correction (ANCOM-BC); 
+		#'        Reference: <doi:10.1038/s41467-020-17041-7>; Require \code{ANCOMBC} package to be installed 
+		#'        (\href{https://bioconductor.org/packages/release/bioc/html/ANCOMBC.html}{https://bioconductor.org/packages/release/bioc/html/ANCOMBC.html})}
+		#'     \item{\strong{'ALDEx2_t'}}{runs Welch's t and Wilcoxon tests with \code{ALDEx2} package; see also the test parameter in \code{ALDEx2::aldex} function;
+		#'     	  ALDEx2 uses the centred log-ratio (clr) transformation and estimates per-feature technical variation within each sample using Monte-Carlo instances 
+		#'     	  drawn from the Dirichlet distribution; Reference: <doi:10.1371/journal.pone.0067019> and <doi:10.1186/2049-2618-2-15>; 
+		#'     	  require \code{ALDEx2} package to be installed 
+		#'     	  (\href{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html}{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html})}
+		#'     \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallace and generalized linear model (glm) test with \code{ALDEx2} package; 
+		#'     	  see also the test parameter in \code{ALDEx2::aldex} function.}
 		#'   }
-		#' @param group default NULL; sample group used for the comparision; a colname of microtable$sample_table.
+		#' @param group default NULL; sample group used for the comparision; a colname of input \code{microtable$sample_table}.
 		#' @param taxa_level default "all"; 'all' represents using abundance data at all taxonomic ranks; 
-		#' 	  For testing at a specific rank, provide taxonomic rank name, such as "Genus"; this parameter can be applied when method != "mseq";
-		#' 	  'mseq' method is performed on the feature abudance, i.e. microtable$otu_table.
-		#' @param filter_thres default 0; the relative abundance threshold used for method != "metastat" or "mseq". 
+		#' 	  For testing at a specific rank, provide taxonomic rank name, such as "Genus".
+		#' 	  If the provided taxonomic name is neither 'all' nor a colname in tax_table of input dataset, 
+		#' 	  the function will use the features in input \code{microtable$otu_table} automatically.
+		#' @param filter_thres default 0; the relative abundance threshold, such as 0.0005; only useful when method != "metastat".
 		#' @param alpha default 0.05; differential significance threshold for method = "lefse" or "rf"; used to select taxa with significance across groups.
-		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of p.adjust function for other available options; 
-		#'    NULL mean disuse the p value adjustment; So when p_adjust_method = NULL, P.adj is same with P.unadj.
+		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for other available options; 
+		#'    NULL mean disuse the p value adjustment; So when \code{p_adjust_method = NULL}, P.adj is same with P.unadj.
 		#' @param lefse_subgroup default NULL; sample sub group used for sub-comparision in lefse; Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>.
 		#' @param lefse_min_subsam default 10; sample numbers required in the subgroup test.
 		#' @param lefse_norm default 1000000; scale value in lefse.
 		#' @param nresam default 0.6667; sample number ratio used in each bootstrap for method = "lefse" or "rf".
 		#' @param boots default 30; bootstrap test number for method = "lefse" or "rf".
 		#' @param rf_ntree default 1000; see ntree in randomForest function of randomForest package when method = "rf".
-		#' @param group_choose_paired default NULL; a vector used for selecting the required groups for paired testing, only used for method = "metastat" or "mseq".
-		#' @param mseq_count default 1; Filter features to have at least 'counts' counts.; see the count parameter in MRcoefs function of metagenomeSeq package.
-		#' @param ... parameters passed to cal_diff function of trans_alpha class when method is one of "KW", "KW_dunn", "wilcox", "t.test" and "anova".
+		#' @param group_choose_paired default NULL; a vector used for selecting the required groups for paired testing, only used for method = "metastat" or "metagenomeSeq".
+		#' @param metagenomeSeq_count default 1; Filter features to have at least 'counts' counts.; see the count parameter in MRcoefs function of \code{metagenomeSeq} package.
+		#' @param ANCOMBC_formula default NULL; same with the formula parameter in \code{ANCOMBC::ancombc} function; If NULL; assign the group parameter to it automatically.
+		#' @param ALDEx2_sig default c("wi.eBH", "kw.eBH"); which column of the final result is used as the significance asterisk assignment;
+		#'   applied to method = "ALDEx2_t" or "ALDEx2_kw"; the first element is provided to "ALDEx2_t"; the second is provided to "ALDEx2_kw";
+		#'   for "ALDEx2_t", the available choice is "wi.eBH" (Expected Benjamini-Hochberg corrected P value of Wilcoxon test)
+		#'   and "we.eBH" (Expected BH corrected P value of Welch’s t test); for "ALDEx2_kw"; for "ALDEx2_t",
+		#'   the available choice is "kw.eBH" (Expected BH corrected P value of Kruskal-Wallace test) and "glm.eBH" (Expected BH corrected P value of glm test).
+		#' @param ... parameters passed to \code{cal_diff} function of \code{trans_alpha} class when method is one of "KW", "KW_dunn", "wilcox", "t.test" and "anova";
+		#' 	 passed to \code{ANCOMBC::ancombc} function when method is "ANCOMBC" (except formula and global parameters; please see ANCOMBC_formula parameter);
+		#' 	 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw".
 		#' @return res_diff and res_abund.\cr
 		#'   \strong{res_abund} includes mean abudance of each taxa (Mean), standard deviation (SD), standard error (SE) and sample number (N) in the group (Group).\cr
 		#'   \strong{res_diff} is the detailed differential test result, containing:\cr
@@ -64,7 +83,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' }
 		initialize = function(
 			dataset = NULL,
-			method = c("lefse", "rf", "metastat", "mseq", "KW", "KW_dunn", "wilcox", "t.test", "anova")[1],
+			method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", "anova", "ANCOMBC", "ALDEx2_t", "ALDEx2_kw")[1],
 			group = NULL,
 			taxa_level = "all",
 			filter_thres = 0,
@@ -77,13 +96,17 @@ trans_diff <- R6Class(classname = "trans_diff",
 			boots = 30,
 			rf_ntree = 1000,
 			group_choose_paired = NULL,
-			mseq_count = 1,
+			metagenomeSeq_count = 1,
+			ANCOMBC_formula = NULL,
+			ALDEx2_sig = c("wi.eBH", "kw.eBH"),
 			...
 			){
 			if(is.null(dataset)){
 				stop("No dataset provided!")
 			}
-			sampleinfo <- dataset$sample_table
+			# in case of dataset changes
+			tmp_dataset <- clone(dataset)
+			sampleinfo <- tmp_dataset$sample_table
 			if(is.null(group)){
 				stop("The group parameter need to be provided for differential test among groups!")
 			}else{
@@ -95,53 +118,62 @@ trans_diff <- R6Class(classname = "trans_diff",
 					}
 				}
 			}
-			method <- match.arg(method, c("lefse", "rf", "metastat", "mseq", "KW", "KW_dunn", "wilcox", "t.test", "anova"))
+			method <- match.arg(method, c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", "anova", "ANCOMBC", "ALDEx2_t", "ALDEx2_kw"))
 			
 			if(is.factor(sampleinfo[, group])){
 				self$group_order <- levels(sampleinfo[, group])
 				sampleinfo[, group] %<>% as.character
 			}
 			
-			if(method != "mseq"){
-				if(is.null(dataset$taxa_abund)){
-					stop("Please first calculate taxa_abund! see cal_abund function in microtable class!")
-				}
-				if(grepl("all", taxa_level, ignore.case = TRUE)){
-					abund_table <- do.call(rbind, unname(dataset$taxa_abund))
-				}else{
-					if(! taxa_level %in% names(dataset$taxa_abund)){
-						stop("Please provide a correct taxa_level parameter !")
-					}
-					abund_table <- dataset$taxa_abund[[taxa_level]]
-				}
-				if(filter_thres > 0){
-					if(filter_thres >= 1){
-						stop("Parameter filter_thres represents relative abudance. It should be smaller than 1 !")
-					}else{
-						abund_table %<>% .[apply(., 1, mean) > filter_thres, ]
-					}
-				}
-				if(grepl("lefse", method, ignore.case = TRUE)){
-					abund_table %<>% {. * lefse_norm}
-					self$lefse_norm <- lefse_norm
-				}
-				abund_table %<>% {.[!grepl("__$|uncultured$|Incertae..edis$|_sp$", rownames(.), ignore.case = TRUE), ]}
+			################################
+			# generate abudance table
+			if(is.null(tmp_dataset$taxa_abund)){
+				message("No taxa_abund found. First calculate it with cal_abund function ...")
+				tmp_dataset$cal_abund()
 			}
+			# make sure the taxa_level can be found from tax_table
+			if(grepl("all", taxa_level, ignore.case = TRUE)){
+				abund_table <- do.call(rbind, unname(tmp_dataset$taxa_abund))
+			}else{
+				# make sure taxa_level can be extracted from taxa_abund
+				if(! taxa_level %in% names(tmp_dataset$taxa_abund)){
+					# recalculate taxa_abund with rownames as features in otu_table
+					message("Provided taxa_level: ", taxa_level, " not in tax_table of dataset; use features in otu_table ...")
+					tmp_dataset$add_rownames2taxonomy(use_name = taxa_level)
+					suppressMessages(tmp_dataset$cal_abund(rel = TRUE))
+				}
+				abund_table <- tmp_dataset$taxa_abund[[taxa_level]]
+			}
+			if(filter_thres > 0){
+				if(filter_thres >= 1){
+					stop("Parameter filter_thres represents relative abudance. It should be smaller than 1 !")
+				}else{
+					abund_table %<>% .[apply(., 1, mean) > filter_thres, ]
+				}
+			}
+			if(grepl("lefse", method, ignore.case = TRUE)){
+				abund_table %<>% {. * lefse_norm}
+				self$lefse_norm <- lefse_norm
+			}
+			abund_table %<>% {.[!grepl("__$|uncultured$|Incertae..edis$|_sp$", rownames(.), ignore.case = TRUE), ]}
+			################################
+			
 			if(method %in% c("KW", "KW_dunn", "wilcox", "t.test", "anova")){
-				tem_data <- clone(dataset)
+				if(method == "KW_dunn"){
+					# filter taxa with equal abudance across all samples
+					abund_table %<>% .[apply(., 1, function(x){length(unique(x)) != 1}), ]
+				}
+				tem_data <- clone(tmp_dataset)
 				# use test method in trans_alpha
 				tem_data$alpha_diversity <- as.data.frame(t(abund_table))
 				tem_data1 <- suppressMessages(trans_alpha$new(dataset = tem_data, group = group))
 				suppressMessages(tem_data1$cal_diff(method = method, p_adjust_method = p_adjust_method, ...))
-				res <- tem_data1$res_diff
+				output <- tem_data1$res_diff
 				if(method != "anova"){
-					colnames(res)[colnames(res) == "Measure"] <- "Taxa"
+					colnames(output)[colnames(output) == "Measure"] <- "Taxa"
 				}else{
-					res <- rownames_to_column(res, var = "Group")
-					res <- reshape2::melt(res, id.vars = "Group", variable.name = "Taxa", value.name = "Significance")
+					output <- reshape2::melt(output, id.vars = "Group", variable.name = "Taxa", value.name = "Significance")
 				}
-				self$res_diff <- res
-				message('The result is stored in object$res_diff ...')
 			}
 			if(method %in% c("lefse", "rf")){
 				# differential test
@@ -166,9 +198,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				if(sum(sel_taxa) == 0){
 					stop("No significant taxa found! Stop running!")
 				}
-				# save abund_table for the cladogram
-				self$abund_table <- abund_table
-				
+
 				abund_table_sub <- abund_table[sel_taxa, ]
 				pvalue_sub <- pvalue[sel_taxa]
 				class_taxa_median_sub <- lapply(res_class, function(x) x$med) %>% do.call(cbind, .) %>% .[, sel_taxa]
@@ -216,13 +246,11 @@ trans_diff <- R6Class(classname = "trans_diff",
 					Method = use_method,
 					MeanDecreaseGini = res[, 1], 
 					stringsAsFactors = FALSE)
-				imp_sort <- dplyr::arrange(res, dplyr::desc(MeanDecreaseGini))
-				rownames(imp_sort) <- imp_sort$Taxa
-				imp_sort$P.unadj <- pvalue_raw[as.character(imp_sort$Taxa)]
-				imp_sort$P.adj <- pvalue_sub[as.character(imp_sort$Taxa)]
-				imp_sort$Significance <- cut(imp_sort$P.adj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", "ns"))
-				self$res_diff <- imp_sort
-				message('The rf result is stored in object$res_diff ...')
+				output <- dplyr::arrange(res, dplyr::desc(MeanDecreaseGini))
+				rownames(output) <- output$Taxa
+				output$P.unadj <- pvalue_raw[as.character(output$Taxa)]
+				output$P.adj <- pvalue_sub[as.character(output$Taxa)]
+				output$Significance <- cut(output$P.adj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", "ns"))
 			}
 			if(method == "lefse"){
 				all_class_pairs <- combn(unique(as.character(group_vec)), 2)
@@ -361,50 +389,47 @@ trans_diff <- R6Class(classname = "trans_diff",
 					max
 				})
 				res <- sapply(res, function(x) {log10(1 + abs(x)) * ifelse(x > 0, 1, -1)})
-				res1 <- cbind.data.frame(Group = apply(class_taxa_median_sub, 2, function(x) rownames(class_taxa_median_sub)[which.max(x)]), 
+				output <- cbind.data.frame(Group = apply(class_taxa_median_sub, 2, function(x) rownames(class_taxa_median_sub)[which.max(x)]), 
 					LDA = res,
 					P.unadj = pvalue_raw[names(pvalue_sub)],
 					P.adj = pvalue_sub)
-				res1 %<>% .[order(.$LDA, decreasing = TRUE), ]
-				res1 <- cbind.data.frame(Comparison = comparisions, Taxa = rownames(res1), Method = "LEfSe", res1)
-				message("Minimum LDA score: ", range(res1$LDA)[1], " maximum LDA score: ", range(res1$LDA)[2])
-				res1$Significance <- cut(res1$P.adj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", "ns"))
-				self$res_diff <- res1
-				message('The lefse result is stored in object$res_diff ...')
+				output %<>% .[order(.$LDA, decreasing = TRUE), ]
+				output <- cbind.data.frame(Comparison = comparisions, Taxa = rownames(output), Method = "LEfSe", output)
+				message("Minimum LDA score: ", range(output$LDA)[1], " maximum LDA score: ", range(output$LDA)[2])
+				output$Significance <- cut(output$P.adj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", "ns"))
 			}
-			if(method != "mseq"){
-				if(grepl("lefse", method, ignore.case = TRUE)){
-					res_abund <- reshape2::melt(rownames_to_column(abund_table_sub/lefse_norm, "Taxa"), id.vars = "Taxa")
+			#######################################
+			# output taxonomic abundance mean and sd for the final res_abund and enrich group finding in metagenomeSeq or ANCOMBC
+			if(grepl("lefse", method, ignore.case = TRUE)){
+				res_abund <- reshape2::melt(rownames_to_column(abund_table_sub/lefse_norm, "Taxa"), id.vars = "Taxa")
+			}else{
+				if(grepl("rf", method, ignore.case = TRUE)){
+					res_abund <- reshape2::melt(rownames_to_column(abund_table_sub, "Taxa"), id.vars = "Taxa")
 				}else{
-					if(grepl("rf", method, ignore.case = TRUE)){
-						res_abund <- reshape2::melt(rownames_to_column(abund_table_sub, "Taxa"), id.vars = "Taxa")
-					}else{
-						res_abund <- reshape2::melt(rownames_to_column(abund_table, "Taxa"), id.vars = "Taxa")
-					}
+					res_abund <- reshape2::melt(rownames_to_column(abund_table, "Taxa"), id.vars = "Taxa")
 				}
-				colnames(res_abund) <- c("Taxa", "Sample", "Abund")
-				res_abund <- suppressWarnings(dplyr::left_join(res_abund, rownames_to_column(sampleinfo), by = c("Sample" = "rowname")))
-				res_abund <- microeco:::summarySE_inter(res_abund, measurevar = "Abund", groupvars = c("Taxa", group))
-				colnames(res_abund)[colnames(res_abund) == group] <- "Group"
-				self$res_abund <- res_abund
-				message('Taxa abundance data is stored in object$res_abund ...')
 			}
-			if(method %in% c("metastat", "mseq")){
+			colnames(res_abund) <- c("Taxa", "Sample", "Abund")
+			res_abund <- suppressWarnings(dplyr::left_join(res_abund, rownames_to_column(sampleinfo), by = c("Sample" = "rowname")))
+			res_abund <- microeco:::summarySE_inter(res_abund, measurevar = "Abund", groupvars = c("Taxa", group))
+			colnames(res_abund)[colnames(res_abund) == group] <- "Group"
+			#######################################
+			if(method %in% c("metastat", "metagenomeSeq", "ANCOMBC", "ALDEx2_t")){
+				if(taxa_level == "all"){
+					stop("Please provide the taxa_level instead of 'all', such as 'Genus' !")
+				}
 				if(is.null(group_choose_paired)){
 					all_name <- combn(unique(as.character(sampleinfo[, group])), 2)
 				}else{
 					all_name <- combn(unique(group_choose_paired), 2)
 				}
-				output <- data.frame()			
+				output <- data.frame()
 			}
 			if(method == "metastat"){
-				if(!taxa_level %in% colnames(dataset$tax_table)){
-					stop("For metastat, taxa_level parameter must be one of column names of dataset$tax_table!")
-				}
 				# transform data
-				ranknumber <- which(colnames(dataset$tax_table) %in% taxa_level)
-				abund <- dataset$otu_table
-				tax <- dataset$tax_table[, 1:ranknumber, drop=FALSE]
+				ranknumber <- which(colnames(tmp_dataset$tax_table) %in% taxa_level)
+				abund <- tmp_dataset$otu_table
+				tax <- tmp_dataset$tax_table[, 1:ranknumber, drop=FALSE]
 				merged_taxonomy <- apply(tax, 1, paste, collapse="|")
 				abund1 <- cbind.data.frame(Display = merged_taxonomy, abund) %>% 
 					reshape2::melt(id.var = "Display", value.name= "Abundance", variable.name = "Sample")
@@ -439,23 +464,25 @@ trans_diff <- R6Class(classname = "trans_diff",
 				}) %>% unlist
 				output$Significance <- cut(output$qvalue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", "ns"))
 				output <- data.frame(output, Group = max_group)
-				self$res_diff <- output
-				message('The metastat result is stored in object$res_diff ...')
 			}
-			if(method == "mseq"){
+			if(method == "metagenomeSeq"){
 				if(!require("metagenomeSeq")){
-					stop("metagenomeSeq package not installed")
+					stop("metagenomeSeq package not installed !")
 				}
 				message("Total ", ncol(all_name), " paired group for calculation ...")
 				for(i in 1:ncol(all_name)) {
 					message(paste0("Run ", i, " : ", paste0(as.character(all_name[,i]), collapse = " - "), " ...\n"))
-					use_dataset <- clone(dataset)
+					use_dataset <- clone(tmp_dataset)
 					use_dataset$sample_table %<>% .[.[, group] %in% as.character(all_name[,i]), ]
 					use_dataset$tidy_dataset()
+					suppressMessages(use_dataset$cal_abund(rel = FALSE))
+					newdata <- microtable$new(otu_table = use_dataset$taxa_abund[[taxa_level]], 
+						sample_table = use_dataset$sample_table)
+					newdata$tidy_dataset()
 					obj <- newMRexperiment(
-						use_dataset$otu_table, 
-						phenoData= AnnotatedDataFrame(use_dataset$sample_table), 
-						featureData = AnnotatedDataFrame(use_dataset$tax_table)
+						newdata$otu_table, 
+						phenoData= AnnotatedDataFrame(newdata$sample_table)
+#						featureData = AnnotatedDataFrame(use_dataset$tax_table)
 						)
 					## Normalization and Statistical testing
 					obj_1 <- cumNorm(obj)
@@ -478,40 +505,145 @@ trans_diff <- R6Class(classname = "trans_diff",
 					}
 					srt <- order(p, decreasing = FALSE)
 					valid <- 1:length(padj)
-					if (mseq_count > 0) {
+					if (metagenomeSeq_count > 0) {
 						np <- rowSums(objres1@counts)
-						valid <- intersect(valid, which(np >= mseq_count))
+						valid <- intersect(valid, which(np >= metagenomeSeq_count))
 					}
 					srt <- srt[which(srt %in% valid)]
 					res <- cbind(tb[, 1:2], p)
 					res <- cbind(res, padj)
 					res <- as.data.frame(res[srt, ])
-					colnames(res) <- c(colnames(tb)[1:2], "pvalues", "adjPvalues")
+					colnames(res) <- c(colnames(tb)[1:2], "P.unadj", "P.adj")
 					res <- cbind.data.frame(feature = rownames(res), res)
 					rownames(res) <- NULL
 					add_name <- paste0(as.character(all_name[, i]), collapse = " - ") %>% rep(., nrow(res))
 					res <- cbind.data.frame(compare = add_name, res)
 					output <- rbind.data.frame(output, res)
 				}
+			}
+			if(method == "ANCOMBC"){
+				if(!require("ANCOMBC")){
+					stop("ANCOMBC package is not installed !")
+				}
+				if(!require("file2meco")){
+					stop("Please install file2meco package! The function meco2phyloseq is required!")
+				}
+				if(is.null(ANCOMBC_formula)){
+					ANCOMBC_formula <- group
+				}
+				if(ncol(all_name) > 1){
+					message("First run the global test ...")
+					use_dataset <- clone(tmp_dataset)
+					suppressMessages(use_dataset$cal_abund(rel = FALSE))
+					newdata <- microtable$new(otu_table = use_dataset$taxa_abund[[taxa_level]], sample_table = use_dataset$sample_table)
+					newdata$tidy_dataset()
+					newdata <- file2meco::meco2phyloseq(newdata)
+					res_raw <- ancombc(phyloseq = newdata, group = group, formula = ANCOMBC_formula, global = TRUE, ...)
+					res <- res_raw$res_global
+					colnames(res) <- c("W", "P.unadj", "P.adj", "diff_abn")
+					res <- cbind.data.frame(feature = rownames(res), res)
+					group_vec <- use_dataset$sample_table[, group] %>% as.character %>% unique
+					comparisions <- paste0(group_vec, collapse = " - ")
+					res <- cbind.data.frame(compare = comparisions, res)
+					output <- rbind.data.frame(output, res)
+				}
+				message("Total ", ncol(all_name), " paired group for test ...")
+				for(i in 1:ncol(all_name)) {
+					message(paste0("Run ", i, " : ", paste0(as.character(all_name[,i]), collapse = " - "), " ...\n"))
+					use_dataset <- clone(tmp_dataset)
+					use_dataset$sample_table %<>% .[.[, group] %in% as.character(all_name[,i]), ]
+					use_dataset$tidy_dataset()
+					suppressMessages(use_dataset$cal_abund(rel = FALSE))
+					newdata <- microtable$new(otu_table = use_dataset$taxa_abund[[taxa_level]], sample_table = use_dataset$sample_table)
+					newdata$tidy_dataset()
+					newdata <- file2meco::meco2phyloseq(newdata)
+					res_raw <- ancombc(phyloseq = newdata, group = group, formula = ANCOMBC_formula, ...)
+					res_raw2 <- res_raw$res
+					res <- data.frame(feature = rownames(res_raw2$W), W = res_raw2$W[, 1], P.unadj = res_raw2$p_val[, 1], 
+						P.adj = res_raw2$q_val[, 1], diff_abn = res_raw2$diff_abn[, 1])
+					rownames(res) <- NULL
+					add_name <- paste0(as.character(all_name[, i]), collapse = " - ") %>% rep(., nrow(res))
+					res <- cbind.data.frame(compare = add_name, res)
+					output <- rbind.data.frame(output, res)
+				}
+			}
+			if(method %in% c("ALDEx2_t", "ALDEx2_kw")){
+				if(!require("ALDEx2")){
+					stop("ALDEx2 package is not installed !")
+				}
+			}
+			if(method == "ALDEx2_t"){
+				message("Total ", ncol(all_name), " paired group for test ...")				
+				for(i in 1:ncol(all_name)) {
+					message(paste0("Run ", i, " : ", paste0(as.character(all_name[,i]), collapse = " - "), " ...\n"))
+					use_dataset <- clone(tmp_dataset)
+					use_dataset$sample_table %<>% .[.[, group] %in% as.character(all_name[,i]), ]
+					use_dataset$tidy_dataset()
+					suppressMessages(use_dataset$cal_abund(rel = FALSE))
+					newdata <- microtable$new(otu_table = use_dataset$taxa_abund[[taxa_level]], sample_table = use_dataset$sample_table)
+					newdata$tidy_dataset()
+					
+					res_raw <- ALDEx2::aldex(newdata$otu_table, newdata$sample_table[, group], test = "t", ...)
+					res <- cbind.data.frame(feature = rownames(res_raw), res_raw)
+					rownames(res) <- NULL
+					add_name <- paste0(as.character(all_name[, i]), collapse = " - ") %>% rep(., nrow(res))
+					res <- cbind.data.frame(compare = add_name, res) %>%
+						.[, !grepl("^rab\\.", colnames(.))]
+					output <- rbind.data.frame(output, res)
+				}
+			}
+			if(method == "ALDEx2_kw"){
+				if(taxa_level == "all"){
+					stop("Please provide the taxa_level instead of 'all', such as 'Genus' !")
+				}
+				use_dataset <- clone(tmp_dataset)
+				use_dataset$tidy_dataset()
+				suppressMessages(use_dataset$cal_abund(rel = FALSE))
+				res_raw <- ALDEx2::aldex(use_dataset$taxa_abund[[taxa_level]], use_dataset$sample_table[, group], test = "kw", ...)
+				res <- cbind.data.frame(feature = rownames(res_raw), res_raw)
+				comparisions <- paste0(unique(as.character(use_dataset$sample_table[, group])), collapse = " - ")
+				output <- cbind.data.frame(compare = comparisions, res)
+			}
+			if(method %in% c("ALDEx2_t", "ALDEx2_kw")){
+				if(! any(colnames(output) %in% ALDEx2_sig)){
+					stop("ALDEx2_sig is not found in the result! Please check the input!")
+				}else{
+					output$P.adj <- output[, ALDEx2_sig %>% .[. %in% colnames(output)] %>% .[1]]
+				}
+			}
+			if(method %in% c("metagenomeSeq", "ANCOMBC", "ALDEx2_t", "ALDEx2_kw")){
 				output %<>% dropallfactors(unfac2num = TRUE)
 				colnames(output)[1:2] <- c("Comparison", "Taxa")
-				self$res_diff <- output
-				message('The differential test result is stored in object$res_diff ...')
+				output$Significance <- cut(output$P.adj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", "ns"))
+				# filter the unknown taxa in output
+				output %<>% .[.$Taxa %in% res_abund$Taxa, ]
+				# get enriched group
+				output$Group <- lapply(seq_along(output$Taxa), function(x){
+					select_group_split <- strsplit(output[x, "Comparison"], split = " - ") %>% unlist
+					res_abund[res_abund$Taxa == output[x, "Taxa"] & res_abund$Group %in% select_group_split, ] %>%
+					{.[which.max(.$Mean), "Group"]}
+				}) %>% unlist
 			}
+			self$res_diff <- output
+			message(method , " analysis result is stored in object$res_diff ...")
+			self$res_abund <- res_abund
+			message('Taxa abundance data is stored in object$res_abund ...')
+			# save abund_table for the cladogram
+			self$abund_table <- abund_table
 			self$method <- method
 			self$taxa_level <- taxa_level
 		},
 		#' @description
-		#' Plotting the abundance of differential taxa.
+		#' Plot the abundance of differential taxa
 		#'
-		#' @param use_number default 1:20; numeric vector; the taxa numbers (1:n) used in the plot; 
+		#' @param use_number default 1:20; numeric vector; the taxa numbers (1:n) selected in the plot; 
 		#'   If the n is larger than the number of total significant taxa, automatically use all the taxa.		
-		#' @param color_values default RColorBrewer::brewer.pal(8, "Dark2"); colors palette.
+		#' @param color_values default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette.
 		#' @param select_group default NULL; this is used to select the paired groups. 
 		#'   This parameter is especially useful when the comparision methods is applied to paired groups;
-		#'   The input select_group must be one of object$res_diff$Comparison.
+		#'   The input select_group must be one of \code{object$res_diff$Comparison}.
 		#' @param select_taxa default NULL; character vector to provide taxa names. 
-		#' 	 The taxa names should be same with the names shown in the plot, not the 'Taxa' column names in object$res_diff$Taxa.
+		#' 	 The taxa names should be same with the names shown in the plot, not the 'Taxa' column names in \code{object$res_diff$Taxa}.
 		#' @param simplify_names default TRUE; whether use the simplified taxonomic name.
 		#' @param keep_prefix default TRUE; whether retain the taxonomic prefix.
 		#' @param group_order default NULL; a vector to order groups, i.e. reorder the legend and colors in plot; 
@@ -530,7 +662,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' 	  In addition, this parameter is also used to label the letters of anova result with the fixed (1 + y_increase) * y_start * Value.
 		#' @param text_y_size default 10; the size for the y axis text.
 		#' @param coord_flip default TRUE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical, horizontal.
-		#' @param ... parameters passed to ggsignif::stat_signif when add_sig = TRUE.
+		#' @param ... parameters passed to \code{ggsignif::stat_signif} when add_sig = TRUE.
 		#' @return ggplot.
 		#' @examples
 		#' \donttest{
@@ -568,24 +700,29 @@ trans_diff <- R6Class(classname = "trans_diff",
 			method <- self$method
 			diff_data <- self$res_diff
 
-			if(method == "mseq"){
-				stop("This function can not be applied to 'mseq' method currently!")
+			# sort according to different columns
+			if(method == "metastat"){
+				message('Reorder taxa according to qvalue in res_diff from low to high ...')
+				diff_data %<>% .[order(.$qvalue, decreasing = FALSE), ]
+				# diff_data %<>% .[.$qvalue < 0.05, ]
 			}else{
-				if(method == "metastat"){
-					message('Reorder taxa according to qvalue in res_diff from low to high ...')
-					diff_data %<>% .[order(.$qvalue, decreasing = FALSE), ]
-					# diff_data %<>% .[.$qvalue < 0.05, ]
-				}else{
-					# lefse and rf are ordered
-					if(! method %in% c("lefse", "rf", "anova")){
-						message('Reorder taxa according to P.adj in res_diff from low to high ...')
-						diff_data %<>% .[order(.$P.adj, decreasing = FALSE), ]
-						# diff_data %<>% .[.$P.adj < 0.05, ]
-					}
+				# lefse and rf are ordered
+				if(! method %in% c("lefse", "rf", "anova")){
+					message('Reorder taxa according to P.adj in res_diff from low to high ...')
+					diff_data %<>% .[order(.$P.adj, decreasing = FALSE), ]
+					# diff_data %<>% .[.$P.adj < 0.05, ]
 				}
 			}
-
-			if(!is.null(select_group)){
+			if(is.null(select_group)){
+				if(method == "ANCOMBC"){
+					if(length(unlist(gregexpr(" - ", diff_data$Comparison[1]))) > 1){
+						if(any(sapply(gregexpr(" - ", t1$res_diff$Comparison), length) == 1)){
+							message("For ANCOMBC, both global and paired test are found. No select_group provided, use the global test result ...")
+							diff_data %<>% .[.$Comparison == diff_data$Comparison[1], ]
+						}
+					}
+				}
+			}else{
 				if(length(select_group) > 1){
 					stop("The select_group parameter should only have one element! Please check the input!")
 				}
@@ -664,8 +801,10 @@ trans_diff <- R6Class(classname = "trans_diff",
 					y_start_use <- max((abund_data$Mean + abund_data$SD)) * y_start
 				}
 				all_taxa <- levels(abund_data$Taxa)
-
-				if(length(levels(abund_data$Group)) > 2 & method %in% c("lefse", "rf", "KW")){
+				
+				# for groups > 3, show the global comparision
+				if((length(levels(abund_data$Group)) > 2 & method %in% c("lefse", "rf", "KW", "ALDEx2_kw")) | 
+					(length(unlist(gregexpr(" - ", diff_data$Comparison[1]))) > 1 & method == "ANCOMBC")){
 					add_letter_text <- diff_data[match(all_taxa, diff_data$Taxa), add_sig_label]
 					textdf <- data.frame(
 						x = all_taxa, 
@@ -674,9 +813,10 @@ trans_diff <- R6Class(classname = "trans_diff",
 						stringsAsFactors = FALSE
 						)
 				}else{
+					# show all the comparisions
 					if(method != "anova"){
 						if(any(grepl("\\s-\\s", x_axis_order))){
-							stop("The group names have ' - ' characters, which can impede the group recognition and mapping in the plot! Please rename groups and rerun!")
+							stop("The group names have ' - ' characters, which can hinder the group recognition and mapping in the plot! Please rename groups and rerun!")
 						}
 						annotations <- c()
 						x_min <- c()
@@ -741,7 +881,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 				p <- p + geom_errorbar(aes(ymin=Mean-SD, ymax=Mean+SD), width=.45, position=position_dodge(barwidth), color = "black")
 			}
 			if(add_sig){
-				if(length(levels(abund_data$Group)) > 2 & method %in% c("lefse", "rf", "KW")){
+				if((length(levels(abund_data$Group)) > 2 & method %in% c("lefse", "rf", "KW", "ALDEx2_kw")) | 
+					(length(unlist(gregexpr(" - ", diff_data$Comparison[1]))) > 1 & method == "ANCOMBC")){
 					p <- p + geom_text(aes(x = x, y = y, label = add), data = textdf, inherit.aes = FALSE)
 				}else{
 					if(method != "anova"){
@@ -780,18 +921,18 @@ trans_diff <- R6Class(classname = "trans_diff",
 			p
 		},
 		#' @description
-		#' Bar plot for LDA score.
+		#' Bar plot for indicator index, such as LDA score and P value.
 		#'
-		#' @param color_values default RColorBrewer::brewer.pal(8, "Dark2"); colors palette for different groups.
+		#' @param color_values default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for different groups.
 		#' @param use_number default 1:10; numeric vector; the taxa numbers used in the plot, i.e. 1:n.
-		#' @param threshold default NULL; threshold value for selecting taxa, such as 3 for LDA score of LEfSe.
+		#' @param threshold default NULL; threshold value of indicators for selecting taxa, such as 3 for LDA score of LEfSe.
 		#' @param select_group default NULL; this is used to select the paired group when multiple comparisions are generated;
-		#'   The input select_group must be one of object$res_diff$Comparison.
+		#'   The input select_group must be one of \code{object$res_diff$Comparison}.
 		#' @param simplify_names default TRUE; whether use the simplified taxonomic name.
 		#' @param keep_prefix default TRUE; whether retain the taxonomic prefix.
 		#' @param group_order default NULL; a vector to order the legend and colors in plot; 
-		#' 	  If NULL, the function can first check whether the group column of sample_table is factor. If yes, use the levels in it.
-		#' 	  If provided, this parameter can overwrite the levels in the group of sample_table.
+		#' 	  If NULL, the function can first check whether the group column of \code{microtable$sample_table} is factor. If yes, use the levels in it.
+		#' 	  If provided, this parameter can overwrite the levels in the group of \code{microtable$sample_table}.
 		#' @param axis_text_y default 12; the size for the y axis text.
 		#' @param plot_vertical default TRUE; whether use vertical bar plot or horizontal.
 		#' @param ... parameters pass to \code{\link{geom_bar}}
@@ -827,7 +968,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 						use_data$Value <- 1 - use_data$qvalue
 						ylab_title <- "1 - qvalue"
 					}else{
-						if(method %in% c("KW", "KW_dunn", "wilcox", "t.test")){
+						if(method != "anova"){
 							use_data %<>% .[.$P.adj < 0.05, ]
 							use_data$Value <- 1 - use_data$P.adj
 							ylab_title <- "1 - P.adjust"
@@ -862,6 +1003,11 @@ trans_diff <- R6Class(classname = "trans_diff",
 			}
 			if(keep_prefix == F){
 				use_data$Taxa %<>% gsub(".__", "", .)
+			}
+			# make sure no duplication
+			use_data %<>% .[!duplicated(.$Taxa), ]
+			if(nrow(use_data) == 0){
+				stop("No available data can be used to show!")
 			}
 			if(is.null(threshold)){
 				sel_num <- use_number
@@ -927,25 +1073,26 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' @description
 		#' Plot the cladogram using taxa with significant difference.
 		#'
-		#' @param color default RColorBrewer::brewer.pal(8, "Dark2"); color palette used in the plot.
+		#' @param color default \code{RColorBrewer::brewer.pal}(8, "Dark2"); color palette used in the plot.
+		#' @param group_order default NULL; a vector to order the legend in plot; 
+		#' 	  If NULL, the function can first check whether the group column of sample_table is factor. If yes, use the levels in it.
+		#' 	  If provided, this parameter can overwrite the levels in the group of sample_table. 
+		#' 	  If the number of provided group_order is less than the number of groups in \code{res_diff$Group}, the function will select the groups of group_order automatically.
 		#' @param use_taxa_num default 200; integer; The taxa number used in the background tree plot; select the taxa according to the mean abundance .
 		#' @param filter_taxa default NULL; The mean relative abundance used to filter the taxa with low abundance.
 		#' @param use_feature_num default NULL; integer; The feature number used in the plot; 
 		#'	  select the features according to the LDA score (method = "lefse") or MeanDecreaseGini (method = "rf") from high to low.
-		#' @param group_order default NULL; a vector to order the legend and colors in plot; 
-		#' 	  If NULL, the function can first check whether the group column of sample_table is factor. If yes, use the levels in it.
-		#' 	  If provided, this parameter can overwrite the levels in the group of sample_table.
 		#' @param clade_label_level default 4; the taxonomic level for marking the label with letters, root is the largest.
 		#' @param select_show_labels default NULL; character vector; The features to show in the plot with full label names, not the letters.
-		#' @param only_select_show default FALSE; whether only use the the select features in the parameter select_show_labels.
+		#' @param only_select_show default FALSE; whether only use the the select features in the parameter \code{select_show_labels}.
 		#' @param sep default "|"; the seperate character in the taxonomic information.
 		#' @param branch_size default 0.2; numberic, size of branch.
 		#' @param alpha default 0.2; shading of the color.
-		#' @param clade_label_size default 2; basic size for the clade label; please also see clade_label_size_add and clade_label_size_log
-		#' @param clade_label_size_add default 5; added basic size for the clade label; see the formula in clade_label_size_log parameter.
-		#' @param clade_label_size_log default exp(1); the base of log function for added size of the clade label; the size formula: 
-		#'   clade_label_size + log(clade_label_level + clade_label_size_add, base = clade_label_size_log); 
-		#'   so use clade_label_size_log, clade_label_size_add and clade_label_size
+		#' @param clade_label_size default 2; basic size for the clade label; please also see \code{clade_label_size_add} and \code{clade_label_size_log}.
+		#' @param clade_label_size_add default 5; added basic size for the clade label; see the formula in \code{clade_label_size_log} parameter.
+		#' @param clade_label_size_log default \code{exp(1)}; the base of \code{log} function for added size of the clade label; the size formula: 
+		#'   \code{clade_label_size + log(clade_label_level + clade_label_size_add, base = clade_label_size_log)}; 
+		#'   so use \code{clade_label_size_log}, \code{clade_label_size_add} and \code{clade_label_size}
 		#'   can totally control the label size for different taxonomic levels.
 		#' @param node_size_scale default 1; scale for the node size.
 		#' @param node_size_offset default 1; offset for the node size.
@@ -958,10 +1105,10 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' }
 		plot_diff_cladogram = function(
 			color = RColorBrewer::brewer.pal(8, "Dark2"),
+			group_order = NULL,
 			use_taxa_num = 200,
 			filter_taxa = NULL,
 			use_feature_num = NULL,
-			group_order = NULL,
 			clade_label_level = 4,
 			select_show_labels = NULL,
 			only_select_show = FALSE,
@@ -993,7 +1140,27 @@ trans_diff <- R6Class(classname = "trans_diff",
 			if(only_select_show == T){
 				marker_table %<>% .[.$Taxa %in% select_show_labels, ]
 			}
-			color <- color[1:length(unique(marker_table$Group))]
+			# color legend order settings
+			if(is.null(group_order)){
+				if(! is.null(self$group_order)){
+					color_groups <- self$group_order
+				}else{
+					color_groups <- marker_table$Group %>% as.character %>% as.factor %>% levels
+				}
+			}else{
+				color_groups <- group_order
+			}
+			
+			# filter redundant groups
+			color_groups %<>% .[. %in% unique(marker_table$Group)]
+			marker_table %<>% .[.$Group %in% color_groups, ]
+			# get the color palette
+			if(length(color) < length(unique(marker_table$Group))){
+				stop("Please provide enough color palette! There are ", length(unique(marker_table$Group)), 
+					" groups, but only ", length(color), " colors provideed in color parameter!")
+			}else{
+				color <- color[1:length(unique(marker_table$Group))]
+			}
 
 			# filter the taxa with unidentified classification or with space, in case of the unexpected error in the following operations
 			abund_table %<>% {.[!grepl("\\|.__\\|", rownames(.)), ]} %>%
@@ -1059,16 +1226,6 @@ trans_diff <- R6Class(classname = "trans_diff",
 			tree <- tidytree::treedata(phylo = phylo, data = tibble::as_tibble(mapping))
 			tree <- ggtree::ggtree(tree, size = 0.2, layout = 'circular')
 			
-			# color legend order settings
-			if(is.null(group_order)){
-				if(! is.null(self$group_order)){
-					color_groups <- self$group_order
-				}else{
-					color_groups <- marker_table$Group %>% as.character %>% as.factor %>% levels
-				}
-			}else{
-				color_groups <- group_order
-			}
 			annotation <- private$generate_cladogram_annotation(marker_table, tree = tree, color = color, color_groups = color_groups)
 			# backgroup hilight
 			annotation_info <- dplyr::left_join(annotation, tree$data, by = c("node" = "label")) %>%
@@ -1088,8 +1245,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			hilights_df$x <- 0
 			hilights_df$y <- 1
 			# resort the table used for the legend color and text
-			hilights_df %<>% `row.names<-`(.$enrich_group) %>%
-				.[color_groups, ]
+			hilights_df %<>% `row.names<-`(.$enrich_group) %>% .[color_groups, ]
 			# make sure the right order in legend
 			hilights_df$enrich_group %<>% factor(., levels = color_groups)
 

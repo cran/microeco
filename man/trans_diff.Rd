@@ -2,15 +2,15 @@
 % Please edit documentation in R/trans_diff.R
 \name{trans_diff}
 \alias{trans_diff}
-\title{Create trans_diff object for the differential analysis on the taxonomic abundance.}
+\title{Create \code{trans_diff} object for the differential analysis on the taxonomic abundance}
 \description{
 This class is a wrapper for a series of differential abundance test and indicator analysis methods, including 
  LEfSe based on the Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>,
  random forest <doi:10.1016/j.geoderma.2018.09.035>, metastat based on White et al. (2009) <doi:10.1371/journal.pcbi.1000352>,
- the method in R package metagenomeSeq Paulson et al. (2013) <doi:10.1038/nmeth.2658>, non-parametric Kruskal-Wallis Rank Sum Test,
- Dunn's Kruskal-Wallis Multiple Comparisons based on the FSA package, Wilcoxon Rank Sum and Signed Rank Tests, t test and anova.
-
-Authors: Chi Liu, Yang Cao, Chenhao Li
+ non-parametric Kruskal-Wallis Rank Sum Test,
+ Dunn's Kruskal-Wallis Multiple Comparisons based on the \code{FSA} package, Wilcoxon Rank Sum and Signed Rank Tests, t test, anova, 
+ R package \code{metagenomeSeq} Paulson et al. (2013) <doi:10.1038/nmeth.2658>, 
+ R package \code{ANCOMBC} <doi:10.1038/s41467-020-17041-7> and R package \code{ALDEx2} <doi:10.1371/journal.pone.0067019; 10.1186/2049-2618-2-15>.
 }
 \examples{
 
@@ -61,23 +61,23 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
 \section{Methods}{
 \subsection{Public methods}{
 \itemize{
-\item \href{#method-new}{\code{trans_diff$new()}}
-\item \href{#method-plot_diff_abund}{\code{trans_diff$plot_diff_abund()}}
-\item \href{#method-plot_diff_bar}{\code{trans_diff$plot_diff_bar()}}
-\item \href{#method-plot_diff_cladogram}{\code{trans_diff$plot_diff_cladogram()}}
-\item \href{#method-print}{\code{trans_diff$print()}}
-\item \href{#method-clone}{\code{trans_diff$clone()}}
+\item \href{#method-trans_diff-new}{\code{trans_diff$new()}}
+\item \href{#method-trans_diff-plot_diff_abund}{\code{trans_diff$plot_diff_abund()}}
+\item \href{#method-trans_diff-plot_diff_bar}{\code{trans_diff$plot_diff_bar()}}
+\item \href{#method-trans_diff-plot_diff_cladogram}{\code{trans_diff$plot_diff_cladogram()}}
+\item \href{#method-trans_diff-print}{\code{trans_diff$print()}}
+\item \href{#method-trans_diff-clone}{\code{trans_diff$clone()}}
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-new"></a>}}
-\if{latex}{\out{\hypertarget{method-new}{}}}
+\if{html}{\out{<a id="method-trans_diff-new"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_diff-new}{}}}
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_diff$new(
   dataset = NULL,
-  method = c("lefse", "rf", "metastat", "mseq", "KW", "KW_dunn", "wilcox", "t.test",
-    "anova")[1],
+  method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox",
+    "t.test", "anova", "ANCOMBC", "ALDEx2_t", "ALDEx2_kw")[1],
   group = NULL,
   taxa_level = "all",
   filter_thres = 0,
@@ -90,7 +90,9 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
   boots = 30,
   rf_ntree = 1000,
   group_choose_paired = NULL,
-  mseq_count = 1,
+  metagenomeSeq_count = 1,
+  ANCOMBC_formula = NULL,
+  ALDEx2_sig = c("wi.eBH", "kw.eBH"),
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -105,26 +107,37 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
   \item{\strong{'lefse'}}{LEfSe method based on Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>}
   \item{\strong{'rf'}}{random forest and non-parametric test method based on An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035>}
   \item{\strong{'metastat'}}{Metastat method for all paired groups based on White et al. (2009) <doi:10.1371/journal.pcbi.1000352>}
-  \item{\strong{'mseq'}}{zero-inflated log-normal model-based differential test method from metagenomeSeq package.}
+  \item{\strong{'metagenomeSeq'}}{zero-inflated log-normal model-based differential test method from \code{metagenomeSeq} package.}
   \item{\strong{'KW'}}{KW: Kruskal-Wallis Rank Sum Test for all groups (>= 2)}
-  \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons when group number > 2; see dunnTest function in FSA package}
+  \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons when group number > 2; see dunnTest function in \code{FSA} package}
   \item{\strong{'wilcox'}}{Wilcoxon Rank Sum and Signed Rank Tests for all paired groups }
   \item{\strong{'t.test'}}{Student's t-Test for all paired groups}
   \item{\strong{'anova'}}{Duncan's multiple range test for anova}
+  \item{\strong{'ANCOMBC'}}{Analysis of Compositions of Microbiomes with Bias Correction (ANCOM-BC); 
+     Reference: <doi:10.1038/s41467-020-17041-7>; Require \code{ANCOMBC} package to be installed 
+     (\href{https://bioconductor.org/packages/release/bioc/html/ANCOMBC.html}{https://bioconductor.org/packages/release/bioc/html/ANCOMBC.html})}
+  \item{\strong{'ALDEx2_t'}}{runs Welch's t and Wilcoxon tests with \code{ALDEx2} package; see also the test parameter in \code{ALDEx2::aldex} function;
+        ALDEx2 uses the centred log-ratio (clr) transformation and estimates per-feature technical variation within each sample using Monte-Carlo instances 
+        drawn from the Dirichlet distribution; Reference: <doi:10.1371/journal.pone.0067019> and <doi:10.1186/2049-2618-2-15>; 
+        require \code{ALDEx2} package to be installed 
+        (\href{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html}{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html})}
+  \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallace and generalized linear model (glm) test with \code{ALDEx2} package; 
+        see also the test parameter in \code{ALDEx2::aldex} function.}
 }}
 
-\item{\code{group}}{default NULL; sample group used for the comparision; a colname of microtable$sample_table.}
+\item{\code{group}}{default NULL; sample group used for the comparision; a colname of input \code{microtable$sample_table}.}
 
 \item{\code{taxa_level}}{default "all"; 'all' represents using abundance data at all taxonomic ranks; 
-For testing at a specific rank, provide taxonomic rank name, such as "Genus"; this parameter can be applied when method != "mseq";
-'mseq' method is performed on the feature abudance, i.e. microtable$otu_table.}
+For testing at a specific rank, provide taxonomic rank name, such as "Genus".
+If the provided taxonomic name is neither 'all' nor a colname in tax_table of input dataset, 
+the function will use the features in input \code{microtable$otu_table} automatically.}
 
-\item{\code{filter_thres}}{default 0; the relative abundance threshold used for method != "metastat" or "mseq".}
+\item{\code{filter_thres}}{default 0; the relative abundance threshold, such as 0.0005; only useful when method != "metastat".}
 
 \item{\code{alpha}}{default 0.05; differential significance threshold for method = "lefse" or "rf"; used to select taxa with significance across groups.}
 
-\item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of p.adjust function for other available options; 
-NULL mean disuse the p value adjustment; So when p_adjust_method = NULL, P.adj is same with P.unadj.}
+\item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for other available options; 
+NULL mean disuse the p value adjustment; So when \code{p_adjust_method = NULL}, P.adj is same with P.unadj.}
 
 \item{\code{lefse_subgroup}}{default NULL; sample sub group used for sub-comparision in lefse; Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>.}
 
@@ -138,11 +151,21 @@ NULL mean disuse the p value adjustment; So when p_adjust_method = NULL, P.adj i
 
 \item{\code{rf_ntree}}{default 1000; see ntree in randomForest function of randomForest package when method = "rf".}
 
-\item{\code{group_choose_paired}}{default NULL; a vector used for selecting the required groups for paired testing, only used for method = "metastat" or "mseq".}
+\item{\code{group_choose_paired}}{default NULL; a vector used for selecting the required groups for paired testing, only used for method = "metastat" or "metagenomeSeq".}
 
-\item{\code{mseq_count}}{default 1; Filter features to have at least 'counts' counts.; see the count parameter in MRcoefs function of metagenomeSeq package.}
+\item{\code{metagenomeSeq_count}}{default 1; Filter features to have at least 'counts' counts.; see the count parameter in MRcoefs function of \code{metagenomeSeq} package.}
 
-\item{\code{...}}{parameters passed to cal_diff function of trans_alpha class when method is one of "KW", "KW_dunn", "wilcox", "t.test" and "anova".}
+\item{\code{ANCOMBC_formula}}{default NULL; same with the formula parameter in \code{ANCOMBC::ancombc} function; If NULL; assign the group parameter to it automatically.}
+
+\item{\code{ALDEx2_sig}}{default c("wi.eBH", "kw.eBH"); which column of the final result is used as the significance asterisk assignment;
+applied to method = "ALDEx2_t" or "ALDEx2_kw"; the first element is provided to "ALDEx2_t"; the second is provided to "ALDEx2_kw";
+for "ALDEx2_t", the available choice is "wi.eBH" (Expected Benjamini-Hochberg corrected P value of Wilcoxon test)
+and "we.eBH" (Expected BH corrected P value of Welch’s t test); for "ALDEx2_kw"; for "ALDEx2_t",
+the available choice is "kw.eBH" (Expected BH corrected P value of Kruskal-Wallace test) and "glm.eBH" (Expected BH corrected P value of glm test).}
+
+\item{\code{...}}{parameters passed to \code{cal_diff} function of \code{trans_alpha} class when method is one of "KW", "KW_dunn", "wilcox", "t.test" and "anova";
+passed to \code{ANCOMBC::ancombc} function when method is "ANCOMBC" (except formula and global parameters; please see ANCOMBC_formula parameter);
+passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw".}
 }
 \if{html}{\out{</div>}}
 }
@@ -175,10 +198,10 @@ t1 <- trans_diff$new(dataset = dataset, method = "wilcox", group = "Group")
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_diff_abund"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_diff_abund}{}}}
+\if{html}{\out{<a id="method-trans_diff-plot_diff_abund"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_diff-plot_diff_abund}{}}}
 \subsection{Method \code{plot_diff_abund()}}{
-Plotting the abundance of differential taxa.
+Plot the abundance of differential taxa
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_diff$plot_diff_abund(
   use_number = 1:20,
@@ -205,17 +228,17 @@ Plotting the abundance of differential taxa.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{use_number}}{default 1:20; numeric vector; the taxa numbers (1:n) used in the plot; 
+\item{\code{use_number}}{default 1:20; numeric vector; the taxa numbers (1:n) selected in the plot; 
 If the n is larger than the number of total significant taxa, automatically use all the taxa.}
 
-\item{\code{color_values}}{default RColorBrewer::brewer.pal(8, "Dark2"); colors palette.}
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette.}
 
 \item{\code{select_group}}{default NULL; this is used to select the paired groups. 
 This parameter is especially useful when the comparision methods is applied to paired groups;
-The input select_group must be one of object$res_diff$Comparison.}
+The input select_group must be one of \code{object$res_diff$Comparison}.}
 
 \item{\code{select_taxa}}{default NULL; character vector to provide taxa names. 
-The taxa names should be same with the names shown in the plot, not the 'Taxa' column names in object$res_diff$Taxa.}
+The taxa names should be same with the names shown in the plot, not the 'Taxa' column names in \code{object$res_diff$Taxa}.}
 
 \item{\code{simplify_names}}{default TRUE; whether use the simplified taxonomic name.}
 
@@ -248,7 +271,7 @@ In addition, this parameter is also used to label the letters of anova result wi
 
 \item{\code{coord_flip}}{default TRUE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical, horizontal.}
 
-\item{\code{...}}{parameters passed to ggsignif::stat_signif when add_sig = TRUE.}
+\item{\code{...}}{parameters passed to \code{ggsignif::stat_signif} when add_sig = TRUE.}
 }
 \if{html}{\out{</div>}}
 }
@@ -275,10 +298,10 @@ t1$plot_diff_abund(use_number = 1:20, add_sig = TRUE)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_diff_bar"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_diff_bar}{}}}
+\if{html}{\out{<a id="method-trans_diff-plot_diff_bar"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_diff-plot_diff_bar}{}}}
 \subsection{Method \code{plot_diff_bar()}}{
-Bar plot for LDA score.
+Bar plot for indicator index, such as LDA score and P value.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_diff$plot_diff_bar(
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),
@@ -297,22 +320,22 @@ Bar plot for LDA score.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{color_values}}{default RColorBrewer::brewer.pal(8, "Dark2"); colors palette for different groups.}
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for different groups.}
 
 \item{\code{use_number}}{default 1:10; numeric vector; the taxa numbers used in the plot, i.e. 1:n.}
 
-\item{\code{threshold}}{default NULL; threshold value for selecting taxa, such as 3 for LDA score of LEfSe.}
+\item{\code{threshold}}{default NULL; threshold value of indicators for selecting taxa, such as 3 for LDA score of LEfSe.}
 
 \item{\code{select_group}}{default NULL; this is used to select the paired group when multiple comparisions are generated;
-The input select_group must be one of object$res_diff$Comparison.}
+The input select_group must be one of \code{object$res_diff$Comparison}.}
 
 \item{\code{simplify_names}}{default TRUE; whether use the simplified taxonomic name.}
 
 \item{\code{keep_prefix}}{default TRUE; whether retain the taxonomic prefix.}
 
 \item{\code{group_order}}{default NULL; a vector to order the legend and colors in plot; 
-If NULL, the function can first check whether the group column of sample_table is factor. If yes, use the levels in it.
-If provided, this parameter can overwrite the levels in the group of sample_table.}
+If NULL, the function can first check whether the group column of \code{microtable$sample_table} is factor. If yes, use the levels in it.
+If provided, this parameter can overwrite the levels in the group of \code{microtable$sample_table}.}
 
 \item{\code{axis_text_y}}{default 12; the size for the y axis text.}
 
@@ -337,17 +360,17 @@ t1$plot_diff_bar(use_number = 1:20)
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot_diff_cladogram"></a>}}
-\if{latex}{\out{\hypertarget{method-plot_diff_cladogram}{}}}
+\if{html}{\out{<a id="method-trans_diff-plot_diff_cladogram"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_diff-plot_diff_cladogram}{}}}
 \subsection{Method \code{plot_diff_cladogram()}}{
 Plot the cladogram using taxa with significant difference.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_diff$plot_diff_cladogram(
   color = RColorBrewer::brewer.pal(8, "Dark2"),
+  group_order = NULL,
   use_taxa_num = 200,
   filter_taxa = NULL,
   use_feature_num = NULL,
-  group_order = NULL,
   clade_label_level = 4,
   select_show_labels = NULL,
   only_select_show = FALSE,
@@ -367,7 +390,12 @@ Plot the cladogram using taxa with significant difference.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{color}}{default RColorBrewer::brewer.pal(8, "Dark2"); color palette used in the plot.}
+\item{\code{color}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); color palette used in the plot.}
+
+\item{\code{group_order}}{default NULL; a vector to order the legend in plot; 
+If NULL, the function can first check whether the group column of sample_table is factor. If yes, use the levels in it.
+If provided, this parameter can overwrite the levels in the group of sample_table. 
+If the number of provided group_order is less than the number of groups in \code{res_diff$Group}, the function will select the groups of group_order automatically.}
 
 \item{\code{use_taxa_num}}{default 200; integer; The taxa number used in the background tree plot; select the taxa according to the mean abundance .}
 
@@ -376,15 +404,11 @@ Plot the cladogram using taxa with significant difference.
 \item{\code{use_feature_num}}{default NULL; integer; The feature number used in the plot; 
 select the features according to the LDA score (method = "lefse") or MeanDecreaseGini (method = "rf") from high to low.}
 
-\item{\code{group_order}}{default NULL; a vector to order the legend and colors in plot; 
-If NULL, the function can first check whether the group column of sample_table is factor. If yes, use the levels in it.
-If provided, this parameter can overwrite the levels in the group of sample_table.}
-
 \item{\code{clade_label_level}}{default 4; the taxonomic level for marking the label with letters, root is the largest.}
 
 \item{\code{select_show_labels}}{default NULL; character vector; The features to show in the plot with full label names, not the letters.}
 
-\item{\code{only_select_show}}{default FALSE; whether only use the the select features in the parameter select_show_labels.}
+\item{\code{only_select_show}}{default FALSE; whether only use the the select features in the parameter \code{select_show_labels}.}
 
 \item{\code{sep}}{default "|"; the seperate character in the taxonomic information.}
 
@@ -392,13 +416,13 @@ If provided, this parameter can overwrite the levels in the group of sample_tabl
 
 \item{\code{alpha}}{default 0.2; shading of the color.}
 
-\item{\code{clade_label_size}}{default 2; basic size for the clade label; please also see clade_label_size_add and clade_label_size_log}
+\item{\code{clade_label_size}}{default 2; basic size for the clade label; please also see \code{clade_label_size_add} and \code{clade_label_size_log}.}
 
-\item{\code{clade_label_size_add}}{default 5; added basic size for the clade label; see the formula in clade_label_size_log parameter.}
+\item{\code{clade_label_size_add}}{default 5; added basic size for the clade label; see the formula in \code{clade_label_size_log} parameter.}
 
-\item{\code{clade_label_size_log}}{default exp(1); the base of log function for added size of the clade label; the size formula: 
-clade_label_size + log(clade_label_level + clade_label_size_add, base = clade_label_size_log); 
-so use clade_label_size_log, clade_label_size_add and clade_label_size
+\item{\code{clade_label_size_log}}{default \code{exp(1)}; the base of \code{log} function for added size of the clade label; the size formula: 
+\code{clade_label_size + log(clade_label_level + clade_label_size_add, base = clade_label_size_log)}; 
+so use \code{clade_label_size_log}, \code{clade_label_size_add} and \code{clade_label_size}
 can totally control the label size for different taxonomic levels.}
 
 \item{\code{node_size_scale}}{default 1; scale for the node size.}
@@ -426,8 +450,8 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-print"></a>}}
-\if{latex}{\out{\hypertarget{method-print}{}}}
+\if{html}{\out{<a id="method-trans_diff-print"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_diff-print}{}}}
 \subsection{Method \code{print()}}{
 Print the trans_alpha object.
 \subsection{Usage}{
@@ -436,8 +460,8 @@ Print the trans_alpha object.
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-clone}{}}}
+\if{html}{\out{<a id="method-trans_diff-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_diff-clone}{}}}
 \subsection{Method \code{clone()}}{
 The objects of this class are cloneable with this method.
 \subsection{Usage}{

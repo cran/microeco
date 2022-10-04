@@ -1,5 +1,5 @@
 #' @title
-#' Create trans_func object for functional analysis.
+#' Create \code{trans_func} object for functional analysis.
 #'
 #' @description
 #' This class is a wrapper for a series of functional analysis on species and communities, including the prokaryotes function identification based on 
@@ -11,11 +11,11 @@
 trans_func <- R6Class(classname = "trans_func",
 	public = list(
 		#' @description
-		#' Create the trans_func object. This function can identify the data type for Prokaryotes or Fungi automatically.
+		#' Create the \code{trans_func} object. This function can identify the data type for Prokaryotes or Fungi automatically.
 		#' 
 		#' @param dataset the object of \code{\link{microtable}} Class.
-		#' @return for_what : "prok" or "fungi" or NA, "prok" represent prokaryotes. "fungi" represent fungi. NA stand for not identified according to the Kingdom information, 
-		#' at this time, if you want to use the functions to identify species traits, you need provide "prok" or "fungi" manually, e.g. dataset$for_what <- "prok".
+		#' @return \code{for_what}: "prok" or "fungi" or NA, "prok" represent prokaryotes. "fungi" represent fungi. NA stand for not identified according to the Kingdom information, 
+		#' at this time, if you want to use the functions to identify species traits, you need provide "prok" or "fungi" manually, e.g. \code{dataset$for_what <- "prok"}.
 		#' @examples
 		#' data(dataset)
 		#' t1 <- trans_func$new(dataset = dataset)
@@ -49,7 +49,7 @@ trans_func <- R6Class(classname = "trans_func",
 		#'
 		#' @param prok_database default "FAPROTAX"; "FAPROTAX" or "NJC19"; select a prokaryotic trait database; see the details:
 		#'   \describe{
-		#'     \item{\strong{'FAPROTAX'}}{FAPROTAX v1.2.4 Reference: Louca et al. (2016). Decoupling function and taxonomy in the global ocean microbiome. 
+		#'     \item{\strong{'FAPROTAX'}}{FAPROTAX v1.2.4; Reference: Louca et al. (2016). Decoupling function and taxonomy in the global ocean microbiome. 
 		#'     	  Science, 353(6305), 1272. <doi:10.1126/science.aaf4507>}
 		#'     \item{\strong{'NJC19'}}{NJC19: Lim et al. (2020). Large-scale metabolic interaction network of the mouse and human gut microbiota. 
 		#'     	  Scientific Data, 7(1). <10.1038/s41597-020-0516-5>}
@@ -58,10 +58,11 @@ trans_func <- R6Class(classname = "trans_func",
 		#'   \describe{
 		#'     \item{\strong{'FUNGuild'}}{Nguyen et al. (2016) FUNGuild: An open annotation tool for parsing fungal community datasets by ecological guild.
 		#'     	  Fungal Ecology, 20(1), 241-248, <doi:10.1016/j.funeco.2015.06.006>}
-		#'     \item{\strong{'FungalTraits'}}{Polme et al. FungalTraits: a user-friendly traits database of fungi and fungus-like stramenopiles.  
+		#'     \item{\strong{'FungalTraits'}}{version: FungalTraits_1.2_ver_16Dec_2020V.1.2; Polme et al. 
+		#'     	  FungalTraits: a user-friendly traits database of fungi and fungus-like stramenopiles.  
 		#'     	  Fungal Diversity 105, 1-16 (2020). <doi:10.1007/s13225-020-00466-2>}
 		#'   }
-		#' @return res_spe_func stored in object.
+		#' @return \code{res_spe_func} stored in object.
 		#' @examples
 		#' \donttest{
 		#' t1$cal_spe_func(prok_database = "FAPROTAX")
@@ -281,7 +282,7 @@ trans_func <- R6Class(classname = "trans_func",
 		#'
 		#' @param abundance_weighted default FALSE; whether use abundance of taxa. If FALSE, calculate the functional population percentage. 
 		#' 	  If TRUE, calculate the functional individual percentage.
-		#' @return res_spe_func_perc stored in the object.
+		#' @return \code{res_spe_func_perc} stored in the object.
 		#' @examples
 		#' \donttest{
 		#' t1$cal_spe_func_perc(abundance_weighted = TRUE)
@@ -340,8 +341,8 @@ trans_func <- R6Class(classname = "trans_func",
 		#'
 		#' @param filter_func default NULL; a vector of function names used to show in the plot.
 		#' @param use_group_list default TRUE; If TRUE, use default group list; If user want to use personalized group list, 
-		#'    please first set trans_func$func_group_list object with a list of group names and functions.
-		#' @param add_facet default TRUE; whether use group names as the facets in the plot, see trans_func$func_group_list object.
+		#'    please first set \code{trans_func$func_group_list} object with a list of group names and functions.
+		#' @param add_facet default TRUE; whether use group names as the facets in the plot, see \code{trans_func$func_group_list} object.
 		#' @param order_x default NULL; character vector; to sort the x axis text; can be also used to select partial samples to show.
 		#' @param color_gradient_low default "#00008B"; the color used as the low end in the color gradient.
 		#' @param color_gradient_high default "#9E0142"; the color used as the high end in the color gradient.
@@ -426,7 +427,7 @@ trans_func <- R6Class(classname = "trans_func",
 		#'
 		#' @param keep_tem default FALSE; whether keep the intermediate file, that is, the feature table in local place.
 		#' @param folderReferenceData default NULL; the folder, see \href{http://tax4fun.gobics.de/}{http://tax4fun.gobics.de/}  and Tax4Fun function in Tax4Fun package.
-		#' @return tax4fun_KO and tax4fun_path in object.
+		#' @return \code{tax4fun_KO} and \code{tax4fun_path} in object.
 		cal_tax4fun = function(keep_tem = FALSE, folderReferenceData = NULL){
 			if(is.null(folderReferenceData)){
 				stop("No folderReferenceData provided! Please see the help document!")
@@ -478,13 +479,13 @@ trans_func <- R6Class(classname = "trans_func",
 		#' 	 use the default temporary in the computer system.
 		#' @param database_mode default 'Ref99NR'; "Ref99NR" or "Ref100NR"; Ref99NR: 99\% clustering reference database; Ref100NR: no clustering.
 		#' @param normalize_by_copy_number default TRUE; whether normalize the result by the 16S rRNA copy number in the genomes. 
-		#' @param min_identity_to_reference default 97; the idenity threshold used for finding the nearest species.
+		#' @param min_identity_to_reference default 97; the sequences identity threshold used for finding the nearest species.
 		#' @param use_uproc default TRUE; whether use UProC to functionally anotate the genomes in the reference data.
 		#' @param num_threads default 1; the threads used in the blastn.
 		#' @param normalize_pathways default FALSE; Different to Tax4Fun, when converting from KEGG functions to KEGG pathways, 
 		#' 	 Tax4Fun2 does not equally split KO gene abundances between pathways a functions is affiliated to. The full predicted abundance is affiliated to each pathway. 
 		#'   Use TRUE to split the abundances (default is FALSE).
-		#' @return res_tax4fun2_KO and res_tax4fun2_pathway in object.
+		#' @return \code{res_tax4fun2_KO} and \code{res_tax4fun2_pathway} in object.
 		#' @examples
 		#' \dontrun{
 		#' t1$cal_tax4fun2(blast_tool_path = "ncbi-blast-2.5.0+/bin", 
@@ -630,6 +631,7 @@ trans_func <- R6Class(classname = "trans_func",
 			otu_table_reduced <- raw_otu_table_reduced[, -1]
 			# for the calculation
 			otu_table_reduced_aggregated <- aggregate(x = otu_table_reduced[, -1, drop = FALSE], by = list(otu_table_reduced[,1]), sum)
+			self$res_tax4fun2_otu_table_reduced_aggregated <- otu_table_reduced_aggregated
 
 			# Write unknown fraction to log file
 			if((ncol(otu_table) - 1) == 1){
@@ -661,6 +663,7 @@ trans_func <- R6Class(classname = "trans_func",
 				reference_file <- read.delim(file = reference_file_path)
 				reference_profile <- rbind(reference_profile, as.numeric(reference_file[, n]))
 			}
+			self$res_tax4fun2_reference_profile <- reference_profile
 			
 			# all the required KEGG files are stored in Tax4Fun2_KEGG Rdata
 			data("Tax4Fun2_KEGG", envir=environment())
@@ -759,7 +762,7 @@ trans_func <- R6Class(classname = "trans_func",
 			for(reference_id in otu_table_reduced_aggregated$Group.1){
 				rownumber <- c(rownumber, which(row.names(distance_matrix) == reference_id))
 			}
-			distance_matrix_reduced <- distance_matrix[rownumber,rownumber]
+			distance_matrix_reduced <- distance_matrix[rownumber, rownumber]
 			distance_matrix_mean <- mean(as.dist(distance_matrix))
 			distance_matrix_reduced_mean <- mean(as.dist(distance_matrix_reduced))
 			rm(distance_matrix)
@@ -772,14 +775,13 @@ trans_func <- R6Class(classname = "trans_func",
 			rel_functional_redundancy_tab <- NULL
 			for(sample_use in 2:ncol(otu_table_reduced_aggregated)){
 				print(paste('Calculate functional redundancy for sample', names(otu_table_reduced_aggregated[sample_use])))
-				functional_prediction_sample <- reference_profile * as.numeric(otu_table_reduced_aggregated[,sample_use])
-				functional_prediction_sample_mod <- ifelse(functional_prediction_sample>=1,1,0)
+				functional_prediction_sample <- reference_profile * as.numeric(otu_table_reduced_aggregated[, sample_use])
+				functional_prediction_sample_mod <- ifelse(functional_prediction_sample >= 1, 1, 0)
 
 				abs_functional_redundancy_sample <- NULL
 				rel_functional_redundancy_sample <- NULL
-				for(i in 1:nrow(ko_list))
-				{
-				  ko_count <- functional_prediction_sample_mod[,i]
+				for(i in 1:nrow(ko_list)){
+				  ko_count <- functional_prediction_sample_mod[, i]
 				  aFRI <- (mean(as.dist(distance_matrix_reduced * ko_count)) * (sum(ko_count) / length(ko_count))) / distance_matrix_mean
 				  rFRI <- (mean(as.dist(distance_matrix_reduced * ko_count)) * (sum(ko_count) / length(ko_count))) / distance_matrix_reduced_mean
 				  abs_functional_redundancy_sample <- c(abs_functional_redundancy_sample, aFRI)
@@ -789,11 +791,10 @@ trans_func <- R6Class(classname = "trans_func",
 				rel_functional_redundancy_tab <- cbind(rel_functional_redundancy_tab, rel_functional_redundancy_sample)
 			}
 
-			abs_functional_redundancy_tab <- data.frame(abs_functional_redundancy_tab)
-			rel_functional_redundancy_tab <- data.frame(rel_functional_redundancy_tab)
+			abs_functional_redundancy_tab %<>% as.data.frame
+			rel_functional_redundancy_tab %<>% as.data.frame
 
-			colnames(abs_functional_redundancy_tab) <- names(self$otu_table)[2:ncol(otu_table_reduced_aggregated)]
-			colnames(rel_functional_redundancy_tab) <- names(self$otu_table)[2:ncol(otu_table_reduced_aggregated)]
+			colnames(abs_functional_redundancy_tab) <- colnames(rel_functional_redundancy_tab) <- colnames(otu_table_reduced_aggregated)[2:ncol(otu_table_reduced_aggregated)]
 
 			abs_functional_redundancy_final <- data.frame(KO = ko_list$ko, abs_functional_redundancy_tab, description = ko_list$description)
 			rel_functional_redundancy_final <- data.frame(KO = ko_list$ko, rel_functional_redundancy_tab, description = ko_list$description)
