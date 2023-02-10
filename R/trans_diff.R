@@ -9,7 +9,8 @@
 #'  Dunn's Kruskal-Wallis Multiple Comparisons based on the \code{FSA} package, Wilcoxon Rank Sum and Signed Rank Tests, t-test, anova, 
 #'  Scheirer Ray Hare test, 
 #'  R package \code{metagenomeSeq} Paulson et al. (2013) <doi:10.1038/nmeth.2658>, 
-#'  R package \code{ANCOMBC} <doi:10.1038/s41467-020-17041-7> and R package \code{ALDEx2} <doi:10.1371/journal.pone.0067019; 10.1186/2049-2618-2-15>.
+#'  R package \code{ANCOMBC} <doi:10.1038/s41467-020-17041-7>, R package \code{ALDEx2} <doi:10.1371/journal.pone.0067019; 10.1186/2049-2618-2-15> and
+#'  beta regression <doi:10.18637/jss.v034.i02>.
 #' 
 #' @export
 trans_diff <- R6Class(classname = "trans_diff",
@@ -41,6 +42,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'     	  (\href{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html}{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html})}
 		#'     \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallace and generalized linear model (glm) test with \code{ALDEx2} package; 
 		#'     	  see also the test parameter in \code{ALDEx2::aldex} function.}
+		#'     \item{\strong{'betareg'}}{Beta Regression based on the \code{betareg} package}
+		#'     \item{\strong{'lme'}}{lme: Linear Mixed Effect Model based on the \code{lmerTest} package}
 		#'   }
 		#' @param group default NULL; sample group used for the comparision; a colname of input \code{microtable$sample_table};
 		#' 	  It is necessary when method is not "anova" or method is "anova" but formula is not provided.
@@ -66,9 +69,18 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'   for "ALDEx2_t", the available choice is "wi.eBH" (Expected Benjamini-Hochberg corrected P value of Wilcoxon test)
 		#'   and "we.eBH" (Expected BH corrected P value of Welch’s t test); for "ALDEx2_kw"; for "ALDEx2_t",
 		#'   the available choice is "kw.eBH" (Expected BH corrected P value of Kruskal-Wallace test) and "glm.eBH" (Expected BH corrected P value of glm test).
-		#' @param ... parameters passed to \code{cal_diff} function of \code{trans_alpha} class when method is one of "KW", "KW_dunn", "wilcox", "t.test" and "anova";
+		#' @param ... parameters passed to \code{cal_diff} function of \code{trans_alpha} class when method is one of 
+		#' 	 "KW", "KW_dunn", "wilcox", "t.test", "anova", "betareg" and "lme";
 		#' 	 passed to \code{ANCOMBC::ancombc} function when method is "ANCOMBC" (except tax_level, global and fix_formula parameters);
 		#' 	 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw".
+		#' @param by_group default NULL; a column of sample_table used to perform the differential test 
+		#'   among groups (\code{group} parameter) for each group (\code{by_group} parameter). So \code{by_group} has a larger scale than \code{group} parameter.
+		#'   Same with the \code{by_group} parameter in trans_alpha class. 
+		#'   Only useful when method is one of \code{c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare")}.
+		#' @param by_ID default NULL; a column of sample_table used to perform paired t test or paired wilcox test for the paired data,
+		#'   such as the data of plant compartments for different plant species (ID). 
+		#'   So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.
+		#'   Same with the \code{by_ID} parameter in trans_alpha class.
 		#' @return res_diff and res_abund.\cr
 		#'   \strong{res_abund} includes mean abudance of each taxa (Mean), standard deviation (SD), standard error (SE) and sample number (N) in the group (Group).\cr
 		#'   \strong{res_diff} is the detailed differential test result, containing:\cr
@@ -90,7 +102,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' }
 		initialize = function(
 			dataset = NULL,
-			method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "ANCOMBC", "ALDEx2_t", "ALDEx2_kw")[1],
+			method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", 
+				"ANCOMBC", "ALDEx2_t", "ALDEx2_kw", "betareg", "lme")[1],
 			group = NULL,
 			taxa_level = "all",
 			filter_thres = 0,
@@ -105,6 +118,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 			group_choose_paired = NULL,
 			metagenomeSeq_count = 1,
 			ALDEx2_sig = c("wi.eBH", "kw.eBH"),
+			by_group = NULL,
+			by_ID = NULL,
 			...
 			){
 			if(is.null(dataset)){
@@ -113,7 +128,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			# in case of dataset changes
 			tmp_dataset <- clone(dataset)
 			sampleinfo <- tmp_dataset$sample_table
-			if(is.null(group) & ! method %in% c("anova", "scheirerRayHare")){
+			if(is.null(group) & ! method %in% c("anova", "scheirerRayHare", "betareg", "lme")){
 				stop("The group parameter need to be provided for differential test among groups!")
 			}else{
 				if(!is.null(group)){
@@ -127,14 +142,14 @@ trans_diff <- R6Class(classname = "trans_diff",
 				}
 			}
 			method <- match.arg(method, c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", 
-				"anova", "scheirerRayHare", "ANCOMBC", "ALDEx2_t", "ALDEx2_kw"))
+				"anova", "scheirerRayHare", "ANCOMBC", "ALDEx2_t", "ALDEx2_kw", "betareg", "lme"))
 			
 			if(!is.null(group)){
 				if(is.factor(sampleinfo[, group])){
 					self$group_order <- levels(sampleinfo[, group])
 					sampleinfo[, group] %<>% as.character
 				}
-			}			
+			}
 			################################
 			# generate abudance table
 			if(is.null(tmp_dataset$taxa_abund)){
@@ -168,25 +183,30 @@ trans_diff <- R6Class(classname = "trans_diff",
 			abund_table %<>% {.[!grepl("__$|uncultured$|Incertae..edis$|_sp$", rownames(.), ignore.case = TRUE), ]}
 			################################
 			
-			if(method %in% c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare")){
+			if(method %in% c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "betareg", "lme")){
 				if(method == "KW_dunn"){
 					# filter taxa with equal abudance across all samples
 					abund_table %<>% .[apply(., 1, function(x){length(unique(x)) != 1}), ]
 				}
+				if(method == "betareg"){
+					abund_table %<>% {. + 0.000001}/1.000002
+				}
 				tem_data <- clone(tmp_dataset)
 				# use test method in trans_alpha
 				tem_data$alpha_diversity <- as.data.frame(t(abund_table))
-				tem_data1 <- suppressMessages(trans_alpha$new(dataset = tem_data, group = group))
-				suppressMessages(tem_data1$cal_diff(method = method, p_adjust_method = p_adjust_method, ...))
+				tem_data1 <- suppressMessages(trans_alpha$new(dataset = tem_data, group = group, by_group = by_group, by_ID = by_ID))
+				tem_data1$cal_diff(method = method, p_adjust_method = p_adjust_method, ...)
 				output <- tem_data1$res_diff
-				if(! method %in% c("anova")){
-					colnames(output)[colnames(output) == "Measure"] <- "Taxa"
-				}else{
-					if(tem_data1$cal_diff_method == "anova"){
-						output <- reshape2::melt(output, id.vars = "Group", variable.name = "Taxa", value.name = "Significance")
+				if(method != "lme"){
+					if(! method %in% "anova"){
+						colnames(output)[colnames(output) == "Measure"] <- "Taxa"
 					}else{
-						# make sure multi-way distinct from one-way
-						method <- tem_data1$cal_diff_method
+						# multi-way anova has formula in the final method; one-way is the original 'anova'
+						if(tem_data1$cal_diff_method == "anova"){
+							output <- reshape2::melt(output, id.vars = "Group", variable.name = "Taxa", value.name = "Significance")
+						}else{
+							method <- tem_data1$cal_diff_method
+						}
 					}
 				}
 			}
@@ -537,8 +557,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 					newdata <- file2meco::meco2phyloseq(newdata)
 					res_raw <- ancombc2(newdata, tax_level = "Species", group = group, global = TRUE, fix_formula = group, ...)
 					res <- res_raw$res_global
-					colnames(res) <- c("W", "P.unadj", "P.adj", "diff_abn")
-					res <- cbind.data.frame(feature = rownames(res), res)
+					colnames(res) <- c("feature", "W", "P.unadj", "P.adj", "diff_abn")
+					rownames(res) <- NULL
 					group_vec <- use_dataset$sample_table[, group] %>% as.character %>% unique
 					comparisions <- paste0(group_vec, collapse = " - ")
 					res <- cbind.data.frame(compare = comparisions, res)
@@ -557,7 +577,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 					newdata <- file2meco::meco2phyloseq(newdata)
 					res_raw <- ancombc2(newdata, tax_level = "Species", group = group, fix_formula = group, ...)
 					res_raw2 <- res_raw$res
-					res <- data.frame(feature = rownames(res_raw2), 
+					res <- data.frame(feature = res_raw2$taxon, 
 						W = res_raw2[, which(grepl("^W_", colnames(res_raw2)) & !grepl("Intercept", colnames(res_raw2)))], 
 						P.unadj = res_raw2[, which(grepl("^p_", colnames(res_raw2)) & !grepl("Intercept", colnames(res_raw2)))], 
 						P.adj = res_raw2[, which(grepl("^q_", colnames(res_raw2)) & !grepl("Intercept", colnames(res_raw2)))], 
@@ -678,8 +698,10 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'   For method = "anova"; the stat position is calculated for each point, i.e. Value = Mean+SD or Mean+SE.
 		#' @param y_increase default 0.05; the increasing y axia space to add label for paired groups; the default 0.05 means 0.05 * y_start * Value; 
 		#' 	  In addition, this parameter is also used to label the letters of anova result with the fixed (1 + y_increase) * y_start * Value.
-		#' @param text_y_size default 10; the size for the y axis text.
+		#' @param text_y_size default 10; the size for the y axis text, i.e. feature text.
 		#' @param coord_flip default TRUE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical, horizontal.
+		#' @param xtext_angle default NULL; number ranging from 0 to 90; used to make x axis text generate angle to reduce text overlap; 
+		#' 	  only useful when coord_flip = FALSE.
 		#' @param ... parameters passed to \code{ggsignif::stat_signif} when add_sig = TRUE.
 		#' @return ggplot.
 		#' @examples
@@ -712,6 +734,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			y_increase = 0.05,
 			text_y_size = 10,
 			coord_flip = TRUE,
+			xtext_angle = 45,
 			...
 			){
 			abund_data <- self$res_abund
@@ -933,9 +956,13 @@ trans_diff <- R6Class(classname = "trans_diff",
 					theme(panel.grid.minor.y = element_blank(), panel.grid.major.y = element_blank()) +
 					theme(axis.title.y = element_blank(), axis.text.y = element_text(size = text_y_size, color = "black"))
 			}else{
-				p <- p + guides(fill = guide_legend(reverse = FALSE, ncol=1), color = "none") +
-					theme(axis.text.x = element_text(angle = 45, colour = "black", vjust = 1, hjust = 1, size = text_y_size)) +
-					theme(axis.title.x = element_blank(), axis.text.x = element_text(size = text_y_size, color = "black")) +
+				p <- p + guides(fill = guide_legend(reverse = FALSE, ncol = 1), color = "none")
+				if(xtext_angle != 0){
+					p <- p + theme(axis.text.x = element_text(angle = xtext_angle, colour = "black", vjust = 1, hjust = 1, size = text_y_size))
+				}else{
+					p <- p + theme(axis.text.x = element_text(angle = xtext_angle, colour = "black", size = text_y_size))
+				}
+				p <- p + theme(axis.title.x = element_blank(), axis.text.x = element_text(size = text_y_size, color = "black")) +
 					theme(plot.margin = unit(c(.1, .1, .1, 1), "cm"))
 			}
 			p

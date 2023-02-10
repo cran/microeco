@@ -6,7 +6,7 @@
 \description{
 This class is a wrapper for the taxonomic abundance transformations and plotting. 
 The transformed data style is the long-format for \code{ggplot2} plotting.
-The plotting methods include bar plot, boxplot, heatmap and pie chart.
+The plotting methods include bar plot, boxplot, heatmap, pie chart and line chart.
 }
 \examples{
 
@@ -150,10 +150,6 @@ Bar plot.
   bar_type = "full",
   others_color = "grey90",
   facet = NULL,
-  facet2 = NULL,
-  facet3 = NULL,
-  facet4 = NULL,
-  order_facet = NULL,
   order_x = NULL,
   x_axis_name = NULL,
   barwidth = NULL,
@@ -180,17 +176,12 @@ Bar plot.
 
 \item{\code{others_color}}{default "grey90"; the color for "others" taxa.}
 
-\item{\code{facet}}{default NULL; if using facet, providing a group column name of sample_table, such as, "Group".}
-
-\item{\code{facet2}}{default NULL; the second facet, used with facet parameter together; facet2 should have a finer scale;
-use this parameter, please first install package \code{ggh4x} using \code{install.packages("ggh4x")}.}
-
-\item{\code{facet3}}{default NULL; the third facet, used with \code{facet} and \code{facet2} parameter together.}
-
-\item{\code{facet4}}{default NULL; the fourth facet, used with facet, facet2 and facet3 parameter together.}
-
-\item{\code{order_facet}}{NULL; vector; used to order the facet, such as, c("Group1", "Group3", "Group2"); 
-If multiple facets are used, please manually assign factors in sample_table of microtable object.}
+\item{\code{facet}}{default NULL; a character vector for the facet; a group column name of \code{sample_table}, such as, \code{"Group"};
+If multiple facets are needed, please provide ordered names, such as \code{c("Group", "Type")}.
+The latter should have a finer scale than the former one;
+Please adjust the facet orders in the plot by assigning factors in \code{sample_table} before creating \code{trans_abund} object or 
+assigning factors in the \code{data_abund} table of \code{trans_abund} object.
+When multiple facets are used, please first install package \code{ggh4x} using the command \code{install.packages("ggh4x")}.}
 
 \item{\code{order_x}}{default NULL; vector; used to order the sample names in x axis; must be the samples vector, such as, c("S1", "S3", "S2").}
 
@@ -245,10 +236,6 @@ Plot the heatmap.
 \if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_heatmap(
   color_values = rev(RColorBrewer::brewer.pal(n = 11, name = "RdYlBu")),
   facet = NULL,
-  facet2 = NULL,
-  facet3 = NULL,
-  facet4 = NULL,
-  order_facet = NULL,
   x_axis_name = NULL,
   order_x = NULL,
   withmargin = TRUE,
@@ -278,16 +265,12 @@ Plot the heatmap.
 \item{\code{color_values}}{default rev(RColorBrewer::brewer.pal(n = 11, name = "RdYlBu")); 
 colors palette for the plotting.}
 
-\item{\code{facet}}{default NULL; a character string; if using facet, provide a column name in sample_table, such as "Group".}
-
-\item{\code{facet2}}{default NULL; the second facet, used with facet parameter together; \code{facet2} should have a finer scale;
-use this parameter, please first install package \code{ggh4x}.}
-
-\item{\code{facet3}}{default NULL; the third facet, used with \code{facet} and \code{facet2} parameter together.}
-
-\item{\code{facet4}}{default NULL; the fourth facet, used with facet, facet2 and facet3 parameter together.}
-
-\item{\code{order_facet}}{NULL; vector; used to order the facet, such as, c("Group1", "Group3", "Group2").}
+\item{\code{facet}}{default NULL; a character vector for the facet; a group column name of \code{sample_table}, such as, \code{"Group"};
+If multiple facets are needed, please provide ordered names, such as \code{c("Group", "Type")}.
+The latter should have a finer scale than the former one;
+Please adjust the facet orders in the plot by assigning factors in \code{sample_table} before creating \code{trans_abund} object or 
+assigning factors in the \code{data_abund} table of \code{trans_abund} object.
+When multiple facets are used, please first install package \code{ggh4x} using the command \code{install.packages("ggh4x")}.}
 
 \item{\code{x_axis_name}}{NULL; a character string; a column name of sample_table used to show the sample names in x axis.}
 
@@ -365,8 +348,6 @@ Box plot.
   middlesize = 1,
   xtext_type_hor = FALSE,
   xtext_size = 10,
-  xtext_keep = TRUE,
-  xtitle_keep = TRUE,
   ytitle_size = 17,
   ...
 )}\if{html}{\out{</div>}}
@@ -398,10 +379,6 @@ Box plot.
 \item{\code{xtext_type_hor}}{default TRUE; x axis text horizontal, if FALSE; text slant.}
 
 \item{\code{xtext_size}}{default 10; x axis text size.}
-
-\item{\code{xtext_keep}}{default TRUE; whether retain x text.}
-
-\item{\code{xtitle_keep}}{default TRUE; whether retain x title.}
 
 \item{\code{ytitle_size}}{default 17; y axis title size.}
 

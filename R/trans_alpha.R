@@ -8,8 +8,12 @@
 trans_alpha <- R6Class(classname = "trans_alpha",
 	public = list(
 		#' @param dataset the object of \code{\link{microtable}} Class.
-		#' @param group default NULL; the sample column used for the statistics; If provided, can return \code{data_stat}.
-		#' @param by_group default NULL; perform the differential test among groups (\code{group} parameter) within each group (\code{by_group} parameter).
+		#' @param group default NULL; a column of sample_table used for the statistics; If provided, can return \code{data_stat}.
+		#' @param by_group default NULL; a column of sample_table used to perform the differential test 
+		#'   among groups (\code{group} parameter) for each group (\code{by_group} parameter). So \code{by_group} has a larger scale than \code{group} parameter.
+		#' @param by_ID default NULL; a column of sample_table used to perform paired t test or paired wilcox test for the paired data,
+		#'   such as the data of plant compartments for different plant species (ID). 
+		#'   So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.
 		#' @param order_x default NULL; a \code{sample_table} column name or a vector containg sample names; if provided, order samples by using \code{factor}.
 		#' @return \code{data_alpha} and \code{data_stat} stored in the object.
 		#' @examples
@@ -17,7 +21,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' data(dataset)
 		#' t1 <- trans_alpha$new(dataset = dataset, group = "Group")
 		#' }
-		initialize = function(dataset = NULL, group = NULL, by_group = NULL, order_x = NULL) {
+		initialize = function(dataset = NULL, group = NULL, by_group = NULL, by_ID = NULL, order_x = NULL) {
 			if(is.null(dataset)){
 				message("Parameter dataset not provided. Please run the functions with your other customized data!")
 				self$data_alpha <- NULL
@@ -48,6 +52,11 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					stop("Provided by_group: ", by_group, " is not found in dataset$sample_table!")
 				}
 			}
+			if(! is.null(by_ID)){
+				if(! by_ID %in% colnames(data_alpha)){
+					stop("Provided by_ID: ", by_ID, " is not found in dataset$sample_table!")
+				}
+			}
 			if(! is.null(group)){
 				if(is.null(dataset)){
 					stop("Parameter dataset not provided, but group is provided!")
@@ -62,6 +71,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			}
 			self$group <- group
 			self$by_group <- by_group
+			self$by_ID <- by_ID
 		},
 		#' @description
 		#' Test the difference of alpha diversity.
@@ -76,16 +86,21 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#'     	  For multi-factor anova, see \code{\link{aov}}}
 		#'     \item{\strong{'scheirerRayHare'}}{Scheirer Ray Hare test for nonparametric test used for a two-way factorial experiment; 
 		#'     	  see \code{scheirerRayHare} function of \code{rcompanion} package}
+		#'     \item{\strong{'lme'}}{lme: Linear Mixed Effect Model based on the \code{lmerTest} package}
+		#'     \item{\strong{'betareg'}}{Beta Regression for Rates and Proportions based on the \code{betareg} package}
 		#'   }
 		#' @param measure default NULL; a vector; if null, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
 		#' 	 e.g. Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage, PD.
 		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options; 
 		#'    NULL can disuse the p value adjustment.
-		#' @param formula default NULL; applied to two-way or multi-factor anova analysis when method = \code{"anova"} or \code{"scheirerRayHare"}; 
+		#' @param formula default NULL; applied to two-way or multi-factor anova analysis when 
+		#'   method = \code{"anova"} or \code{"scheirerRayHare"} or \code{"lme"} or \code{"betareg"}; 
 		#'   specified set for independent variables, i.e. the latter part of the formula in \code{\link{aov}}, 
 		#'   such as \code{'block + N*P*K'}.
 		#' @param ... parameters passed to \code{kruskal.test} or \code{wilcox.test} function (\code{method = "KW"}) or \code{dunnTest} function of \code{FSA} package 
-		#'   (\code{method = "KW_dunn"}) or \code{agricolae::duncan.test} (\code{method = "anova"}).
+		#'   (\code{method = "KW_dunn"}) or \code{agricolae::duncan.test} (\code{method = "anova"}, one-way) or \code{lmerTest::lmer} (\code{method = "lme"}) or 
+		#'   \code{rcompanion::scheirerRayHare} (\code{method = "scheirerRayHare"}) or
+		#'   \code{betareg::betareg} (\code{method = "betareg"}).
 		#' @return \code{res_diff} in object with the format \code{data.frame}.
 		#'   In the data frame, 'Group' column means that the group has the maximum median or mean value across the test groups;
 		#'   For non-parametric methods, maximum median value; For t.test, maximum mean value.
@@ -97,20 +112,21 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' t1$cal_diff(method = "anova")
 		#' }
 		cal_diff = function(
-			method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare")[1], 
+			method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lme", "betareg")[1], 
 			measure = NULL, 
 			p_adjust_method = "fdr", 
 			formula = NULL,
 			...
 			){
-			method <- match.arg(method, c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare"))
+			method <- match.arg(method, c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lme", "betareg"))
 			group <- self$group
-			if(method == "scheirerRayHare" & is.null(formula)){
+			
+			if(method %in% c("scheirerRayHare", "lme", "betareg") & is.null(formula)){
 				if(is.null(formula)){
 					stop("formula is necessary! Please provide formula parameter!")
 				}
 			}
-			if(!method %in% c("anova", "scheirerRayHare")){
+			if(!method %in% c("anova", "scheirerRayHare", "lme", "betareg")){
 				if(is.null(group)){
 					stop("For the method: ", method, " , group is necessary! Please recreate the object!")
 				}
@@ -123,6 +139,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			# 'by_group' for test inside each by_group instead of all groups in 'group'
 			by_group <- self$by_group
 			data_alpha <- self$data_alpha
+			by_ID <- self$by_ID
+
 			if(is.null(measure)){
 				measure <- unique(as.character(data_alpha$Measure))
 			}else{
@@ -149,16 +167,24 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				res_list$group_by <- c()
 				for(k in measure){
 					if(is.null(by_group)){
-						div_table <- data_alpha[data_alpha$Measure == k, c(group, "Value")]
-						res_list <- private$kwwitt_test(method = method, input_table = div_table, group = group, res_list = res_list, measure = k, ...)
+						if(is.null(by_ID)){
+							div_table <- data_alpha[data_alpha$Measure == k, c(group, "Value")]
+						}else{
+							div_table <- data_alpha[data_alpha$Measure == k, c(group, by_ID, "Value")]
+						}
+						res_list <- private$kwwitt_test(method = method, input_table = div_table, group = group, res_list = res_list, measure = k, by_ID = by_ID, ...)
 					}else{
 						for(each_group in unique_bygroups){
-							div_table <- data_alpha[data_alpha$Measure == k & all_bygroups == each_group, c(by_group, group, "Value")]
+							if(is.null(by_ID)){
+								div_table <- data_alpha[data_alpha$Measure == k & all_bygroups == each_group, c(by_group, group, "Value")]
+							}else{
+								div_table <- data_alpha[data_alpha$Measure == k & all_bygroups == each_group, c(by_group, group, by_ID, "Value")]
+							}
 							if(length(unique(as.character(div_table[, group]))) < 2){
 								next
 							}
 							res_list <- private$kwwitt_test(method = method, input_table = div_table, group = group, res_list = res_list, 
-								group_by = each_group, measure = k, ...)
+								group_by = each_group, measure = k, by_ID = by_ID, ...)
 						}
 					}
 				}
@@ -229,27 +255,59 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					colnames(compare_result)[2] <- "Group"
 				}
 			}
-			if(method %in% c("anova", "scheirerRayHare") & !is.null(formula)){
+			if(method %in% c("anova", "scheirerRayHare", "betareg") & !is.null(formula)){
 				# to make multi-factor distinct from one-way anova
 				compare_result <- data.frame()
 				for(k in measure){
 					div_table <- data_alpha[data_alpha$Measure == k, ]
 					if(method == "anova"){
-						model <- aov(reformulate(formula, "Value"), div_table)
+						model <- aov(reformulate(formula, "Value"), div_table, ...)
 						tmp <- summary(model)[[1]]
 						tmp1 <- data.frame(method = paste0(method, " formula for ", formula), Measure = k, Factors = rownames(tmp), 
 							Df = tmp$Df, Fvalue = tmp$`F value`, P.unadj = tmp$`Pr(>F)`)
-					}else{
-						invisible(capture.output(tmp <- rcompanion::scheirerRayHare(reformulate(formula, "Value"), div_table)))
+					}
+					if(method == "scheirerRayHare"){
+						invisible(capture.output(tmp <- rcompanion::scheirerRayHare(reformulate(formula, "Value"), div_table, ...)))
 						tmp1 <- data.frame(method = paste0(method, " formula for ", formula), Measure = k, Factors = rownames(tmp), 
 							Df = tmp$Df, Fvalue = tmp$H, P.unadj = tmp$p.value)
+					}
+					if(method == "betareg"){
+						check_res <- tryCatch(tmp <- betareg::betareg(reformulate(formula, "Value"), data = div_table, ...), error = function(e) { skip_to_next <- TRUE})
+						if(rlang::is_true(check_res)) {
+							message("Model fitting failed for ", k, " ! Skip ...")
+							next
+						}else{
+							tmp <- betareg::betareg(reformulate(formula, "Value"), data = div_table, ...)
+							# extract the first element: coefficients
+							tmp_coefficients <- summary(tmp)[[1]]
+							tmp_mean <- tmp_coefficients$mean %>% as.data.frame
+							tmp_precision <- tmp_coefficients$precision %>% as.data.frame
+							tmp1 <- data.frame(method = paste0(method, " formula for ", formula), Measure = k, 
+								Factors = c(rownames(tmp_mean), rownames(tmp_precision)), 
+								Estimate = c(tmp_mean$Estimate, tmp_precision$Estimate), 
+								Zvalue = c(tmp_mean$`z value`, tmp_precision$`z value`), 
+								P.unadj = c(tmp_mean$`Pr(>|z|)`, tmp_precision$`Pr(>|z|)`))
+						}
 					}
 					compare_result %<>% rbind(., tmp1)
 				}
 				compare_result$Significance <- cut(compare_result$P.unadj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label = c("***", "**", "*", "ns"))
 				method <- paste0(method, "-formula")
 			}
-			if(! method %in% c("anova", paste0(c("anova", "scheirerRayHare"), "-formula"))){
+			if(method %in% "lme"){
+				if(length(measure) > 1){
+					stop("More than 1 measures are found! Please select a measure with measure parameter!")
+				}
+				compare_result <- list()
+				div_table <- data_alpha[data_alpha$Measure == measure, ]
+				compare_result$model <- lmerTest::lmer(reformulate(formula, "Value"), data = div_table, ...)
+				compare_result$summary <- summary(compare_result$model)
+				compare_result$anova <- anova(compare_result$model)
+				compare_result$ranova <- lmerTest::ranova(compare_result$model)
+				compare_result$r2 <- performance::r2(compare_result$model)
+				compare_result$p_value <- parameters::p_value(compare_result$model)
+			}
+			if(! method %in% c("anova", paste0(c("anova", "scheirerRayHare", "betareg"), "-formula"), "lme")){
 				compare_result$Significance <- cut(compare_result$P.adj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label = c("***", "**", "*", "ns"))
 				compare_result$Significance %<>% as.character
 			}
@@ -367,10 +425,10 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 						)
 				}
 			}else{
-				p <- ggplot(use_data, aes_string(x = group, y = "Value")) + 
+				p <- ggplot(use_data, aes_meco(x = group, y = "Value")) + 
 					theme_minimal() +
-					stat_summary(fun.data=mean_se, fun.args = list(mult=1), geom="errorbar", width=0.2) +
-					stat_summary(fun.y=mean, geom="point", size = rel(3)) + 
+					stat_summary(fun.data = mean_se, fun.args = list(mult = 1), geom = "errorbar", width = 0.2) +
+					stat_summary(fun = mean, geom = "point", size = rel(3)) + 
 					theme(
 						axis.title = element_text(face = "bold",size = rel(1.8)),
 						axis.line.x = element_line(colour="black"),
@@ -556,9 +614,14 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			if(!is.null(self$data_stat)) cat(paste("data_stat have", ncol(self$data_stat), "columns: ", paste0(colnames(self$data_stat), collapse = ", "), "\n"))
 			invisible(self)
 		}
-		),
+	),
 	private = list(
-		kwwitt_test = function(method = NULL, input_table = NULL, group = NULL, res_list = NULL, group_by = NULL, measure = NULL, ...){
+		kwwitt_test = function(method = NULL, input_table = NULL, group = NULL, res_list = NULL, group_by = NULL, measure = NULL, by_ID = NULL, ...){
+			if(!is.null(by_ID)){
+				if(method == "KW"){
+					stop("Please use wilcox instead of KW when by_ID is provided!")
+				}
+			}
 			groupvec <- as.character(input_table[, group])
 			use_comp_group_num <- unique(c(2, length(unique(groupvec))))
 			for(i in use_comp_group_num){
@@ -566,15 +629,40 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				use_method <- switch(method, KW = "Kruskal-Wallis Rank Sum Test", wilcox = "Wilcoxon Rank Sum Test", t.test = "t.test")
 				for(j in 1:ncol(all_name)){
 					table_compare <- input_table[groupvec %in% as.character(all_name[, j]), ]
-					table_compare[, group] %<>% factor(., levels = unique(as.character(.)))
-					formu <- reformulate(group, "Value")
+					if(is.null(by_ID)){
+						table_compare[, group] %<>% factor(., levels = unique(as.character(.)))
+						formu <- reformulate(group, "Value")
+					}else{
+						table_compare %<>% dropallfactors
+						tmp <- table(table_compare[, by_ID])
+						# check the missing item for paired comparison
+						if(length(unique(tmp)) > 1){
+							# delete the missing item
+							tmp %<>% .[. != min(.)]
+							table_compare %<>% .[.[, by_ID] %in% names(tmp), ]
+						}
+						order_ID <- unique(table_compare[, by_ID])
+						order_group <- unique(table_compare[, group])
+						x_value_table <- table_compare[table_compare[, group] == order_group[1], ]
+						y_value_table <- table_compare[table_compare[, group] == order_group[2], ]
+						x_value <- x_value_table[match(x_value_table[, by_ID], order_ID), "Value"]
+						y_value <- y_value_table[match(y_value_table[, by_ID], order_ID), "Value"]
+					}
 					if(i == 2){
 						if(method == "t.test"){
-							res1 <- t.test(formu, data = table_compare, ...)
+							if(is.null(by_ID)){
+								res1 <- t.test(formu, data = table_compare, ...)
+							}else{
+								res1 <- t.test(x = x_value, y = y_value, paired = TRUE, ...)
+							}
 							max_group_select <- tapply(table_compare$Value, table_compare[, group], mean) %>% {.[which.max(.)]} %>% names
 						}else{
 							if(method == "wilcox"){
-								res1 <- suppressWarnings(wilcox.test(formu, data = table_compare, ...))
+								if(is.null(by_ID)){
+									res1 <- suppressWarnings(wilcox.test(formu, data = table_compare, ...))
+								}else{
+									res1 <- suppressWarnings(wilcox.test(x = x_value, y = y_value, paired = TRUE, ...))
+								}
 								max_group_select <- tapply(table_compare$Value, table_compare[, group], median) %>% {.[which.max(.)]} %>% names
 							}else{
 								if(method == "KW" & length(use_comp_group_num) == 1){

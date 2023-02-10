@@ -11,7 +11,8 @@ This class is a wrapper for a series of differential abundance test and indicato
  Dunn's Kruskal-Wallis Multiple Comparisons based on the \code{FSA} package, Wilcoxon Rank Sum and Signed Rank Tests, t-test, anova, 
  Scheirer Ray Hare test, 
  R package \code{metagenomeSeq} Paulson et al. (2013) <doi:10.1038/nmeth.2658>, 
- R package \code{ANCOMBC} <doi:10.1038/s41467-020-17041-7> and R package \code{ALDEx2} <doi:10.1371/journal.pone.0067019; 10.1186/2049-2618-2-15>.
+ R package \code{ANCOMBC} <doi:10.1038/s41467-020-17041-7>, R package \code{ALDEx2} <doi:10.1371/journal.pone.0067019; 10.1186/2049-2618-2-15> and
+ beta regression <doi:10.18637/jss.v034.i02>.
 }
 \examples{
 
@@ -78,7 +79,8 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
 \if{html}{\out{<div class="r">}}\preformatted{trans_diff$new(
   dataset = NULL,
   method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox",
-    "t.test", "anova", "scheirerRayHare", "ANCOMBC", "ALDEx2_t", "ALDEx2_kw")[1],
+    "t.test", "anova", "scheirerRayHare", "ANCOMBC", "ALDEx2_t", "ALDEx2_kw", "betareg",
+    "lme")[1],
   group = NULL,
   taxa_level = "all",
   filter_thres = 0,
@@ -93,6 +95,8 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
   group_choose_paired = NULL,
   metagenomeSeq_count = 1,
   ALDEx2_sig = c("wi.eBH", "kw.eBH"),
+  by_group = NULL,
+  by_ID = NULL,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -128,6 +132,8 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
         (\href{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html}{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html})}
   \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallace and generalized linear model (glm) test with \code{ALDEx2} package; 
         see also the test parameter in \code{ALDEx2::aldex} function.}
+  \item{\strong{'betareg'}}{Beta Regression based on the \code{betareg} package}
+  \item{\strong{'lme'}}{lme: Linear Mixed Effect Model based on the \code{lmerTest} package}
 }}
 
 \item{\code{group}}{default NULL; sample group used for the comparision; a colname of input \code{microtable$sample_table};
@@ -168,7 +174,18 @@ for "ALDEx2_t", the available choice is "wi.eBH" (Expected Benjamini-Hochberg co
 and "we.eBH" (Expected BH corrected P value of Welch’s t test); for "ALDEx2_kw"; for "ALDEx2_t",
 the available choice is "kw.eBH" (Expected BH corrected P value of Kruskal-Wallace test) and "glm.eBH" (Expected BH corrected P value of glm test).}
 
-\item{\code{...}}{parameters passed to \code{cal_diff} function of \code{trans_alpha} class when method is one of "KW", "KW_dunn", "wilcox", "t.test" and "anova";
+\item{\code{by_group}}{default NULL; a column of sample_table used to perform the differential test 
+among groups (\code{group} parameter) for each group (\code{by_group} parameter). So \code{by_group} has a larger scale than \code{group} parameter.
+Same with the \code{by_group} parameter in trans_alpha class. 
+Only useful when method is one of \code{c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare")}.}
+
+\item{\code{by_ID}}{default NULL; a column of sample_table used to perform paired t test or paired wilcox test for the paired data,
+such as the data of plant compartments for different plant species (ID). 
+So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.
+Same with the \code{by_ID} parameter in trans_alpha class.}
+
+\item{\code{...}}{parameters passed to \code{cal_diff} function of \code{trans_alpha} class when method is one of 
+"KW", "KW_dunn", "wilcox", "t.test", "anova", "betareg" and "lme";
 passed to \code{ANCOMBC::ancombc} function when method is "ANCOMBC" (except tax_level, global and fix_formula parameters);
 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw".}
 }
@@ -226,6 +243,7 @@ Plot the abundance of differential taxa
   y_increase = 0.05,
   text_y_size = 10,
   coord_flip = TRUE,
+  xtext_angle = 45,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -272,9 +290,12 @@ For method = "anova"; the stat position is calculated for each point, i.e. Value
 \item{\code{y_increase}}{default 0.05; the increasing y axia space to add label for paired groups; the default 0.05 means 0.05 * y_start * Value; 
 In addition, this parameter is also used to label the letters of anova result with the fixed (1 + y_increase) * y_start * Value.}
 
-\item{\code{text_y_size}}{default 10; the size for the y axis text.}
+\item{\code{text_y_size}}{default 10; the size for the y axis text, i.e. feature text.}
 
 \item{\code{coord_flip}}{default TRUE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical, horizontal.}
+
+\item{\code{xtext_angle}}{default NULL; number ranging from 0 to 90; used to make x axis text generate angle to reduce text overlap; 
+only useful when coord_flip = FALSE.}
 
 \item{\code{...}}{parameters passed to \code{ggsignif::stat_signif} when add_sig = TRUE.}
 }

@@ -106,11 +106,11 @@ tidy_taxonomy_column <- function(taxonomy_table, i, pattern, replacement, ignore
 }
 
 # inner function
-summarySE_inter = function(usedata = NULL, measurevar, groupvars = NULL, na.rm = TRUE) {
-	length2 <- function(x, na.rm=TRUE) ifelse(na.rm, sum(!is.na(x)), length(x))
+summarySE_inter <- function(usedata = NULL, measurevar, groupvars = NULL, na.rm = TRUE) {
+	length2 <- function(x, na.rm = TRUE) ifelse(na.rm, sum(!is.na(x)), length(x))
 	datac <- usedata %>% 
 			dplyr::grouped_df(groupvars) %>% 
-			dplyr::summarise(N = length2(!!sym(measurevar), na.rm=na.rm), Mean = mean(!!sym(measurevar), na.rm=na.rm), SD = stats::sd(!!sym(measurevar), na.rm=na.rm)) %>%
+			dplyr::summarise(N = length2(!!sym(measurevar), na.rm = na.rm), Mean = mean(!!sym(measurevar), na.rm = na.rm), SD = stats::sd(!!sym(measurevar), na.rm = na.rm)) %>%
 			as.data.frame
 	datac$SE <- datac$SD / sqrt(datac$N)
 	datac
@@ -211,5 +211,33 @@ StatCorLm <- ggproto("StatCorLm", Stat,
 	data.frame(label = as.character(as.expression(res)))
 }
 
+aes_meco <- function (x, y, ...){
+    mapping <- list(...)
+    if (!missing(x)) 
+        mapping["x"] <- list(x)
+    if (!missing(y)) 
+        mapping["y"] <- list(y)
+    caller_env <- parent.frame()
+    mapping <- lapply(mapping, function(x) {
+        if (is.character(x)) {
+            x <- rlang::parse_expr(x)
+        }
+        new_aesthetic(x, env = caller_env)
+    })
+    structure(mapping, class = "uneval")
+}
 
+new_aesthetic <- function (x, env = globalenv()){
+    if (rlang::is_quosure(x)) {
+        if (!rlang::quo_is_symbolic(x)) {
+            x <- rlang::quo_get_expr(x)
+        }
+        return(x)
+    }
+    if (rlang::is_symbolic(x)) {
+        x <- rlang::new_quosure(x, env = env)
+        return(x)
+    }
+    x
+}
 

@@ -96,6 +96,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#'     	  For multi-factor anova, see \code{aov}}
 		#'     \item{\strong{'scheirerRayHare'}}{Scheirer Ray Hare test for nonparametric test used for a two-way factorial experiment; 
 		#'     	  see \code{scheirerRayHare} function of \code{rcompanion} package}
+		#'     \item{\strong{'lme'}}{lme: Linear Mixed Effect Model based on the \code{lmerTest} package}
 		#'   }
 		#' @param ... parameters passed to \code{cal_diff} function of \code{\link{trans_alpha}} class.
 		#' @return \code{res_diff} in object.
@@ -107,7 +108,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' t1$cal_diff(group = "Group", method = "KW_dunn")
 		#' t1$cal_diff(group = "Group", method = "anova")
 		#' }
-		cal_diff = function(group = NULL, by_group = NULL, method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare")[1], ...){
+		cal_diff = function(group = NULL, by_group = NULL, method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lme")[1], ...){
 			if(is.null(group) & ! method %in% c("anova", "scheirerRayHare")){
 				stop("The group parameter is necessary for the method: ", method, "!")
 			}
@@ -172,7 +173,7 @@ trans_env <- R6Class(classname = "trans_env",
 					stop("Please provide a correct group name!")
 				}
 				merge_data <- cbind.data.frame(sample_table[, group, drop = FALSE], env_data[rownames(sample_table), ])
-				g <- GGally::ggpairs(merge_data, aes_string(color = group, alpha = alpha),  ...)
+				g <- GGally::ggpairs(merge_data, aes_meco(colour = group, alpha = alpha),  ...)
 				# Loop through each plot changing relevant scales 
 				for(i in 1:g$nrow){
 					for(j in 1:g$ncol){
@@ -320,27 +321,42 @@ trans_env <- R6Class(classname = "trans_env",
 			message('The original ordination result is stored in object$res_ordination ...')
 			self$res_ordination_R2 <- unlist(RsquareAdj(res_ordination))
 			message('The R2 is stored in object$res_ordination_R2 ...')
-			# test for sig.environ.variables
-			self$res_ordination_terms <- anova(res_ordination, by = "terms", permu = 1000)
-			message('The terms anova result is stored in object$res_ordination_terms ...')
-			self$res_ordination_axis <- anova(res_ordination, by = "axis", perm.max = 1000)
-			message('The axis anova result is stored in object$res_ordination_axis ...')
+		},
+		#' @description
+		#' Use anova to test the significance of the terms and axis in ordination.
+		#'
+		#' @param ... the parameters passing to \code{anova} function.
+		#' @return \code{res_ordination_terms and res_ordination_axis} in object.
+		#' @examples
+		#' \donttest{
+		#' t1$cal_ordination_anova()
+		#' }
+		cal_ordination_anova = function(...){
+			if(is.null(self$res_ordination)){
+				stop("Please first run cal_ordination function to obtain the ordination result!")
+			}else{
+				# test for sig.environ.variables
+				self$res_ordination_terms <- anova(self$res_ordination, by = "terms", permu = 1000, ...)
+				message('The terms anova result is stored in object$res_ordination_terms ...')
+				self$res_ordination_axis <- anova(self$res_ordination, by = "axis", perm.max = 1000, ...)
+				message('The axis anova result is stored in object$res_ordination_axis ...')
+			}
 		},
 		#' @description
 		#' Fits each environmental vector onto the ordination to obtain the contribution of each variable.
 		#'
 		#' @param ... the parameters passing to \code{vegan::envfit} function.
-		#' @return \code{res_ordination_envsquare} in object.
+		#' @return \code{res_ordination_envfit} in object.
 		#' @examples
 		#' \donttest{
-		#' t1$cal_ordination_envsquare()
+		#' t1$cal_ordination_envfit()
 		#' }
-		cal_ordination_envsquare = function(...){
+		cal_ordination_envfit = function(...){
 			if(is.null(self$res_ordination)){
 				stop("Please first run cal_ordination function to obtain the ordination result!")
 			}else{
-				self$res_ordination_envsquare <- vegan::envfit(self$res_ordination, self$data_env, ...)
-				message('Result is stored in object$res_ordination_envsquare ...')
+				self$res_ordination_envfit <- vegan::envfit(self$res_ordination, self$data_env, ...)
+				message('Result is stored in object$res_ordination_envfit ...')
 			}
 		},
 		#' @description
@@ -529,7 +545,7 @@ trans_env <- R6Class(classname = "trans_env",
 			if("point" %in% plot_type){
 				p <- p + geom_point(
 					data = df_sites, 
-					aes_string("x", "y", colour = plot_color, shape = plot_shape), 
+					aes_meco("x", "y", colour = plot_color, shape = plot_shape), 
 					size = point_size,
 					alpha = point_alpha,
 					...
@@ -585,7 +601,7 @@ trans_env <- R6Class(classname = "trans_env",
 				combined_centroid_xy <- merge(df_sites, centroid_xy, by.x = plot_color, by.y = "group")
 				p <- p + geom_segment(
 					data = combined_centroid_xy, 
-					aes_string(x = "x", xend = "cx", y = "y", yend = "cy", color = plot_color),
+					aes_meco(x = "x", xend = "cx", y = "y", yend = "cy", colour = plot_color),
 					alpha = centroid_segment_alpha, 
 					size = centroid_segment_size, 
 					linetype = centroid_segment_linetype
@@ -598,7 +614,7 @@ trans_env <- R6Class(classname = "trans_env",
 					ellipse_chull_fill_color <- NULL
 					ellipse_chull_alpha <- 0
 				}
-				mapping <- aes_string(x = "x", y = "y", group = plot_color, color = plot_color, fill = ellipse_chull_fill_color)
+				mapping <- aes_meco(x = "x", y = "y", group = plot_color, colour = plot_color, fill = ellipse_chull_fill_color)
 				if("ellipse" %in% plot_type){
 					p <- p + ggplot2::stat_ellipse(
 						mapping = mapping, 
@@ -645,7 +661,7 @@ trans_env <- R6Class(classname = "trans_env",
 				if(is.null(taxa_nudge_x) & is.null(taxa_nudge_y)){
 					p <- p + ggrepel::geom_text_repel(
 						data = df_arrows_spe1, 
-						aes_string("x", "y", label = self$taxa_level), 
+						aes_meco("x", "y", label = self$taxa_level), 
 						size = taxa_text_size, 
 						color = taxa_text_color, 
 						segment.alpha = .01, 
@@ -673,7 +689,7 @@ trans_env <- R6Class(classname = "trans_env",
 						}
 					}
 					for(j in seq_len(nrow(df_arrows_spe1))){
-						p <- p + ggrepel::geom_text_repel(data = df_arrows_spe1[j, ], aes_string("x", "y", label = self$taxa_level), size = taxa_text_size, 
+						p <- p + ggrepel::geom_text_repel(data = df_arrows_spe1[j, ], aes_meco("x", "y", label = self$taxa_level), size = taxa_text_size, 
 							color = taxa_text_color, segment.alpha = .01, parse = TRUE, nudge_x = taxa_nudge_x[j], nudge_y = taxa_nudge_y[j])
 					}
 				}
@@ -681,7 +697,7 @@ trans_env <- R6Class(classname = "trans_env",
 			if(!is.null(add_sample_label)){
 				p <- p + ggrepel::geom_text_repel(
 					data = df_sites,
-					mapping = aes_string(x = "x", y = "y", label = add_sample_label)
+					mapping = aes_meco(x = "x", y = "y", label = add_sample_label)
 					)
 			}
 			p
@@ -832,6 +848,9 @@ trans_env <- R6Class(classname = "trans_env",
 					}
 				}
 				abund_table %<>% .[!grepl("__$", rownames(.)), ]
+				if(nrow(abund_table) == 0){
+					stop("No available feature! Please check the input data!")
+				}
 				if(use_data %in% names(self$dataset$taxa_abund) & !is.null(use_taxa_num)){
 					if(nrow(abund_table) > use_taxa_num){
 						abund_table %<>% .[1:use_taxa_num, ] 
@@ -850,7 +869,7 @@ trans_env <- R6Class(classname = "trans_env",
 				abund_table <- abund_table[sel_sample_names, ]
 			}
 			env_data %<>% .[rownames(.) %in% rownames(abund_table), , drop = FALSE]
-			abund_table <- abund_table[rownames(env_data), ]
+			abund_table <- abund_table[rownames(env_data), , drop = FALSE]
 			if(is.null(by_group)){
 				groups <- rep("All", nrow(env_data))
 			}else{
@@ -1284,9 +1303,9 @@ trans_env <- R6Class(classname = "trans_env",
 				plot_shape <- NULL
 			}
 			if(is.null(group)){
-				p <- ggplot(use_data, aes_string(x = "x", y = "y"))
+				p <- ggplot(use_data, aes_meco(x = "x", y = "y"))
 			}else{
-				p <- ggplot(use_data, aes_string(x = "x", y = "y", color = "Group", shape = plot_shape))
+				p <- ggplot(use_data, aes_meco(x = "x", y = "y", colour = "Group", shape = plot_shape))
 			}
 			p <- p + geom_point(size = point_size, alpha = point_alpha)
 			if(is.null(group)){

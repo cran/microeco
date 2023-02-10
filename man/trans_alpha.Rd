@@ -57,7 +57,13 @@ t1$plot_alpha(measure = "Shannon", add_sig = TRUE)
 \if{latex}{\out{\hypertarget{method-trans_alpha-new}{}}}
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_alpha$new(dataset = NULL, group = NULL, by_group = NULL, order_x = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_alpha$new(
+  dataset = NULL,
+  group = NULL,
+  by_group = NULL,
+  by_ID = NULL,
+  order_x = NULL
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -65,9 +71,14 @@ t1$plot_alpha(measure = "Shannon", add_sig = TRUE)
 \describe{
 \item{\code{dataset}}{the object of \code{\link{microtable}} Class.}
 
-\item{\code{group}}{default NULL; the sample column used for the statistics; If provided, can return \code{data_stat}.}
+\item{\code{group}}{default NULL; a column of sample_table used for the statistics; If provided, can return \code{data_stat}.}
 
-\item{\code{by_group}}{default NULL; perform the differential test among groups (\code{group} parameter) within each group (\code{by_group} parameter).}
+\item{\code{by_group}}{default NULL; a column of sample_table used to perform the differential test 
+among groups (\code{group} parameter) for each group (\code{by_group} parameter). So \code{by_group} has a larger scale than \code{group} parameter.}
+
+\item{\code{by_ID}}{default NULL; a column of sample_table used to perform paired t test or paired wilcox test for the paired data,
+such as the data of plant compartments for different plant species (ID). 
+So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.}
 
 \item{\code{order_x}}{default NULL; a \code{sample_table} column name or a vector containg sample names; if provided, order samples by using \code{factor}.}
 }
@@ -95,7 +106,8 @@ t1 <- trans_alpha$new(dataset = dataset, group = "Group")
 Test the difference of alpha diversity.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_alpha$cal_diff(
-  method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare")[1],
+  method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lme",
+    "betareg")[1],
   measure = NULL,
   p_adjust_method = "fdr",
   formula = NULL,
@@ -116,6 +128,8 @@ Test the difference of alpha diversity.
         For multi-factor anova, see \code{\link{aov}}}
   \item{\strong{'scheirerRayHare'}}{Scheirer Ray Hare test for nonparametric test used for a two-way factorial experiment; 
         see \code{scheirerRayHare} function of \code{rcompanion} package}
+  \item{\strong{'lme'}}{lme: Linear Mixed Effect Model based on the \code{lmerTest} package}
+  \item{\strong{'betareg'}}{Beta Regression for Rates and Proportions based on the \code{betareg} package}
 }}
 
 \item{\code{measure}}{default NULL; a vector; if null, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
@@ -124,12 +138,15 @@ e.g. Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage, PD.}
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options; 
 NULL can disuse the p value adjustment.}
 
-\item{\code{formula}}{default NULL; applied to two-way or multi-factor anova analysis when method = \code{"anova"} or \code{"scheirerRayHare"}; 
+\item{\code{formula}}{default NULL; applied to two-way or multi-factor anova analysis when 
+method = \code{"anova"} or \code{"scheirerRayHare"} or \code{"lme"} or \code{"betareg"}; 
 specified set for independent variables, i.e. the latter part of the formula in \code{\link{aov}}, 
 such as \code{'block + N*P*K'}.}
 
 \item{\code{...}}{parameters passed to \code{kruskal.test} or \code{wilcox.test} function (\code{method = "KW"}) or \code{dunnTest} function of \code{FSA} package 
-(\code{method = "KW_dunn"}) or \code{agricolae::duncan.test} (\code{method = "anova"}).}
+(\code{method = "KW_dunn"}) or \code{agricolae::duncan.test} (\code{method = "anova"}, one-way) or \code{lmerTest::lmer} (\code{method = "lme"}) or 
+\code{rcompanion::scheirerRayHare} (\code{method = "scheirerRayHare"}) or
+\code{betareg::betareg} (\code{method = "betareg"}).}
 }
 \if{html}{\out{</div>}}
 }

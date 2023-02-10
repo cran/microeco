@@ -169,7 +169,6 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' t1$plot_ordination(plot_type = "point")
 		#' t1$plot_ordination(plot_color = "Group", plot_shape = "Group", plot_type = "point")
 		#' t1$plot_ordination(plot_color = "Group", plot_type = c("point", "ellipse"))
-		#' t1$plot_ordination(plot_color = "Group", plot_type = c("point", "chull"))
 		#' t1$plot_ordination(plot_color = "Group", plot_type = c("point", "centroid"), 
 		#' 	  centroid_segment_linetype = 1)
 		plot_ordination = function(
@@ -212,7 +211,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 				combined[, plot_color] %<>% factor(., levels = plot_group_order)
 			}
 			
-			p <- ggplot(combined, aes_string(x = plot_x, y = plot_y, color = plot_color, shape = plot_shape))
+			p <- ggplot(combined, aes_meco(x = plot_x, y = plot_y, colour = plot_color, shape = plot_shape))
 			if("point" %in% plot_type){
 				p <- p + geom_point(alpha = point_alpha, size = point_size)
 			}
@@ -231,7 +230,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 				combined_centroid_xy <- merge(combined, centroid_xy, by.x = plot_color, by.y = "group")
 				p <- p + geom_segment(
 					data = combined_centroid_xy, 
-					aes_string(x = plot_x, xend = "cx", y = plot_y, yend = "cy", color = plot_color),
+					aes_meco(x = plot_x, xend = "cx", y = plot_y, yend = "cy", colour = plot_color),
 					alpha = centroid_segment_alpha, 
 					size = centroid_segment_size, 
 					linetype = centroid_segment_linetype
@@ -244,7 +243,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 					ellipse_chull_fill_color <- NULL
 					ellipse_chull_alpha <- 0
 				}
-				mapping <- aes_string(x = plot_x, y = plot_y, group = plot_color, color = plot_color, fill = ellipse_chull_fill_color)
+				mapping <- aes_meco(x = plot_x, y = plot_y, group = plot_color, colour = plot_color, fill = ellipse_chull_fill_color)
 				if("ellipse" %in% plot_type){
 					p <- p + ggplot2::stat_ellipse(
 						mapping = mapping, 
@@ -268,7 +267,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 				}
 			}
 			if(!is.null(add_sample_label)){
-				p <- p + ggrepel::geom_text_repel(aes_string(label = add_sample_label))
+				p <- p + ggrepel::geom_text_repel(aes_meco(label = add_sample_label))
 			}
 			if(!is.null(plot_color)){
 				p <- p + scale_color_manual(values = color_values)
@@ -284,7 +283,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @param manova_all default TRUE; TRUE represents test for all the groups, i.e. the overall test;
 		#'    FALSE represents test for all the paired groups.
 		#' @param manova_set default NULL; other specified group set for manova, such as \code{"Group + Type"} and \code{"Group*Type"}; see also \code{\link{adonis2}}.
-		#' @param group default NULL; a column name of sample_table used for manova. If NULL, search group stored in the object.
+		#'    manova_set has higher priority than manova_all parameter. If manova_set is provided; manova_all is disabled.
+		#' @param group default NULL; a column name of \code{sample_table} used for manova. If NULL, search \code{group} variable stored in the object.
 		#' @param p_adjust_method default "fdr"; p.adjust method when \code{manova_all = FALSE}; see method parameter of \code{p.adjust} function for available options.
 		#' @param ... parameters passed to \code{\link{adonis2}} function of \code{vegan} package.
 		#' @return \code{res_manova} stored in object.
@@ -352,48 +352,76 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @param within_group default TRUE; whether transform sample distance within groups, if FALSE, transform sample distance between any two groups.
 		#' @param by_group default NULL; one colname name of sample_table in \code{microtable} object.
 		#'   If provided, transform distances by the provided by_group parameter. This is especially useful for ordering and filtering values further.
-		#'   When \code{within_group = TRUE}, by_group parameter is the format of paired groups.
-		#'   When \code{within_group = FALSE}, by_group parameter is the format same with the group information in \code{sample_table}.
+		#'   When \code{within_group = TRUE}, the result of by_group parameter is the format of paired groups.
+		#'   When \code{within_group = FALSE}, the result of by_group parameter is the format same with the group information in \code{sample_table}.
+		#' @param ordered_group default NULL; a vector representing the ordered elements of \code{group} parameter; only useful when within_group = FALSE.
+		#' @param sep default TRUE; a character string to separate the group names after merging them into a new name.
 		#' @return \code{res_group_distance} stored in object.
 		#' @examples
 		#' \donttest{
 		#' t1$cal_group_distance(within_group = TRUE)
 		#' }
-		cal_group_distance = function(within_group = TRUE, by_group = NULL){
+		cal_group_distance = function(within_group = TRUE, by_group = NULL, ordered_group = NULL, sep = " vs "){
+			if(!is.null(by_group)){
+				if(!all(by_group %in% colnames(self$sample_table))){
+					stop("Input by_group parameter must be colnames of sample_table in the microtable object!")
+				}
+			}
+			if(is.null(self$group)){
+				stop("The group inside the object is NULL! ",
+					"Please provide the group parameter when creating the trans_beta object!")
+			}
 			if(within_group){
-				res <- private$within_group_distance(distance = self$use_matrix, sampleinfo = self$sample_table, type = self$group, by_group = by_group)
+				res <- private$within_group_distance(distance = self$use_matrix, sampleinfo = self$sample_table, type = self$group, by_group = by_group, sep = sep)
 			}else{
-				res <- private$between_group_distance(distance = self$use_matrix, sampleinfo = self$sample_table, type = self$group, by_group = by_group)
+				res <- private$between_group_distance(distance = self$use_matrix, sampleinfo = self$sample_table, type = self$group, by_group = by_group, 
+					ordered_group = ordered_group, sep = sep)
 			}
 			colnames(res)[colnames(res) == "value"] <- "Value"
 			self$res_group_distance <- res
-			self$res_group_distance_bygroup <- by_group
 			message('The result is stored in object$res_group_distance ...')
 		},
 		#' @description
 		#' Differential test of distances among groups.
 		#'
-		#' @param comp_bygroup default FALSE; whether perform the differential test using by_group column coming from the return of function \code{cal_group_distance}.
+		#' @param group default NULL; a column name of \code{object$res_group_distance} used for the statistics; If NULL, use the \code{group} inside the object.
+		#' @param by_group default NULL; a column of \code{object$res_group_distance} used to perform the differential test 
+		#'   among elements in \code{group} parameter for each element in \code{by_group} parameter. So \code{by_group} has a larger scale than \code{group} parameter.
+		#'   This \code{by_group} is very different from the \code{by_group} parameter in the \code{cal_group_distance} function.
+		#' @param by_ID default NULL; a column of \code{object$res_group_distance} used to perform paired t test or paired wilcox test for the paired data,
+		#'   such as the data of plant compartments for different plant species (ID). 
+		#'   So \code{by_ID} should be the smallest unit of sample collection without any repetition in it.
 		#' @param ... parameters passed to \code{cal_diff} function of \code{\link{trans_alpha}} class.
 		#' @return \code{res_group_distance_diff} stored in object.
 		#' @examples
 		#' \donttest{
 		#' t1$cal_group_distance_diff()
 		#' }
-		cal_group_distance_diff = function(comp_bygroup = FALSE, ...){
+		cal_group_distance_diff = function(group = NULL, by_group = NULL, by_ID = NULL, ...){
 			res_group_distance <- self$res_group_distance
 			# use method in trans_alpha
 			temp1 <- suppressMessages(trans_alpha$new(dataset = NULL))
 			res_group_distance$Measure <- "group_distance"
 			temp1$data_alpha <- res_group_distance
-			if(!comp_bygroup){
+			if(is.null(group)){
 				temp1$group <- self$group
 			}else{
-				if(!is.null(self$res_group_distance_bygroup)){
-					temp1$group <- self$res_group_distance_bygroup
-				}else{
-					stop("comp_bygroup is TRUE, but no by_group found! Please rerun cal_group_distance function!")
+				temp1$group <- group
+			}
+			if(! temp1$group %in% colnames(res_group_distance)){
+				stop("The group parameter: ", group, " is not in object$res_group_distance!")
+			}
+			if(!is.null(by_group)){
+				if(! by_group %in% colnames(res_group_distance)){
+					stop("Provided by_group parameter: ", by_group, " is not in object$res_group_distance!")
 				}
+				temp1$by_group <- by_group
+			}
+			if(!is.null(by_ID)){
+				if(! by_ID %in% colnames(res_group_distance)){
+					stop("Provided by_ID parameter: ", by_ID, " is not in object$res_group_distance!")
+				}
+				temp1$by_ID <- by_ID
 			}
 			suppressMessages(temp1$cal_diff(...))
 			self$res_group_distance_diff <- temp1$res_diff
@@ -492,19 +520,19 @@ trans_beta <- R6Class(classname = "trans_beta",
 					g1 <- g1 + geom_text(data=hc_d_measure$label, aes(x=x, y=y, label=label, hjust=-0.1), size=4)
 				}else{
 					if(length(replace_name) > 1){
-						g1 <- g1 + geom_text(data=data2, aes_string(x="x", y="y", label = "replace_name_use", hjust=-0.1), size=4)
+						g1 <- g1 + geom_text(data=data2, aes_meco(x="x", y="y", label = "replace_name_use", hjust=-0.1), size=4)
 					}else{
-						g1 <- g1 + geom_text(data=data2, aes_string(x="x", y="y", label = replace_name, hjust=-0.1), size=4)
+						g1 <- g1 + geom_text(data=data2, aes_meco(x="x", y="y", label = replace_name, hjust=-0.1), size=4)
 					}
 				}
 			} else {
 				if(is.null(replace_name)){
-					g1 <- g1 + geom_text(data=data2, aes_string(x="x", y="y", label="label", hjust=-0.1, color = group), size=4)
+					g1 <- g1 + geom_text(data=data2, aes_meco(x="x", y="y", label="label", hjust=-0.1, colour = group), size=4)
 				}else{
 					if(length(replace_name) > 1){
-						g1 <- g1 + geom_text(data=data2, aes_string(x="x", y="y", label="replace_name_use", hjust=-0.1, color = group), size=4)
+						g1 <- g1 + geom_text(data=data2, aes_meco(x="x", y="y", label="replace_name_use", hjust=-0.1, colour = group), size=4)
 					}else{
-						g1 <- g1 + geom_text(data=data2, aes_string(x="x", y="y", label=replace_name, hjust=-0.1, color = group), size=4)
+						g1 <- g1 + geom_text(data=data2, aes_meco(x="x", y="y", label=replace_name, hjust=-0.1, colour = group), size=4)
 					}
 				}
 				g1 <- g1 + scale_color_manual(values = use_colors)
@@ -526,12 +554,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 		}
 		),
 	private = list(
-		within_group_distance = function(distance, sampleinfo, type, by_group = NULL){
-			if(!is.null(by_group)){
-				if(!all(by_group %in% colnames(sampleinfo))){
-					stop("Input by_group must be colnames of sample_table in the microtable object!")
-				}
-			}
+		within_group_distance = function(distance, sampleinfo, type, by_group = NULL, sep = " vs "){
 			all_group <- as.character(sampleinfo[, type]) %>% unique
 			res <- data.frame()
 			for(i in all_group){
@@ -546,7 +569,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 					for(j in by_group){
 						tmp <- sampleinfo[select_sample, j]
 						paired_comb <- combn(length(tmp), 2)
-						merged_bygroup <- lapply(seq_len(ncol(paired_comb)), function(x){paste0(sort(tmp[paired_comb[, x]]), collapse = " vs ")}) %>% unlist
+						merged_bygroup <- lapply(seq_len(ncol(paired_comb)), function(x){paste0(sort(tmp[paired_comb[, x]]), collapse = sep)}) %>% unlist
 						distance_res %<>% cbind(., merged_bygroup)
 					}
 				}
@@ -558,15 +581,26 @@ trans_beta <- R6Class(classname = "trans_beta",
 			}
 			res
 		},
-		between_group_distance = function(distance, sampleinfo, type, by_group = NULL){
+		between_group_distance = function(distance, sampleinfo, type, by_group = NULL, ordered_group = NULL, sep = " vs "){
 			all_group <- as.character(sampleinfo[, type]) %>% unique
+			# first check ordered_group
+			if(!is.null(ordered_group)){
+				ordered_group %<>% as.character
+				if(!all(all_group %in% ordered_group)){
+					stop("Please check the ordered_group! Part of groups are missing!")
+				}
+			}
 			com1 <- combn(all_group, 2)
 			res <- data.frame()
 			for(i in seq_len(ncol(com1))){
 				if(is.null(by_group)){
 					f_name <- rownames(sampleinfo[sampleinfo[, type] == com1[1, i], ])
 					s_name <- rownames(sampleinfo[sampleinfo[, type] == com1[2, i], ])
-					vsname <- paste0(com1[1,i], " vs ", com1[2,i])
+					if(!is.null(ordered_group)){
+						vsname <- paste0(ordered_group[ordered_group %in% c(com1[1, i], com1[2, i])], collapse = sep)
+					}else{
+						vsname <- paste0(com1[1, i], sep, com1[2, i])
+					}
 					distance_res <- as.vector(distance[f_name, s_name])
 					distance_res <- data.frame(Value = distance_res, vsname)
 				}else{
@@ -578,7 +612,11 @@ trans_beta <- R6Class(classname = "trans_beta",
 					for(j in tmp){
 						f_name <- rownames(sampleinfo[sampleinfo[, type] == com1[1, i] & sampleinfo[, by_group] == j, ])
 						s_name <- rownames(sampleinfo[sampleinfo[, type] == com1[2, i] & sampleinfo[, by_group] == j, ])
-						vsname <- paste0(com1[1,i], " vs ", com1[2,i])
+						if(!is.null(ordered_group)){
+							vsname <- paste0(ordered_group[ordered_group %in% c(com1[1, i], com1[2, i])], collapse = sep)
+						}else{
+							vsname <- paste0(com1[1, i], sep, com1[2, i])
+						}
 						tmp_dis <- as.vector(distance[f_name, s_name])
 						if(length(tmp_dis) == 0){
 							next
@@ -590,6 +628,13 @@ trans_beta <- R6Class(classname = "trans_beta",
 					}
 				}
 				res %<>% rbind(., distance_res)
+			}
+			if(nrow(res) == 0){
+				if(!is.null(by_group)){
+					stop("No result is obtained! Please check the input by_group parameter! ", 
+						"This probably comes from the wrong names in ", by_group, " of the sample information table! ",
+						"Wrong names can lead to no overlap among ", type, " for each element of ", by_group, "!")
+				}
 			}
 			colnames(res)[2] <- type
 			if(ncol(res) > 2){

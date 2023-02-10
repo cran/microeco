@@ -47,11 +47,19 @@ t1$cal_ordination(method = "CCA", taxa_level = "Genus")
 }
 
 ## ------------------------------------------------
-## Method `trans_env$cal_ordination_envsquare`
+## Method `trans_env$cal_ordination_anova`
 ## ------------------------------------------------
 
 \donttest{
-t1$cal_ordination_envsquare()
+t1$cal_ordination_anova()
+}
+
+## ------------------------------------------------
+## Method `trans_env$cal_ordination_envfit`
+## ------------------------------------------------
+
+\donttest{
+t1$cal_ordination_envfit()
 }
 
 ## ------------------------------------------------
@@ -125,7 +133,8 @@ t1$plot_scatterfit(x =
 \item \href{#method-trans_env-plot_diff}{\code{trans_env$plot_diff()}}
 \item \href{#method-trans_env-cal_autocor}{\code{trans_env$cal_autocor()}}
 \item \href{#method-trans_env-cal_ordination}{\code{trans_env$cal_ordination()}}
-\item \href{#method-trans_env-cal_ordination_envsquare}{\code{trans_env$cal_ordination_envsquare()}}
+\item \href{#method-trans_env-cal_ordination_anova}{\code{trans_env$cal_ordination_anova()}}
+\item \href{#method-trans_env-cal_ordination_envfit}{\code{trans_env$cal_ordination_envfit()}}
 \item \href{#method-trans_env-trans_ordination}{\code{trans_env$trans_ordination()}}
 \item \href{#method-trans_env-plot_ordination}{\code{trans_env$plot_ordination()}}
 \item \href{#method-trans_env-cal_mantel}{\code{trans_env$cal_mantel()}}
@@ -193,7 +202,7 @@ Test the difference of environmental variable across groups.
 \if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_diff(
   group = NULL,
   by_group = NULL,
-  method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare")[1],
+  method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lme")[1],
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -215,6 +224,7 @@ Test the difference of environmental variable across groups.
         For multi-factor anova, see \code{aov}}
   \item{\strong{'scheirerRayHare'}}{Scheirer Ray Hare test for nonparametric test used for a two-way factorial experiment; 
         see \code{scheirerRayHare} function of \code{rcompanion} package}
+  \item{\strong{'lme'}}{lme: Linear Mixed Effect Model based on the \code{lmerTest} package}
 }}
 
 \item{\code{...}}{parameters passed to \code{cal_diff} function of \code{\link{trans_alpha}} class.}
@@ -354,12 +364,42 @@ t1$cal_ordination(method = "CCA", taxa_level = "Genus")
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-trans_env-cal_ordination_envsquare"></a>}}
-\if{latex}{\out{\hypertarget{method-trans_env-cal_ordination_envsquare}{}}}
-\subsection{Method \code{cal_ordination_envsquare()}}{
+\if{html}{\out{<a id="method-trans_env-cal_ordination_anova"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_env-cal_ordination_anova}{}}}
+\subsection{Method \code{cal_ordination_anova()}}{
+Use anova to test the significance of the terms and axis in ordination.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_ordination_anova(...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{the parameters passing to \code{anova} function.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+\code{res_ordination_terms and res_ordination_axis} in object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\donttest{
+t1$cal_ordination_anova()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_env-cal_ordination_envfit"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_env-cal_ordination_envfit}{}}}
+\subsection{Method \code{cal_ordination_envfit()}}{
 Fits each environmental vector onto the ordination to obtain the contribution of each variable.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_ordination_envsquare(...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_ordination_envfit(...)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -370,12 +410,12 @@ Fits each environmental vector onto the ordination to obtain the contribution of
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-\code{res_ordination_envsquare} in object.
+\code{res_ordination_envfit} in object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-t1$cal_ordination_envsquare()
+t1$cal_ordination_envfit()
 }
 }
 \if{html}{\out{</div>}}

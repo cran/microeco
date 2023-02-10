@@ -2,8 +2,8 @@
 #' Create \code{trans_venn} object.
 #'
 #' @description
-#' This class is a wrapper for a series of venn analysis related methods, including venn result, 2- to 5-way venn diagram, 
-#' more than 5-way petal plot and venn result transformations based on David et al. (2012) <doi:10.1128/AEM.01459-12>.
+#' This class is a wrapper for a series of venn analysis related methods, including 2- to 5-way venn diagram, 
+#' more than 5-way petal or bar plot and intersection transformations based on David et al. (2012) <doi:10.1128/AEM.01459-12>.
 #'
 #' @export
 trans_venn <- R6Class(classname = "trans_venn",
@@ -147,9 +147,13 @@ trans_venn <- R6Class(classname = "trans_venn",
 			colnumber <- self$colnumber
 			ratio <- self$ratio
 			res_names <- self$res_names
-			switch_num <- colnumber-1
+			switch_num <- colnumber - 1
 			summary_table <- self$data_summary
-			
+
+			if(colnumber > 5 & petal_plot == F){
+				message("The number of elements is larger than 5! Automatically change petal_plot = TRUE! An alternative way of visualization is to use plot_bar function ...")
+				petal_plot <- TRUE
+			}
 			# text position in venn
 			if(is.null(text_name_position)){
 				text_name_position <- switch(switch_num, 
@@ -326,9 +330,6 @@ trans_venn <- R6Class(classname = "trans_venn",
 					label = other_text_show, 
 					size = other_text_size)				
 			}
-			if(colnumber > 5 & petal_plot == F){
-				stop("This colnumber > 5! Please use petal_plot = TRUE !")
-			}
 			p
 		},
 		#' @description
@@ -375,7 +376,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 				.[order(.$Counts, decreasing = TRUE), ]
 			plot_data[, 1] %<>% factor(., levels = .)
 			
-			g1 <- ggplot(plot_data, aes_string(x = "rowname", y = "Counts")) +
+			g1 <- ggplot(plot_data, aes(x = rowname, y = Counts)) +
 				theme_classic() +
 				geom_col(color = bar_color, fill = bar_fill) +
 				ylab(up_y_title) +
@@ -397,9 +398,9 @@ trans_venn <- R6Class(classname = "trans_venn",
 			data2$variable %<>% factor(., levels = levels(plot_data[, 1]))
 			data3 <- data2[!is.na(data2$value), ]
 			#data2$value[is.na(data2$value)] <- 0
-			g2 <- ggplot(data2, aes_string(x = "variable", y = "rowname")) +
+			g2 <- ggplot(data2, aes(x = variable, y = rowname)) +
 				theme_bw() +
-				geom_point(aes_string(x = "variable", y = "rowname"), data = data3, size = point_size, color = point_color, inherit.aes = FALSE) +
+				geom_point(aes(x = variable, y = rowname), data = data3, size = point_size, color = point_color, inherit.aes = FALSE) +
 				theme(legend.position = "none") +
 				theme(axis.title = element_blank(), axis.text.x = element_blank(), axis.ticks = element_blank()) +
 				theme(axis.text = element_text(size = bottom_y_text_size)) +

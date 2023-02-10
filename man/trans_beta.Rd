@@ -30,7 +30,6 @@ t1$cal_ordination(ordination = "PCoA")
 t1$plot_ordination(plot_type = "point")
 t1$plot_ordination(plot_color = "Group", plot_shape = "Group", plot_type = "point")
 t1$plot_ordination(plot_color = "Group", plot_type = c("point", "ellipse"))
-t1$plot_ordination(plot_color = "Group", plot_type = c("point", "chull"))
 t1$plot_ordination(plot_color = "Group", plot_type = c("point", "centroid"), 
 	  centroid_segment_linetype = 1)
 
@@ -242,7 +241,6 @@ Plotting the ordination result based on An et al. (2019) <doi:10.1016/j.geoderma
 \preformatted{t1$plot_ordination(plot_type = "point")
 t1$plot_ordination(plot_color = "Group", plot_shape = "Group", plot_type = "point")
 t1$plot_ordination(plot_color = "Group", plot_type = c("point", "ellipse"))
-t1$plot_ordination(plot_color = "Group", plot_type = c("point", "chull"))
 t1$plot_ordination(plot_color = "Group", plot_type = c("point", "centroid"), 
 	  centroid_segment_linetype = 1)
 }
@@ -272,9 +270,10 @@ Calculate perMANOVA based on <doi:10.1111/j.1442-9993.2001.01070.pp.x> and R veg
 \item{\code{manova_all}}{default TRUE; TRUE represents test for all the groups, i.e. the overall test;
 FALSE represents test for all the paired groups.}
 
-\item{\code{manova_set}}{default NULL; other specified group set for manova, such as \code{"Group + Type"} and \code{"Group*Type"}; see also \code{\link{adonis2}}.}
+\item{\code{manova_set}}{default NULL; other specified group set for manova, such as \code{"Group + Type"} and \code{"Group*Type"}; see also \code{\link{adonis2}}.
+manova_set has higher priority than manova_all parameter. If manova_set is provided; manova_all is disabled.}
 
-\item{\code{group}}{default NULL; a column name of sample_table used for manova. If NULL, search group stored in the object.}
+\item{\code{group}}{default NULL; a column name of \code{sample_table} used for manova. If NULL, search \code{group} variable stored in the object.}
 
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method when \code{manova_all = FALSE}; see method parameter of \code{p.adjust} function for available options.}
 
@@ -328,7 +327,12 @@ A wrapper for \code{betadisper} function in vegan package for multivariate homog
 \subsection{Method \code{cal_group_distance()}}{
 Transform sample distances within groups or between groups.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_group_distance(within_group = TRUE, by_group = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_group_distance(
+  within_group = TRUE,
+  by_group = NULL,
+  ordered_group = NULL,
+  sep = " vs "
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -338,8 +342,12 @@ Transform sample distances within groups or between groups.
 
 \item{\code{by_group}}{default NULL; one colname name of sample_table in \code{microtable} object.
 If provided, transform distances by the provided by_group parameter. This is especially useful for ordering and filtering values further.
-When \code{within_group = TRUE}, by_group parameter is the format of paired groups.
-When \code{within_group = FALSE}, by_group parameter is the format same with the group information in \code{sample_table}.}
+When \code{within_group = TRUE}, the result of by_group parameter is the format of paired groups.
+When \code{within_group = FALSE}, the result of by_group parameter is the format same with the group information in \code{sample_table}.}
+
+\item{\code{ordered_group}}{default NULL; a vector representing the ordered elements of \code{group} parameter; only useful when within_group = FALSE.}
+
+\item{\code{sep}}{default TRUE; a character string to separate the group names after merging them into a new name.}
 }
 \if{html}{\out{</div>}}
 }
@@ -363,13 +371,26 @@ t1$cal_group_distance(within_group = TRUE)
 \subsection{Method \code{cal_group_distance_diff()}}{
 Differential test of distances among groups.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_group_distance_diff(comp_bygroup = FALSE, ...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_group_distance_diff(
+  group = NULL,
+  by_group = NULL,
+  by_ID = NULL,
+  ...
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{comp_bygroup}}{default FALSE; whether perform the differential test using by_group column coming from the return of function \code{cal_group_distance}.}
+\item{\code{group}}{default NULL; a column name of \code{object$res_group_distance} used for the statistics; If NULL, use the \code{group} inside the object.}
+
+\item{\code{by_group}}{default NULL; a column of \code{object$res_group_distance} used to perform the differential test 
+among elements in \code{group} parameter for each element in \code{by_group} parameter. So \code{by_group} has a larger scale than \code{group} parameter.
+This \code{by_group} is very different from the \code{by_group} parameter in the \code{cal_group_distance} function.}
+
+\item{\code{by_ID}}{default NULL; a column of \code{object$res_group_distance} used to perform paired t test or paired wilcox test for the paired data,
+such as the data of plant compartments for different plant species (ID). 
+So \code{by_ID} should be the smallest unit of sample collection without any repetition in it.}
 
 \item{\code{...}}{parameters passed to \code{cal_diff} function of \code{\link{trans_alpha}} class.}
 }

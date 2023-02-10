@@ -4,7 +4,7 @@
 #' @description
 #' This class is a wrapper for the taxonomic abundance transformations and plotting. 
 #' The transformed data style is the long-format for \code{ggplot2} plotting.
-#' The plotting methods include bar plot, boxplot, heatmap and pie chart.
+#' The plotting methods include bar plot, boxplot, heatmap, pie chart and line chart.
 #'
 #' @export
 trans_abund <- R6Class(classname = "trans_abund",
@@ -146,13 +146,12 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' @param color_values default \code{RColorBrewer::brewer.pal}(12, "Paired"); colors palette for the plotting.
 		#' @param bar_type default "full"; "full" or "notfull"; if full, the total abundance sum to 1 or 100 percentage.
 		#' @param others_color default "grey90"; the color for "others" taxa.
-		#' @param facet default NULL; if using facet, providing a group column name of sample_table, such as, "Group".
-		#' @param facet2 default NULL; the second facet, used with facet parameter together; facet2 should have a finer scale;
-		#'   use this parameter, please first install package \code{ggh4x} using \code{install.packages("ggh4x")}.
-		#' @param facet3 default NULL; the third facet, used with \code{facet} and \code{facet2} parameter together.
-		#' @param facet4 default NULL; the fourth facet, used with facet, facet2 and facet3 parameter together.
-		#' @param order_facet NULL; vector; used to order the facet, such as, c("Group1", "Group3", "Group2"); 
-		#'   If multiple facets are used, please manually assign factors in sample_table of microtable object.
+		#' @param facet default NULL; a character vector for the facet; a group column name of \code{sample_table}, such as, \code{"Group"};
+		#'    If multiple facets are needed, please provide ordered names, such as \code{c("Group", "Type")}.
+		#'    The latter should have a finer scale than the former one;
+		#'    Please adjust the facet orders in the plot by assigning factors in \code{sample_table} before creating \code{trans_abund} object or 
+		#'    assigning factors in the \code{data_abund} table of \code{trans_abund} object.
+		#'    When multiple facets are used, please first install package \code{ggh4x} using the command \code{install.packages("ggh4x")}.
 		#' @param order_x default NULL; vector; used to order the sample names in x axis; must be the samples vector, such as, c("S1", "S3", "S2").
 		#' @param x_axis_name NULL; a character string; a column name of sample_table in dataset; used to show the sample names in x axis.
 		#' @param barwidth default NULL; bar width, see width in \code{\link{geom_bar}}.
@@ -177,10 +176,6 @@ trans_abund <- R6Class(classname = "trans_abund",
 			bar_type = "full",
 			others_color = "grey90",
 			facet = NULL,
-			facet2 = NULL,
-			facet3 = NULL,
-			facet4 = NULL,
-			order_facet = NULL,
 			order_x = NULL,
 			x_axis_name = NULL,
 			barwidth = NULL,
@@ -216,13 +211,12 @@ trans_abund <- R6Class(classname = "trans_abund",
 				plot_data %<>% {.[.$Taxonomy %in% use_taxanames, ]}
 				plot_data$Taxonomy %<>% factor(., levels = rev(use_taxanames))
 			}
-			# order x axis samples and facet
+			# order x axis samples
 			plot_data <- private$adjust_axis_facet(
 				plot_data = plot_data, 
 				x_axis_name = x_axis_name, 
-				order_x = order_x, 
-				facet = facet, 
-				order_facet = order_facet)
+				order_x = order_x
+				)
 
 			# arrange plot_data--Abundance according to the Taxonomy-group column factor-levels
 			plot_data <- plot_data[unlist(lapply(levels(plot_data$Taxonomy), function(x) which(plot_data$Taxonomy == x))),]
@@ -237,25 +231,25 @@ trans_abund <- R6Class(classname = "trans_abund",
 				plot_data$Sample %<>% factor(., levels = order_x_clustering)
 			}
 			if(use_alluvium){
-				p <- ggplot(plot_data, aes_string(x = "Sample", y = "Abundance", fill = "Taxonomy", color = "Taxonomy",  weight = "Abundance", 
-					alluvium = "Taxonomy", stratum = "Taxonomy")) +
+				p <- ggplot(plot_data, aes(
+						x = .data[["Sample"]], y = .data[["Abundance"]], 
+						fill = .data[["Taxonomy"]], color = .data[["Taxonomy"]], 
+						weight = .data[["Abundance"]], 
+						alluvium = .data[["Taxonomy"]], stratum = .data[["Taxonomy"]]
+					)) +
 					ggalluvial::geom_flow(alpha = .4, width = 3/15) +
 					ggalluvial::geom_stratum(width = .2) +
-					scale_color_manual(values = rev(bar_colors_use)) +
-					scale_y_continuous(expand = c(0, 0))
+					scale_color_manual(values = rev(bar_colors_use))
 			}else{
-				p <- ggplot(plot_data, aes_string(x = "Sample", y = "Abundance", fill = "Taxonomy"))
+				p <- ggplot(plot_data, aes(x = .data[["Sample"]], y = .data[["Abundance"]], fill = .data[["Taxonomy"]]))
 				if(bar_type == "full"){
 					if(self$use_percentage == T){
-						p <- p + geom_bar(stat = "identity", position = "stack", show.legend = T, width = barwidth) + 
-							scale_y_continuous(expand = c(0, 0))
+						p <- p + geom_bar(stat = "identity", position = "stack", show.legend = T, width = barwidth)
 					}else{
 						p <- p + geom_bar(stat = "identity", position = "fill", show.legend = T, width = barwidth)
-						p <- p + scale_y_continuous(limits = c(0,1), expand = c(0, 0))
 					}
 				}else{
-					p <- p + geom_bar(stat = "identity", position = "stack", show.legend = T, width = barwidth) + 
-						scale_y_continuous(expand = c(0, 0))
+					p <- p + geom_bar(stat = "identity", position = "stack", show.legend = T, width = barwidth)
 				}
 			}
 			p <- p + scale_fill_manual(values = rev(bar_colors_use)) + xlab("")
@@ -264,32 +258,37 @@ trans_abund <- R6Class(classname = "trans_abund",
 			}else{
 				p <- p + ylab(self$ylabname)		
 			}
-			if(!is.null(facet)) {
-				if(is.null(facet2)){
+			if(!is.null(facet)){
+				if(length(facet) == 1){
 					p <- p + facet_grid(reformulate(facet, "."), scales = "free", space = "free")
 				}else{
-					p <- p + ggh4x::facet_nested(reformulate(c(facet, facet2, facet3, facet4)), nest_line = element_line(linetype = 2), scales = "free", space = "free")
+					p <- p + ggh4x::facet_nested(reformulate(facet), nest_line = element_line(linetype = 2), scales = "free", space = "free")
 				}
 				p <- p + theme(strip.background = element_rect(fill = facet_color, color = facet_color), strip.text = element_text(size=strip_text))
 				p <- p + scale_y_continuous(expand = c(0, 0.01))
+			}else{
+				if(bar_type == "full" & self$use_percentage == FALSE){
+					p <- p + scale_y_continuous(limits = c(0, 1), expand = c(0, 0))
+				}else{
+					p <- p + scale_y_continuous(expand = c(0, 0))
+				}
 			}
+
 			p <- p + theme(panel.grid = element_blank(), panel.border = element_blank()) + 
 				theme(axis.line.y = element_line(color = "grey60", linetype = "solid", lineend = "square"))
 			if(legend_text_italic == T) {
 				p <- p + theme(legend.text = element_text(face = 'italic'))
 			}
 			
-			p <- p + private$ggplot_xtext_type(xtext_type_hor = xtext_type_hor, xtext_size = xtext_size)
-			if(!xtext_keep){
-				p <- p + theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
-			}
-			p <- p + theme(axis.title.y= element_text(size=ytitle_size))
+			p <- p + private$ggplot_xtext_type(xtext_type_hor = xtext_type_hor, xtext_size = xtext_size, xtext_keep = xtext_keep)
+
+			p <- p + theme(axis.title.y = element_text(size = ytitle_size))
 			if(xtitle_keep == F) {
 				p <- p + theme(axis.title.x = element_blank())
 			}
-			p <- p + guides(fill=guide_legend(title=self$taxrank))
+			p <- p + guides(fill = guide_legend(title = self$taxrank))
 			if(use_alluvium){
-			p <- p + guides(color = guide_legend(title=self$taxrank))
+				p <- p + guides(color = guide_legend(title = self$taxrank))
 			}
 			p
 		},
@@ -298,12 +297,12 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#'
 		#' @param color_values default rev(RColorBrewer::brewer.pal(n = 11, name = "RdYlBu")); 
 		#' 	  colors palette for the plotting.
-		#' @param facet default NULL; a character string; if using facet, provide a column name in sample_table, such as "Group".
-		#' @param facet2 default NULL; the second facet, used with facet parameter together; \code{facet2} should have a finer scale;
-		#'   use this parameter, please first install package \code{ggh4x}.
-		#' @param facet3 default NULL; the third facet, used with \code{facet} and \code{facet2} parameter together.
-		#' @param facet4 default NULL; the fourth facet, used with facet, facet2 and facet3 parameter together.
-		#' @param order_facet NULL; vector; used to order the facet, such as, c("Group1", "Group3", "Group2").
+		#' @param facet default NULL; a character vector for the facet; a group column name of \code{sample_table}, such as, \code{"Group"};
+		#'    If multiple facets are needed, please provide ordered names, such as \code{c("Group", "Type")}.
+		#'    The latter should have a finer scale than the former one;
+		#'    Please adjust the facet orders in the plot by assigning factors in \code{sample_table} before creating \code{trans_abund} object or 
+		#'    assigning factors in the \code{data_abund} table of \code{trans_abund} object.
+		#'    When multiple facets are used, please first install package \code{ggh4x} using the command \code{install.packages("ggh4x")}.
 		#' @param x_axis_name NULL; a character string; a column name of sample_table used to show the sample names in x axis.
 		#' @param order_x default NULL; vector; used to order the sample names in x axis; must be the samples vector, such as, c("S1", "S3", "S2").
 		#' @param withmargin default TRUE; whether retain the tile margin.
@@ -333,10 +332,6 @@ trans_abund <- R6Class(classname = "trans_abund",
 		plot_heatmap = function(
 			color_values = rev(RColorBrewer::brewer.pal(n = 11, name = "RdYlBu")), 
 			facet = NULL,
-			facet2 = NULL,
-			facet3 = NULL,
-			facet4 = NULL,
-			order_facet = NULL,
 			x_axis_name = NULL,
 			order_x = NULL,
 			withmargin = TRUE,
@@ -363,8 +358,8 @@ trans_abund <- R6Class(classname = "trans_abund",
 			plot_data %<>% {.[.$Taxonomy %in% use_taxanames, ]}
 
 			if(pheatmap == FALSE){
-				# order x axis samples and facet
-				plot_data <- private$adjust_axis_facet(plot_data = plot_data, x_axis_name = x_axis_name, order_x = order_x, facet = facet, order_facet = order_facet)
+				# order x axis samples
+				plot_data <- private$adjust_axis_facet(plot_data = plot_data, x_axis_name = x_axis_name, order_x = order_x)
 				if (is.null(min_abundance)){
 					min_abundance <- ifelse(min(plot_data$Abundance) > 0.001, min(plot_data$Abundance), 0.001)
 				}
@@ -373,7 +368,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 				}
 				plot_data$Taxonomy %<>% factor(., levels = rev(use_taxanames))
 
-				p <- ggplot(plot_data, aes_string(x = "Sample", y = "Taxonomy", label = formatC("Abundance", format = "f", digits = 1)))
+				p <- ggplot(plot_data, aes(x = .data[["Sample"]], y = .data[["Taxonomy"]], label = .data[[formatC("Abundance", format = "f", digits = 1)]]))
 				
 				if(withmargin == T){
 					p <- p + geom_tile(aes(fill = Abundance), colour = margincolor, size = 0.5)
@@ -393,14 +388,11 @@ trans_abund <- R6Class(classname = "trans_abund",
 					p <- p + scale_fill_gradientn(colours = color_values, trans = plot_colorscale, breaks=plot_breaks, na.value = "#00008B",
 						limits = c(min_abundance, max_abundance))
 				}
-				if(!is.null(order_facet)) {
-					plot_data[, facet] <- factor(plot_data[, facet], levels = unique(order_facet))
-				}
 				if(!is.null(facet)){
-					if(is.null(facet2)){
+					if(length(facet) == 1){
 						p <- p + facet_grid(reformulate(facet, "."), scales = "free", space = "free")
 					}else{
-						p <- p + ggh4x::facet_nested(reformulate(c(facet, facet2, facet3, facet4)), nest_line = element_line(linetype = 2), scales = "free", space = "free")
+						p <- p + ggh4x::facet_nested(reformulate(facet), nest_line = element_line(linetype = 2), scales = "free", space = "free")
 					}
 					p <- p + theme(strip.background = element_rect(color = "white", fill = "grey92"), strip.text = element_text(size=strip_text))
 				}
@@ -408,10 +400,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 				if (!is.null(ytext_size)){
 					p <- p + theme(axis.text.y = element_text(size = ytext_size))
 				}
-				p <- p + private$ggplot_xtext_type(xtext_type_hor = xtext_type_hor, xtext_size = xtext_size)
-				if(!xtext_keep) {
-					p <- p + theme(axis.ticks.x = element_blank(), axis.text.x = element_blank(), axis.title.x = element_blank())
-				}
+				p <- p + private$ggplot_xtext_type(xtext_type_hor = xtext_type_hor, xtext_size = xtext_size, xtext_keep = xtext_keep)
 				if(grid_clean){
 					p <- p + theme(panel.border = element_blank(), panel.grid = element_blank())
 				}
@@ -448,8 +437,6 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' @param middlesize default 1; The middle line size.
 		#' @param xtext_type_hor default TRUE; x axis text horizontal, if FALSE; text slant.
 		#' @param xtext_size default 10; x axis text size.
-		#' @param xtext_keep default TRUE; whether retain x text.
-		#' @param xtitle_keep default TRUE; whether retain x title.
 		#' @param ytitle_size default 17; y axis title size.
 		#' @param ... parameters pass to \code{\link{geom_boxplot}}.
 		#' @return ggplot2 plot. 
@@ -470,8 +457,6 @@ trans_abund <- R6Class(classname = "trans_abund",
 			middlesize = 1,
 			xtext_type_hor = FALSE,
 			xtext_size = 10,
-			xtext_keep = TRUE,
-			xtitle_keep = TRUE,
 			ytitle_size = 17,
 			...
 			){
@@ -481,7 +466,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 			plot_data %<>% {.[.$Taxonomy %in% use_taxanames, ]}
 			plot_data$Taxonomy %<>% factor(., levels = use_taxanames)
 
-			p <- ggplot(plot_data, aes_string(x = "Taxonomy", y = "Abundance")) 
+			p <- ggplot(plot_data, aes(x = .data[["Taxonomy"]], y = .data[["Abundance"]])) 
 			p <- p + ylab(self$ylabname) + guides(col = guide_legend(reverse = TRUE)) + xlab("")
 			if (plot_flip == T){ 
 				p <- p + coord_flip()
@@ -490,29 +475,22 @@ trans_abund <- R6Class(classname = "trans_abund",
 				p <- p + geom_boxplot(color = color_values[1], ...)
 			} else {
 				if(boxfill == T){
-					p <- p + geom_boxplot(aes_string(color = group, fill = group), ...)
+					p <- p + geom_boxplot(aes(color = .data[[group]], fill = .data[[group]]), ...)
 					p <- p + scale_fill_manual(values = color_values)
 					p <- p + scale_color_manual(values = color_values) + guides(color = "none")
 					## Change the default middle line
 					dat <- ggplot_build(p)$data[[1]]
 					p <- p + geom_segment(data=dat, aes(x=xmin, xend=xmax, y=middle, yend=middle), colour = middlecolor, size=middlesize)
 				} else {	 
-					p <- p + geom_boxplot(aes_string(color = group), ...) + scale_color_manual(values = color_values)
+					p <- p + geom_boxplot(aes(color = .data[[group]]), ...) + scale_color_manual(values = color_values)
 				}
 			}
 			if(show_point == T){
 				p <- p + geom_point(size = point_size, color = point_color, alpha = point_alpha, position = "jitter")
-			}			
-			p <- p + private$ggplot_xtext_type(xtext_type_hor = xtext_type_hor, xtext_size = xtext_size)
-
-			if(!xtext_keep){
-				p <- p + theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
 			}
+			p <- p + private$ggplot_xtext_type(xtext_type_hor = xtext_type_hor, xtext_size = xtext_size)
 			p <- p + theme(axis.title.y = element_text(size = ytitle_size)) + scale_y_continuous(expand = c(0, 0.01))
 
-			if(xtitle_keep == F) {
-				p <- p + theme(axis.title.x = element_blank())
-			}
 			if(!is.null(group)) {
 				p <- p + guides(fill=guide_legend(title=group))
 			}
@@ -563,7 +541,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 			plot_data %<>% {.[.$Taxonomy %in% use_taxanames, ]}
 			plot_data$Taxonomy %<>% factor(., levels = use_taxanames)
 						
-			p <- ggplot(plot_data, aes_string(x = "Sample", y = "Abundance", color = "Taxonomy", group = "Taxonomy"))
+			p <- ggplot(plot_data, aes(x = .data[["Sample"]], y = .data[["Abundance"]], color = .data[["Taxonomy"]], group = .data[["Taxonomy"]]))
 			if(("SE" %in% colnames(plot_data)) & plot_SE){
 				p <- p + geom_errorbar(aes(ymin = Abundance - SE, ymax = Abundance + SE), width = errorbar_width, position = position, size = errorbar_size)
 			}else{
@@ -605,7 +583,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 			plot_data$Taxonomy[!plot_data$Taxonomy %in% use_taxanames] <- "Others"
 			plot_data$Taxonomy %<>% factor(., levels = rev(c(use_taxanames, "Others")))
 
-			p <- ggplot(plot_data, aes(x='', y=Abundance, fill = Taxonomy, label = percent(Abundance))) + 
+			p <- ggplot(plot_data, aes(x = '', y = Abundance, fill = Taxonomy, label = percent(Abundance))) + 
 				geom_bar(width = 1, stat = "identity") +
 				coord_polar("y", start=0) +
 				private$blank_theme +
@@ -637,7 +615,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 		}
 		),
 	private = list(
-		adjust_axis_facet = function(plot_data, x_axis_name, order_x, facet, order_facet){
+		adjust_axis_facet = function(plot_data, x_axis_name, order_x){
 			# order x axis samples and facet
 			if(!is.null(x_axis_name)){
 				colnames(plot_data)[colnames(plot_data) == "Sample"] <- "Sample_rownames_before"
@@ -654,20 +632,17 @@ trans_abund <- R6Class(classname = "trans_abund",
 					plot_data$Sample %<>% factor(., levels = order_x)
 				}
 			}
-			if(!is.null(order_facet)){
-				if(is.null(facet)){
-					stop("You provide order_facet. It is necessary to provide facet!")
-				}else{
-					plot_data[, facet] %<>% factor(., levels = order_facet)
-				}
-			}
 			plot_data
 		},
-		ggplot_xtext_type = function(xtext_type_hor, xtext_size){
-			if(xtext_type_hor == T){
-				theme(axis.text.x = element_text(colour = "black", size = xtext_size))
-			} else {
-				theme(axis.text.x = element_text(angle = 40, colour = "black", vjust = 1, hjust = 1, size = xtext_size))
+		ggplot_xtext_type = function(xtext_type_hor, xtext_size, xtext_keep = TRUE){
+			if(xtext_keep){
+				if(xtext_type_hor == T){
+					theme(axis.text.x = element_text(colour = "black", size = xtext_size))
+				}else{
+					theme(axis.text.x = element_text(angle = 40, colour = "black", vjust = 1, hjust = 1, size = xtext_size))
+				}
+			}else{
+				theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
 			}
 		},
 		blank_theme = 
