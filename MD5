@@ -1,14 +1,14 @@
-63ccb84aee6e5217428abe3d1ea5f625 *DESCRIPTION
+93db77ca368d8758e9cbc3f2460fa51c *DESCRIPTION
 ccb2fffa24e106ae592cc87da5750a45 *NAMESPACE
 e2f85d69d84139c112f7126af032dfb0 *R/data.R
 1535ed4b8373e93721c3890bc2f5df59 *R/import.R
-af694a532220010b718044792e4f3c44 *R/microtable.R
+9e2fb4d7dc11e6249fbb9c0ca261c820 *R/microtable.R
 29891936b9f786dc8c5f424191f5a2bf *R/trans_abund.R
 69fe3fc1b503d0f56cd8138f8fcff1fe *R/trans_alpha.R
 c5ed4f4e2115ca032ee600dd91d0a023 *R/trans_beta.R
 e811f82cad828d9bf66e33f5b10ef913 *R/trans_classifier.R
 8f1458f0c528676350d1c22888599b18 *R/trans_diff.R
-8777c88b1dda4a955823cd1e4f6a21cb *R/trans_env.R
+a11ea20116519b32757ac49fd573904d *R/trans_env.R
 5c6d80b275692700ca30a9650eb45477 *R/trans_func.R
 3373183f2153e3a96ea2b332b5d51986 *R/trans_network.R
 a1c92396c98f81aaf4882e745ae770ae *R/trans_nullmodel.R
@@ -40,7 +40,7 @@ eaf97e05055107f508134d00af0b6abe *man/dropallfactors.Rd
 1df889ec3c8320c1347ec463edd4a80d *man/env_data_16S.Rd
 8edbc9c5891c79972688c911b7d14333 *man/fungi_func_FUNGuild.Rd
 c596cae8915dcba3a9302094fbde4cf5 *man/fungi_func_FungalTraits.Rd
-2c269789819cdb230723b392c3898890 *man/microtable.Rd
+7e5252fb6da9ad8b748321a41d7382db *man/microtable.Rd
 7febbe0d474ad23b2454fed0a7125661 *man/otu_table_16S.Rd
 9ee1c31e68ddf3b60c9449b14bae0b1e *man/otu_table_ITS.Rd
 164c37d6c9c0747ec00e679e4e55de32 *man/phylo_tree_16S.Rd
