@@ -103,6 +103,7 @@ t1$cal_mantel(partial_mantel = TRUE, use_measure = "bray")
 t2 <- trans_diff$new(dataset = dataset, method = "rf", group = "Group", rf_taxa_level = "Genus")
 t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S[, 4:11])
 t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_diff$Taxa[1:40])
+t1$cal_cor(use_data = "other", p_adjust_type = "Env", other_taxa = t2$res_diff$Taxa[1:40])
 }
 
 ## ------------------------------------------------
@@ -669,7 +670,7 @@ Actually, it can also be used for calculating other correlation between any two 
   select_env_data = NULL,
   cor_method = c("pearson", "spearman", "kendall")[1],
   p_adjust_method = "fdr",
-  p_adjust_type = c("Type", "Taxa", "Env")[3],
+  p_adjust_type = c("All", "Type", "Taxa", "Env")[1],
   add_abund_table = NULL,
   by_group = NULL,
   use_taxa_num = NULL,
@@ -690,9 +691,16 @@ Actually, it can also be used for calculating other correlation between any two 
 
 \item{\code{cor_method}}{default "pearson"; "pearson", "spearman" or "kendall"; correlation method.}
 
-\item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options.}
+\item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options.
+\code{p_adjust_method = "none"} can disable the p value adjustment.}
 
-\item{\code{p_adjust_type}}{default "Env"; "Type", "Taxa" or "Env"; p.adjust type; Env: environmental data; Taxa: taxa data; Type: group used.}
+\item{\code{p_adjust_type}}{default "All"; "All", "Type", "Taxa" or "Env"; P value adjustment type.
+"Env": adjustment for each environmental variable separately; 
+"Taxa": adjustment for each taxon separately; 
+"Type": adjustment according to the groups provided. If \code{by_group} is NULL, adjustment is performed for all the data together.
+If \code{by_group} is provided, for each group in it separately.
+These three options are the first three colnames of return table \code{res_cor}.
+"All": adjustment for all the data together no matter whether \code{by_group} is provided. If \code{by_group} is NULL, it is same with the "Type" option.}
 
 \item{\code{add_abund_table}}{default NULL; additional data table to be used. Samples must be rows.}
 
@@ -721,6 +729,7 @@ please see the example.}
 t2 <- trans_diff$new(dataset = dataset, method = "rf", group = "Group", rf_taxa_level = "Genus")
 t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S[, 4:11])
 t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_diff$Taxa[1:40])
+t1$cal_cor(use_data = "other", p_adjust_type = "Env", other_taxa = t2$res_diff$Taxa[1:40])
 }
 }
 \if{html}{\out{</div>}}
@@ -843,6 +852,7 @@ Scatter plot and add fitted line. The most important thing is to make sure that 
   line_se_color = "grey70",
   pvalue_trim = 4,
   cor_coef_trim = 3,
+  lm_equation = TRUE,
   lm_fir_trim = 2,
   lm_sec_trim = 2,
   lm_squ_trim = 2,
@@ -912,6 +922,8 @@ If provided, overlook the levels in the group of dataset$sample_table.}
 \item{\code{pvalue_trim}}{default 4; trim the decimal places of p value.}
 
 \item{\code{cor_coef_trim}}{default 3; trim the decimal places of correlation coefficient.}
+
+\item{\code{lm_equation}}{default TRUE; whether include the equation in the label when \code{type = "lm"}.}
 
 \item{\code{lm_fir_trim}}{default 2; trim the decimal places of regression first coefficient.}
 

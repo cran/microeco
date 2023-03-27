@@ -138,6 +138,7 @@ dataset$cal_abund()
 
 \dontrun{
 dataset$save_abund(dirpath = "taxa_abund")
+dataset$save_abund(merge_all = TRUE, rm_un = TRUE, sep = "\t")
 }
 
 ## ------------------------------------------------
@@ -602,6 +603,7 @@ Calculate the taxonomic abundance at each taxonomic rank.
 \if{html}{\out{<div class="r">}}\preformatted{microtable$cal_abund(
   select_cols = NULL,
   rel = TRUE,
+  merge_by = "|",
   split_group = FALSE,
   split_by = "&&",
   split_column = NULL
@@ -611,10 +613,13 @@ Calculate the taxonomic abundance at each taxonomic rank.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{select_cols}}{default NULL; numeric vector or character vector of colnames of \code{microtable$tax_table}; used to select columns to merge and calculate abundances.
+\item{\code{select_cols}}{default NULL; numeric vector or character vector of colnames of \code{microtable$tax_table}; 
+applied to select columns to merge and calculate abundances according to ordered hierarchical levels.
 This is very useful if there are commented columns or some columns with multiple structure that cannot be used directly.}
 
-\item{\code{rel}}{default TRUE; if TRUE, relative abundance is used; if FALSE, absolute abundance will be summed.}
+\item{\code{rel}}{default TRUE; if TRUE, relative abundance is used; if FALSE, absolute abundance (i.e. raw values) will be summed.}
+
+\item{\code{merge_by}}{default "|"; the symbol to merge and concatenate taxonomic names of different levels.}
 
 \item{\code{split_group}}{default FALSE; if TRUE, split the rows to multiple rows according to one or more columns in \code{tax_table}. 
 Very useful when multiple mapping info exist.}
@@ -645,15 +650,34 @@ dataset$cal_abund()
 \if{html}{\out{<a id="method-microtable-save_abund"></a>}}
 \if{latex}{\out{\hypertarget{method-microtable-save_abund}{}}}
 \subsection{Method \code{save_abund()}}{
-Save taxonomic abundance to the computer local place.
+Save taxonomic abundance to local file.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{microtable$save_abund(dirpath = "taxa_abund")}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{microtable$save_abund(
+  dirpath = "taxa_abund",
+  merge_all = FALSE,
+  rm_un = FALSE,
+  rm_pattern = "__$",
+  sep = ",",
+  ...
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{dirpath}}{default "taxa_abund"; directory name to save the taxonomic abundance files.}
+\item{\code{dirpath}}{default "taxa_abund"; directory to save the taxonomic abundance files. It will be created if it does not exist.}
+
+\item{\code{merge_all}}{default FALSE; Whether merge all tables into one. The merged file format is generally called 'mpa' style.}
+
+\item{\code{rm_un}}{default FALSE; Whether remove unclassified taxa in which the name ends with '__' generally.}
+
+\item{\code{rm_pattern}}{default "__$"; The pattern searched through the merged taxonomic names. See also \code{pattern} parameter in \code{\link{grepl}} function. 
+Only available when \code{rm_un = TRUE}. The default "__$" means removing the names end with '__'.}
+
+\item{\code{sep}}{default ","; the field separator string. Same with \code{sep} parameter in \code{\link{write.table}} function.
+default \code{','} correspond to the file name suffix 'csv'. The option \code{'\t'} correspond to the file name suffix 'tsv'. For other options, suffix are all 'txt'.}
+
+\item{\code{...}}{parameters passed to \code{\link{write.table}}.}
 }
 \if{html}{\out{</div>}}
 }
@@ -661,6 +685,7 @@ Save taxonomic abundance to the computer local place.
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
 dataset$save_abund(dirpath = "taxa_abund")
+dataset$save_abund(merge_all = TRUE, rm_un = TRUE, sep = "\t")
 }
 }
 \if{html}{\out{</div>}}

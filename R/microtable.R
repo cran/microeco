@@ -453,9 +453,11 @@ microtable <- R6Class(classname = "microtable",
 		#' @description
 		#' Calculate the taxonomic abundance at each taxonomic rank.
 		#'
-		#' @param select_cols default NULL; numeric vector or character vector of colnames of \code{microtable$tax_table}; used to select columns to merge and calculate abundances.
+		#' @param select_cols default NULL; numeric vector or character vector of colnames of \code{microtable$tax_table}; 
+		#'   applied to select columns to merge and calculate abundances according to ordered hierarchical levels.
 		#'   This is very useful if there are commented columns or some columns with multiple structure that cannot be used directly.
-		#' @param rel default TRUE; if TRUE, relative abundance is used; if FALSE, absolute abundance will be summed.
+		#' @param rel default TRUE; if TRUE, relative abundance is used; if FALSE, absolute abundance (i.e. raw values) will be summed.
+		#' @param merge_by default "|"; the symbol to merge and concatenate taxonomic names of different levels.
 		#' @param split_group default FALSE; if TRUE, split the rows to multiple rows according to one or more columns in \code{tax_table}. 
 		#'   Very useful when multiple mapping info exist.
 		#' @param split_by default "&&"; Separator delimiting collapsed values; only useful when \code{split_group = TRUE}; see sep in separate_rows function.
@@ -470,11 +472,12 @@ microtable <- R6Class(classname = "microtable",
 		cal_abund = function(
 			select_cols = NULL, 
 			rel = TRUE, 
+			merge_by = "|",
 			split_group = FALSE, 
 			split_by = "&&", 
 			split_column = NULL
 			){
-			taxa_abund = list()
+			taxa_abund <- list()
 			if(is.null(self$tax_table)){
 				stop("No tax_table found! Please check your data!")
 			}
@@ -497,7 +500,7 @@ microtable <- R6Class(classname = "microtable",
 				stop("0 rows in tax_table! Please check your data!")
 			}
 			if(is.null(select_cols)){
-				select_cols <- 1:ncol(self$tax_table)
+				select_cols <- seq_len(ncol(self$tax_table))
 			}else{
 				if(!is.numeric(select_cols)){
 					if(any(! select_cols %in% colnames(self$tax_table))){
@@ -512,7 +515,7 @@ microtable <- R6Class(classname = "microtable",
 					stop("Spliting rows by one or more columns require split_column parameter! Please set split_column and try again!")
 				}
 			}
-			for(i in seq_along(select_cols)) {
+			for(i in seq_along(select_cols)){
 				taxrank <- colnames(self$tax_table)[select_cols[i]]
 				# assign the columns used for the splitting
 				if(!is.null(split_column)){
@@ -526,6 +529,7 @@ microtable <- R6Class(classname = "microtable",
 											self, 
 											columns = select_cols[1:i], 
 											rel = rel, 
+											merge_by = merge_by,
 											split_group = split_group, 
 											split_by = split_by, 
 											split_column = use_split_column)
@@ -534,19 +538,48 @@ microtable <- R6Class(classname = "microtable",
 			message('The result is stored in object$taxa_abund ...')
 		},
 		#' @description
-		#' Save taxonomic abundance to the computer local place.
+		#' Save taxonomic abundance to local file.
 		#'
-		#' @param dirpath default "taxa_abund"; directory name to save the taxonomic abundance files.
+		#' @param dirpath default "taxa_abund"; directory to save the taxonomic abundance files. It will be created if it does not exist.
+		#' @param merge_all default FALSE; Whether merge all tables into one. The merged file format is generally called 'mpa' style.
+		#' @param rm_un default FALSE; Whether remove unclassified taxa in which the name ends with '__' generally.
+		#' @param rm_pattern default "__$"; The pattern searched through the merged taxonomic names. See also \code{pattern} parameter in \code{\link{grepl}} function. 
+		#' 	  Only available when \code{rm_un = TRUE}. The default "__$" means removing the names end with '__'.
+		#' @param sep default ","; the field separator string. Same with \code{sep} parameter in \code{\link{write.table}} function.
+		#' 	  default \code{','} correspond to the file name suffix 'csv'. The option \code{'\t'} correspond to the file name suffix 'tsv'. For other options, suffix are all 'txt'.
+		#' @param ... parameters passed to \code{\link{write.table}}.
 		#' @examples
 		#' \dontrun{
 		#' dataset$save_abund(dirpath = "taxa_abund")
+		#' dataset$save_abund(merge_all = TRUE, rm_un = TRUE, sep = "\t")
 		#' }
-		save_abund = function(dirpath = "taxa_abund"){
+		save_abund = function(dirpath = "taxa_abund", merge_all = FALSE, rm_un = FALSE, rm_pattern = "__$", sep = ",", ...){
 			if(!dir.exists(dirpath)){
 				dir.create(dirpath)
 			}
-			for(i in names(self$taxa_abund)){
-				write.csv(self$taxa_abund[[i]], file = paste0(dirpath, "/", i, "_abund.csv"), row.names = TRUE)
+			suffix <- switch(sep, ',' = "csv", '\t' = "tsv", "txt")
+			if(merge_all){
+				res <- data.frame()
+				for(i in names(self$taxa_abund)){
+					res %<>% rbind(., self$taxa_abund[[i]])
+				}
+				res <- data.frame(Taxa = rownames(res), res)
+				if(rm_un){
+					res %<>% .[!grepl(rm_pattern, .$Taxa), ]
+				}
+				save_path <- paste0(dirpath, "/mpa_abund.", suffix)
+				write.table(res, file = save_path, row.names = FALSE, sep = sep, ...)
+				message('Save abundance to ', save_path, ' ...')
+			}else{
+				for(i in names(self$taxa_abund)){
+					tmp <- self$taxa_abund[[i]]
+					if(rm_un){
+						tmp %<>% .[!grepl(rm_pattern, rownames(.)), ]
+					}
+					tmp <- data.frame(Taxa = rownames(tmp), tmp)
+					save_path <- paste0(dirpath, "/", i, "_abund.", suffix)
+					write.table(tmp, file = save_path, row.names = FALSE, sep = sep, ...)
+				}
 			}
 		},
 		#' @description
@@ -568,29 +601,31 @@ microtable <- R6Class(classname = "microtable",
 			renamevec    <-     c("Observed", "Coverage", "Chao1", "ACE", "Shannon", "Simpson", "InvSimpson", "Fisher")
 			names(renamevec) <- c("S.obs", "coverage", "S.chao1", "S.ACE", "shannon", "simpson", "invsimpson", "fisher")
 			if(is.null(measures)){
-				measures <- as.character(renamevec)
+				use_measures <- as.character(renamevec)
+			}else{
+				use_measures <- measures
 			}
-			if(any(measures %in% names(renamevec))){
-				measures[measures %in% names(renamevec)] <- renamevec[names(renamevec) %in% measures]
+			if(any(use_measures %in% names(renamevec))){
+				use_measures[use_measures %in% names(renamevec)] <- renamevec[names(renamevec) %in% use_measures]
 			}
-			if(!any(measures %in% renamevec)){
+			if(!any(use_measures %in% renamevec)){
 				stop("None of the `measures` you provided are supported. Try default `NULL` instead.")
 			}
 			outlist <- vector("list")
 			estimRmeas <- c("Chao1", "Observed", "ACE")
-			if(any(estimRmeas %in% measures)){
+			if(any(estimRmeas %in% use_measures)){
 				outlist <- c(outlist, list(t(data.frame(vegan::estimateR(OTU), check.names = FALSE))))
 			}
-			if("Shannon" %in% measures){
+			if("Shannon" %in% use_measures){
 				outlist <- c(outlist, list(shannon = vegan::diversity(OTU, index = "shannon")))
 			}
-			if("Simpson" %in% measures){
+			if("Simpson" %in% use_measures){
 				outlist <- c(outlist, list(simpson = vegan::diversity(OTU, index = "simpson")))
 			}
-			if("InvSimpson" %in% measures){
+			if("InvSimpson" %in% use_measures){
 				outlist <- c(outlist, list(invsimpson = vegan::diversity(OTU, index = "invsimpson")))
 			}
-			if("Fisher" %in% measures){
+			if("Fisher" %in% use_measures){
 				fisher <- tryCatch(vegan::fisher.alpha(OTU, se = TRUE), 
 					warning = function(w){suppressWarnings(vegan::fisher.alpha(OTU, se = TRUE)[, c("alpha", "se")])},
 					error = function(e){c("Skip the index Fisher because of an error ...")}
@@ -606,7 +641,7 @@ microtable <- R6Class(classname = "microtable",
 					}
 				}
 			}
-			if(is.null(measures)){
+			if("Coverage" %in% use_measures){
 				outlist <- c(outlist, list(coverage = private$goods(OTU)))
 			}
 			if(PD){
@@ -730,13 +765,14 @@ microtable <- R6Class(classname = "microtable",
 			}
 			otu_table
 		},
-		# taxa abundance calculation function
+		# taxa abundance calculation
 		transform_data_proportion = function(
-			input, 
-			columns, 
-			rel, 
-			split_group = FALSE, 
-			split_by = "&&", 
+			input,
+			columns,
+			rel,
+			merge_by = "|",
+			split_group = FALSE,
+			split_by = "&&",
 			split_column
 			){
 			sampleinfo <- input$sample_table
@@ -749,9 +785,9 @@ microtable <- R6Class(classname = "microtable",
 				split_merge_abund <- tidyr::separate_rows(merge_abund, all_of(split_column), sep = split_by)
 				new_tax <- split_merge_abund[, columns, drop = FALSE]
 				new_abund <- split_merge_abund[, (ncol(tax) + 1):(ncol(merge_abund)), drop = FALSE]
-				abund1 <- cbind.data.frame(Display = apply(new_tax, 1, paste, collapse="|"), new_abund)
+				abund1 <- cbind.data.frame(Display = apply(new_tax, 1, paste, collapse = merge_by), new_abund)
 			}else{
-				abund1 <- cbind.data.frame(Display = apply(tax, 1, paste, collapse="|"), abund)
+				abund1 <- cbind.data.frame(Display = apply(tax, 1, paste, collapse = merge_by), abund)
 			}
 			# first convert table to long format
 			# then sum abundance by sample and taxonomy
@@ -769,7 +805,7 @@ microtable <- R6Class(classname = "microtable",
 				colnames(abund1)[colnames(abund1) == "sum_abund"] <- "res_abund"
 			}
 			# dcast the table
-			abund2 <- as.data.frame(data.table::dcast(abund1, Display~Sample, value.var= list("res_abund"))) %>%
+			abund2 <- as.data.frame(data.table::dcast(abund1, Display ~ Sample, value.var = list("res_abund"))) %>%
 				`row.names<-`(.[,1]) %>% 
 				.[,-1, drop = FALSE]
 			abund2 <- abund2[order(apply(abund2, 1, mean), decreasing = TRUE), rownames(sampleinfo), drop = FALSE]

@@ -2,10 +2,10 @@
 % Please edit documentation in R/trans_venn.R
 \name{trans_venn}
 \alias{trans_venn}
-\title{Create \code{trans_venn} object.}
+\title{Create \code{trans_venn} object for the Venn diagram and UpSet plot.}
 \description{
-This class is a wrapper for a series of venn analysis related methods, including 2- to 5-way venn diagram, 
-more than 5-way petal or bar plot and intersection transformations based on David et al. (2012) <doi:10.1128/AEM.01459-12>.
+This class is a wrapper for a series of intersection analysis related methods, including 2- to 5-way venn diagram, 
+more than 5-way petal or UpSet plot and intersection transformations based on David et al. (2012) <doi:10.1128/AEM.01459-12>.
 }
 \examples{
 
@@ -197,25 +197,34 @@ t1$plot_venn()
 \if{html}{\out{<a id="method-trans_venn-plot_bar"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_venn-plot_bar}{}}}
 \subsection{Method \code{plot_bar()}}{
-Plot the intersections using histogram. Especially useful when samples > 5.
+Plot the intersections using , i.e. UpSet plot. Especially useful when samples > 5.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_venn$plot_bar(
-  bottom_y_text_size = 12,
-  up_y_title = "Intersection set",
+  left_plot = TRUE,
+  sort_samples = TRUE,
+  up_y_title = "Intersection size",
   up_y_title_size = 15,
   up_y_text_size = 8,
-  bar_color = "grey70",
-  bar_fill = "grey70",
-  point_size = 3,
-  point_color = "black",
-  bottom_height = 0.5
+  up_bar_fill = "grey70",
+  bottom_y_text_size = 12,
+  bottom_height = 1,
+  bottom_point_size = 3,
+  bottom_point_color = "black",
+  bottom_background_fill = "grey95",
+  left_width = 0.3,
+  left_bar_fill = "grey70",
+  left_x_text_size = 10,
+  left_background_fill = "grey95"
 )}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{bottom_y_text_size}}{default 12; y axis text size, i.e. sample name size, of bottom plot.}
+\item{\code{left_plot}}{default TRUE; whether add the left bar plot to show the feature number of each sample.}
+
+\item{\code{sort_samples}}{default TRUE; whether sort samples according to the number of features in each sample.
+If FALSE, use the sample orders in sample_table of the raw dataset.}
 
 \item{\code{up_y_title}}{default "Intersection set"; y axis title of upper plot.}
 
@@ -223,15 +232,25 @@ Plot the intersections using histogram. Especially useful when samples > 5.
 
 \item{\code{up_y_text_size}}{default 4; y axis text size of upper plot.}
 
-\item{\code{bar_color}}{default "grey70"; bar border color of upper plot.}
+\item{\code{up_bar_fill}}{default "grey70"; bar fill color of upper plot.}
 
-\item{\code{bar_fill}}{default "grey70"; bar fill color of upper plot.}
+\item{\code{bottom_y_text_size}}{default 12; y axis text size, i.e. sample name size, of bottom sample plot.}
 
-\item{\code{point_size}}{default 3; point size of bottom plot.}
+\item{\code{bottom_height}}{default 1; bottom plot height relative to the upper bar plot. 1 represents the height of bottom plot is same with the upper bar plot.}
 
-\item{\code{point_color}}{default "black"; point color of bottom plot.}
+\item{\code{bottom_point_size}}{default 3; point size of bottom plot.}
 
-\item{\code{bottom_height}}{default 0.5; bottom plot height.}
+\item{\code{bottom_point_color}}{default "black"; point color of bottom plot.}
+
+\item{\code{bottom_background_fill}}{default "grey95"; fill color for the striped background in the bottom sample plot.}
+
+\item{\code{left_width}}{default 0.3; left bar plot width relative to the right bottom plot.}
+
+\item{\code{left_bar_fill}}{default "grey70"; fill color for the left bar plot presenting feature number.}
+
+\item{\code{left_x_text_size}}{default 10; x axis text size of the left bar plot.}
+
+\item{\code{left_background_fill}}{default "grey95"; fill color for the striped background in the left plot.}
 }
 \if{html}{\out{</div>}}
 }
