@@ -152,6 +152,14 @@ test1$plot_sum_links(plot_pos = TRUE, plot_num = 10)
 }
 
 ## ------------------------------------------------
+## Method `trans_network$random_network`
+## ------------------------------------------------
+
+\dontrun{
+t1$random_network(runs = 100)
+}
+
+## ------------------------------------------------
 ## Method `trans_network$trans_comm`
 ## ------------------------------------------------
 
@@ -177,6 +185,7 @@ t2 <- t1$trans_comm(use_col = "module")
 \item \href{#method-trans_network-cal_powerlaw}{\code{trans_network$cal_powerlaw()}}
 \item \href{#method-trans_network-cal_sum_links}{\code{trans_network$cal_sum_links()}}
 \item \href{#method-trans_network-plot_sum_links}{\code{trans_network$plot_sum_links()}}
+\item \href{#method-trans_network-random_network}{\code{trans_network$random_network()}}
 \item \href{#method-trans_network-trans_comm}{\code{trans_network$trans_comm()}}
 \item \href{#method-trans_network-print}{\code{trans_network$print()}}
 \item \href{#method-trans_network-clone}{\code{trans_network$clone()}}
@@ -423,13 +432,13 @@ Calculate network modules and add module names to the network node properties.
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{method}}{default "cluster_fast_greedy"; the method used to find the optimal community structure of a graph;
-the following are available functions (options) from igraph package: "cluster_fast_greedy", "cluster_optimal",
-"cluster_edge_betweenness", "cluster_infomap", "cluster_label_prop", "cluster_leading_eigen",
-"cluster_louvain", "cluster_spinglass", "cluster_walktrap". 
-For the details of these functions, see the help document, such as \code{help(cluster_fast_greedy)};
-Note that the default "cluster_fast_greedy" method can only be used for undirected network. 
-If the user selects \code{network_method = "beemStatic"} in cal_network function or provides other directed network, 
-please use cluster_optimal or others for the modules identification.}
+the following are available functions (options) from igraph package: \cr
+\code{"cluster_fast_greedy"}, \code{"cluster_walktrap"}, \code{"cluster_edge_betweenness"}, \cr
+\code{"cluster_infomap"}, \code{"cluster_label_prop"}, \code{"cluster_leading_eigen"}, \cr
+\code{"cluster_louvain"}, \code{"cluster_spinglass"}, \code{"cluster_optimal"}. \cr
+For the details of these functions, please see the help document, such as \code{help(cluster_fast_greedy)};
+Note that the default \code{"cluster_fast_greedy"} method can not be applied to directed network. 
+If directed network is provided, the function can automatically switch the default method from \code{"cluster_fast_greedy"} to \code{"cluster_walktrap"}.}
 
 \item{\code{module_name_prefix}}{default "M"; the prefix of module names; module names are made of the module_name_prefix and numbers;
 numbers are assigned according to the sorting result of node numbers in modules with decreasing trend.}
@@ -828,7 +837,7 @@ If the distribution follows power law, then fit degrees to power law distributio
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{...}}{parameters pass to fit_power_law function in igraph package.}
+\item{\code{...}}{parameters pass to bootstrap_p function in poweRlaw package.}
 }
 \if{html}{\out{</div>}}
 }
@@ -912,6 +921,47 @@ chorddiag plot
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
 test1$plot_sum_links(plot_pos = TRUE, plot_num = 10)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_network-random_network"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_network-random_network}{}}}
+\subsection{Method \code{random_network()}}{
+Generate random networks, compare them with the empirical network and get the p value of topological properties.
+The generation of random graph is based on the \code{erdos.renyi.game} function of igraph package.
+The numbers of vertices and edges in the random graph are same with the empirical network stored in the object.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_network$random_network(runs = 100, output_sim = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{runs}}{default 100; simulation number of random network.}
+
+\item{\code{output_sim}}{default FALSE; whether output each simulated network result.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+a data.frame with the following components:
+\describe{
+  \item{\code{Observed}}{Topological properties of empirical network}
+  \item{\code{Mean_sim}}{Mean of properties of simulated networks}
+  \item{\code{SD_sim}}{SD of properties of simulated networks}
+  \item{\code{p_value}}{Significance, i.e. p values}
+}
+When \code{output_sim = TRUE}, the columns from the five to the last are each simulated result.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$random_network(runs = 100)
 }
 }
 \if{html}{\out{</div>}}

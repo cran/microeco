@@ -9,7 +9,8 @@
 #'  Dunn's Kruskal-Wallis Multiple Comparisons based on the \code{FSA} package, Wilcoxon Rank Sum and Signed Rank Tests, t-test, anova, 
 #'  Scheirer Ray Hare test, 
 #'  R package \code{metagenomeSeq} Paulson et al. (2013) <doi:10.1038/nmeth.2658>, 
-#'  R package \code{ANCOMBC} <doi:10.1038/s41467-020-17041-7>, R package \code{ALDEx2} <doi:10.1371/journal.pone.0067019; 10.1186/2049-2618-2-15> and
+#'  R package \code{ANCOMBC} <doi:10.1038/s41467-020-17041-7>, R package \code{ALDEx2} <doi:10.1371/journal.pone.0067019; 10.1186/2049-2618-2-15>, 
+#'  R package \code{MicrobiomeStat} <doi:10.1186/s13059-022-02655-5> and
 #'  beta regression <doi:10.18637/jss.v034.i02>.
 #' 
 #' @export
@@ -43,6 +44,11 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'     \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallace and generalized linear model (glm) test with \code{ALDEx2} package; 
 		#'     	  see also the test parameter in \code{ALDEx2::aldex} function.}
 		#'     \item{\strong{'DESeq2'}}{Differential expression analysis based on the Negative Binomial (a.k.a. Gamma-Poisson) distribution based on the \code{DESeq2} package.}
+		#'     \item{\strong{'linda'}}{Linear Model for Differential Abundance Analysis of High-dimensional Compositional Data 
+		#'     	  based on the \code{linda} function of \code{MicrobiomeStat} package. 
+		#'     	  Here the group parameter is passed to formula parameter in \code{linda} function with the prefix '~'.
+		#'     	  The parameter \code{feature.dat.type = 'count'} has been fixed. Other parameters can be passed to the \code{linda} function.
+		#'     	 Reference: <doi:10.1186/s13059-022-02655-5>}
 		#'     \item{\strong{'betareg'}}{Beta Regression based on the \code{betareg} package}
 		#'     \item{\strong{'lme'}}{lme: Linear Mixed Effect Model based on the \code{lmerTest} package}
 		#'   }
@@ -56,7 +62,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' @param filter_thres default 0; the relative abundance threshold, such as 0.0005; only available when method != "metastat".
 		#' @param alpha default 0.05; differential significance threshold for method = "lefse" or "rf"; used to select taxa with significance across groups.
 		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for other available options; 
-		#'    NULL mean disuse the p value adjustment; So when \code{p_adjust_method = NULL}, P.adj is same with P.unadj.
+		#'    "none" means disable p value adjustment; So when \code{p_adjust_method = "none"}, P.adj is same with P.unadj.
 		#' @param lefse_subgroup default NULL; sample sub group used for sub-comparision in lefse; Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>.
 		#' @param lefse_min_subsam default 10; sample numbers required in the subgroup test.
 		#' @param lefse_norm default 1000000; scale value in lefse.
@@ -74,11 +80,12 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' 	 "KW", "KW_dunn", "wilcox", "t.test", "anova", "betareg" and "lme";
 		#' 	 passed to \code{ANCOMBC::ancombc2} function when method is "ancombc2" (except tax_level, global and fix_formula parameters);
 		#' 	 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw";
-		#' 	 passed to \code{DESeq2::DESeq} function when method = "DESeq2".
+		#' 	 passed to \code{DESeq2::DESeq} function when method = "DESeq2";
+		#' 	 passed to \code{MicrobiomeStat::linda} function when method = "linda".
 		#' @param by_group default NULL; a column of sample_table used to perform the differential test 
-		#'   among groups (\code{group} parameter) for each group (\code{by_group} parameter). So \code{by_group} has a larger scale than \code{group} parameter.
-		#'   Same with the \code{by_group} parameter in trans_alpha class. 
-		#'   Only useful when method is one of \code{c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare")}.
+		#'   among groups (\code{group} parameter) for each group (\code{by_group} parameter). So \code{by_group} has a higher level than \code{group} parameter.
+		#'   Same with the \code{by_group} parameter in \code{trans_alpha} class. 
+		#'   Only available when method is one of \code{c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare")}.
 		#' @param by_ID default NULL; a column of sample_table used to perform paired t test or paired wilcox test for the paired data,
 		#'   such as the data of plant compartments for different plant species (ID). 
 		#'   So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.
@@ -105,7 +112,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		initialize = function(
 			dataset = NULL,
 			method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", 
-				"ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "betareg", "lme")[1],
+				"ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "linda", "betareg", "lme")[1],
 			group = NULL,
 			taxa_level = "all",
 			filter_thres = 0,
@@ -124,33 +131,40 @@ trans_diff <- R6Class(classname = "trans_diff",
 			by_ID = NULL,
 			...
 			){
+			if(is.null(p_adjust_method)){
+				message('Redefine p_adjust_method = "fdr" instead of NULL. To disable p value adjustment, please use p_adjust_method = "none" ...')
+				p_adjust_method <- "fdr"
+			}
 			if(is.null(dataset)){
 				self$method <- NULL
 				message("Input dataset is NULL. Please run the functions with customized data ...")
 			}else{
+				method <- match.arg(method, c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", 
+					"anova", "scheirerRayHare", "ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "linda", "betareg", "lme"))
 				# in case of dataset changes
 				tmp_dataset <- clone(dataset)
 				sampleinfo <- tmp_dataset$sample_table
 				if(is.null(group) & ! method %in% c("anova", "scheirerRayHare", "betareg", "lme")){
-					stop("The group parameter need to be provided for differential test among groups!")
+					stop("The group parameter is necessary for differential test among groups!")
 				}else{
 					if(!is.null(group)){
-						if(length(group) > 1){
-							stop("Please provide only one colname of sample_table for group parameter!")
-						}else{
-							if(! group %in% colnames(sampleinfo)){
-								stop("Please provide a correct colname of sample_table for group parameter!")
+						if(! method %in% c("linda")){
+							if(length(group) > 1){
+								stop("Please provide only one colname of sample_table for group parameter!")
+							}else{
+								if(! group %in% colnames(sampleinfo)){
+									stop("Please provide a correct colname of sample_table for group parameter!")
+								}
 							}
 						}
 					}
 				}
-				method <- match.arg(method, c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", 
-					"anova", "scheirerRayHare", "ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "betareg", "lme"))
-				
 				if(!is.null(group)){
-					if(is.factor(sampleinfo[, group])){
-						self$group_order <- levels(sampleinfo[, group])
-						sampleinfo[, group] %<>% as.character
+					if(group %in% colnames(sampleinfo)){
+						if(is.factor(sampleinfo[, group])){
+							self$group_order <- levels(sampleinfo[, group])
+							sampleinfo[, group] %<>% as.character
+						}
 					}
 				}
 				################################
@@ -184,7 +198,6 @@ trans_diff <- R6Class(classname = "trans_diff",
 					self$lefse_norm <- lefse_norm
 				}
 				abund_table %<>% {.[!grepl("__$|uncultured$|Incertae..edis$|_sp$", rownames(.), ignore.case = TRUE), ]}
-				################################
 				
 				if(method %in% c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "betareg", "lme")){
 					if(method == "KW_dunn"){
@@ -221,18 +234,25 @@ trans_diff <- R6Class(classname = "trans_diff",
 					names(pvalue_raw) <- rownames(abund_table)
 					pvalue_raw[is.nan(pvalue_raw)] <- 1
 					message(sum(pvalue_raw < alpha), " taxa found significant ...")
-					if(is.null(p_adjust_method)){
-						pvalue <- pvalue_raw
-					}else{
-						pvalue <- p.adjust(pvalue_raw, method = p_adjust_method)
-					}
+
+					pvalue <- p.adjust(pvalue_raw, method = p_adjust_method)
 					# select significant taxa
 					sel_taxa <- pvalue < alpha
 					message("After P value adjustment, ", sum(sel_taxa), " taxa found significant ...")
 					if(sum(sel_taxa) == 0){
-						stop("No significant taxa found! Stop running!")
+						if(p_adjust_method == "none"){
+							stop('No significant feature found!')
+						}else{
+							stop('No significant feature found! To disable p value adjustment, please use p_adjust_method = "none"!')
+						}
 					}
-
+					if(sum(sel_taxa) == 1){
+						if(p_adjust_method == "none"){
+							stop('Only one significant feature found! Stop running subsequent process!')
+						}else{
+							stop('Only one significant feature found! Stop running subsequent process! To disable p value adjustment, please use p_adjust_method = "none"!')
+						}
+					}
 					abund_table_sub <- abund_table[sel_taxa, ]
 					pvalue_sub <- pvalue[sel_taxa]
 					class_taxa_median_sub <- lapply(res_class, function(x) x$med) %>% do.call(cbind, .) %>% .[, sel_taxa]
@@ -434,9 +454,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				}
 				#######################################
 				if(method %in% c("metastat", "metagenomeSeq", "ancombc2", "ALDEx2_t", "DESeq2")){
-					if(taxa_level == "all"){
-						stop("Please provide the taxa_level instead of 'all', such as 'Genus' !")
-					}
+					private$check_taxa_level_all(taxa_level)
 					if(is.null(group_choose_paired)){
 						all_name <- combn(unique(as.character(sampleinfo[, group])), 2)
 					}else{
@@ -513,14 +531,10 @@ trans_diff <- R6Class(classname = "trans_diff",
 						# extract the result
 						tb <- data.frame(logFC = objres1@fitZeroLogNormal$logFC, se = objres1@fitZeroLogNormal$se)
 						p <- objres1@pvalues
-						if(is.null(p_adjust_method)){
-							padj <- p
+						if(p_adjust_method == "ihw-ubiquity" | p_adjust_method == "ihw-abundance"){
+							padj <- MRihw(objres1, p, p_adjust_method, 0.1)
 						}else{
-							if (p_adjust_method == "ihw-ubiquity" | p_adjust_method == "ihw-abundance") {
-								padj <- MRihw(objres1, p, p_adjust_method, 0.1)
-							} else {
-								padj <- p.adjust(p, method = p_adjust_method)
-							}
+							padj <- p.adjust(p, method = p_adjust_method)
 						}
 						srt <- order(p, decreasing = FALSE)
 						valid <- 1:length(padj)
@@ -603,7 +617,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 						newdata <- microtable$new(otu_table = use_dataset$taxa_abund[[taxa_level]], sample_table = use_dataset$sample_table)
 						newdata$tidy_dataset()
 						newdata <- file2meco::meco2phyloseq(newdata)
-						res_raw <- ancombc2(newdata, tax_level = "Species", group = group, fix_formula = group, ...)
+						res_raw <- ANCOMBC::ancombc2(newdata, tax_level = "Species", group = group, fix_formula = group, ...)
 						res_raw2 <- res_raw$res
 						res <- data.frame(feature = res_raw2$taxon, 
 							W = res_raw2[, which(grepl("^W_", colnames(res_raw2)) & !grepl("Intercept", colnames(res_raw2)))], 
@@ -659,6 +673,50 @@ trans_diff <- R6Class(classname = "trans_diff",
 						output$P.adj <- output[, ALDEx2_sig %>% .[. %in% colnames(output)] %>% .[1]]
 					}
 				}
+				if(method == "linda"){
+					if(!require("MicrobiomeStat")){
+						stop("MicrobiomeStat package is not installed!")
+					}
+					private$check_taxa_level_all(taxa_level)
+					use_dataset <- clone(tmp_dataset)
+					use_dataset$tidy_dataset()
+					suppressMessages(use_dataset$cal_abund(rel = FALSE))
+					if(!grepl("^~", group)){
+						use_formula <- paste0("~", group)
+					}else{
+						use_formula <- group
+						group %<>% gsub("^~", "", .)
+					}
+					message("Perform linda with formula: ", use_formula, " ...")
+					res <- MicrobiomeStat::linda(as.matrix(use_dataset$taxa_abund[[taxa_level]]), use_dataset$sample_table, formula = use_formula, 
+						feature.dat.type = 'count', ...)
+					self$res_diff_raw <- res
+					message('Original result is stored in object$res_diff_raw ...')
+					group_filter <- gsub(" ", "", group)
+					group_split <- strsplit(group, split = "+", fixed = TRUE) %>% unlist
+					group_split %<>% .[. %in% colnames(use_dataset$sample_table)]
+					list_groups <- list()
+					for(j in group_split){
+						list_groups[[j]] <- use_dataset$sample_table[, j] %>% as.character %>% unique
+					}
+					output <- data.frame()
+					for(i in names(res$output)){
+						message('Tidy and merge the table: ', i,' ...')
+						tmp <- res$output[[i]]
+						# identify group name and elements
+						for(j in names(list_groups)){
+							if(i %in% paste0(j, list_groups[[j]])){
+								tmp_group_element1 <- gsub(j, "", i)
+								tmp_group_element2 <- paste0(j, list_groups[[j]]) %>% .[!. %in% names(res$output)] %>% gsub(j, "", .)
+								tmp <- data.frame(compare = paste0(tmp_group_element1, " - ", tmp_group_element2), Taxa = rownames(tmp), tmp)
+								output %<>% rbind(., tmp)
+							}else{
+								next
+							}
+						}
+					}
+					colnames(output)[colnames(output) %in% c("pvalue", "padj")] <- c("P.unadj", "P.adj")
+				}
 				#######################################
 				# output taxonomic abundance mean and sd for the final res_abund and enrich group finding in metagenomeSeq or ANCOMBC
 				if(grepl("lefse", method, ignore.case = TRUE)){
@@ -672,23 +730,32 @@ trans_diff <- R6Class(classname = "trans_diff",
 				}
 				# further calculate mean and sd of res_abund with group parameter
 				if(!is.null(group)){
-					colnames(res_abund) <- c("Taxa", "Sample", "Abund")
-					res_abund <- suppressWarnings(dplyr::left_join(res_abund, rownames_to_column(sampleinfo), by = c("Sample" = "rowname")))
-					res_abund <- microeco:::summarySE_inter(res_abund, measurevar = "Abund", groupvars = c("Taxa", group))
-					colnames(res_abund)[colnames(res_abund) == group] <- "Group"
+					if(group %in% colnames(sampleinfo)){
+						colnames(res_abund) <- c("Taxa", "Sample", "Abund")
+						res_abund <- suppressWarnings(dplyr::left_join(res_abund, rownames_to_column(sampleinfo), by = c("Sample" = "rowname")))
+						res_abund <- microeco:::summarySE_inter(res_abund, measurevar = "Abund", groupvars = c("Taxa", group))
+						colnames(res_abund)[colnames(res_abund) == group] <- "Group"
+					}
 				}
-				if(method %in% c("metagenomeSeq", "ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2")){
+				if(method %in% c("metagenomeSeq", "ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "linda")){
 					output %<>% dropallfactors(unfac2num = TRUE)
 					colnames(output)[1:2] <- c("Comparison", "Taxa")
 					output$Significance <- cut(output$P.adj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", "ns"))
-					# filter the unknown taxa in output
-					output %<>% .[.$Taxa %in% res_abund$Taxa, ]
-					# get enriched group
-					output$Group <- lapply(seq_along(output$Taxa), function(x){
-						select_group_split <- strsplit(output[x, "Comparison"], split = " - ") %>% unlist
-						res_abund[res_abund$Taxa == output[x, "Taxa"] & res_abund$Group %in% select_group_split, ] %>%
-						{.[which.max(.$Mean), "Group"]}
-					}) %>% unlist
+					if(group %in% colnames(sampleinfo)){
+						# filter the unknown taxa in output
+						output %<>% .[.$Taxa %in% res_abund$Taxa, ]
+						# get enriched group
+						output$Group <- lapply(seq_along(output$Taxa), function(x){
+							select_group_split <- strsplit(output[x, "Comparison"], split = " - ") %>% unlist
+							res_abund[res_abund$Taxa == output[x, "Taxa"] & res_abund$Group %in% select_group_split, ] %>%
+							{.[which.max(.$Mean), "Group"]}
+						}) %>% unlist
+					}
+				}
+				if(method == "linda"){
+					if(! group %in% colnames(sampleinfo)){
+						method <- paste0("linda formula: ", group)
+					}
 				}
 				self$res_diff <- output
 				message(method , " analysis result is stored in object$res_diff ...")
@@ -1030,7 +1097,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			method <- self$method
 			if(!is.null(method)){
 				if(grepl("formula", method)){
-					stop("The function can not be applied to multi-way anova!")
+					stop("The function can not be applied to multi-factor analysis!")
 				}
 				if(method == "lefse"){
 					colnames(use_data)[colnames(use_data) == "LDA"] <- "Value"
@@ -1241,7 +1308,13 @@ trans_diff <- R6Class(classname = "trans_diff",
 				stop("This function is available only when taxa_level = 'all' !")
 			}
 			if(!is.null(use_feature_num)){
-				marker_table %<>% .[1:use_feature_num, ]
+				if(use_feature_num > nrow(marker_table)){
+					message("Input use_feature_num ", use_feature_num, " larger than available features number ", nrow(marker_table), " ! ", 
+						"Use ", nrow(marker_table), " instead of it ...")
+				}else{
+					message("Select ", use_feature_num, " significant features ...")
+					marker_table %<>% .[1:use_feature_num, ]
+				}
 			}
 			if(only_select_show == T){
 				marker_table %<>% .[.$Taxa %in% select_show_labels, ]
@@ -1258,8 +1331,16 @@ trans_diff <- R6Class(classname = "trans_diff",
 			}
 			
 			# filter redundant groups
-			color_groups %<>% .[. %in% unique(marker_table$Group)]
-			marker_table %<>% .[.$Group %in% color_groups, ]
+			if(! all(color_groups %in% unique(marker_table$Group))){
+				tmp_message <- color_groups[! color_groups %in% unique(marker_table$Group)]
+				message("Part of groups in group_order, ", paste(tmp_message, collapse = " "), ", not found in the feature table ...")
+				color_groups %<>% .[. %in% unique(marker_table$Group)]
+			}
+			if(! all(unique(marker_table$Group) %in% color_groups)){
+				tmp_message <- unique(marker_table$Group)[! unique(marker_table$Group) %in% color_groups]
+				message("Part of groups in the feature table, ", paste(tmp_message, collapse = " "), ", not found in the group_order ...")
+				marker_table %<>% .[.$Group %in% color_groups, ]
+			}
 			# get the color palette
 			if(length(color) < length(unique(marker_table$Group))){
 				stop("Please provide enough color palette! There are ", length(unique(marker_table$Group)), 
@@ -1268,71 +1349,20 @@ trans_diff <- R6Class(classname = "trans_diff",
 				color <- color[1:length(unique(marker_table$Group))]
 			}
 
-			# filter the taxa with unidentified classification or with space, in case of the unexpected error in the following operations
-			abund_table %<>% {.[!grepl("\\|.__\\|", rownames(.)), ]} %>%
-				{.[!grepl("\\s", rownames(.)), ]} %>%
-				# also filter uncleared classification to make it in line with the lefse above
-				{.[!grepl("Incertae_sedis|unculture", rownames(.), ignore.case = TRUE), ]}
-
-			if(!is.null(use_taxa_num)){
-				abund_table %<>% .[names(sort(apply(., 1, mean), decreasing = TRUE)[1:use_taxa_num]), ]
-			}
-			if(!is.null(filter_taxa)){
-				abund_table %<>% .[apply(., 1, mean) > (self$lefse_norm * filter_taxa), ]
-			}
-			abund_table %<>% .[sort(rownames(.)), ]
-
-			tree_table <- data.frame(taxa = row.names(abund_table), abd = rowMeans(abund_table), stringsAsFactors = FALSE) %>%
-				dplyr::mutate(taxa =  paste("r__Root", .data$taxa, sep = sep), abd = .data$abd/max(.data$abd)*100)
-			taxa_split <- strsplit(tree_table$taxa, split = sep, fixed = TRUE)
-			nodes <- purrr::map_chr(taxa_split, utils::tail, n = 1)
-
-			# check whether some nodes duplicated from bad classification
-			if(any(duplicated(nodes))){
-				del <- nodes %>% .[duplicated(.)] %>% unique
-				for(i in del){
-					tree_table %<>% .[!grepl(paste0("\\|", i, "($|\\|)"), .$taxa), ]
-				}
-				taxa_split <- strsplit(tree_table$taxa, split = sep, fixed = TRUE)
-				nodes <- purrr::map_chr(taxa_split, utils::tail, n = 1)
-			}
-
-			# add root node
-			nodes %<>% c("r__Root", .)
-			# levels used for extend of clade label
-			label_levels <- purrr::map_chr(nodes, ~ gsub("__.*$", "", .x)) %>%
-				factor(levels = rev(unlist(lapply(taxa_split, function(x) gsub("(.)__.*", "\\1", x))) %>% .[!duplicated(.)]))
-
-			# root must be a parent node
-			nodes_parent <- purrr::map_chr(taxa_split, ~ .x[length(.x) - 1]) %>% c("root", .)
-
-			## add index for nodes
-			is_tip <- !nodes %in% nodes_parent
-			index <- vector("integer", length(is_tip))
-			index[is_tip] <- 1:sum(is_tip)
-			index[!is_tip] <- (sum(is_tip)+1):length(is_tip)
-
-			edges <- cbind(parent = index[match(nodes_parent, nodes)], child = index)
-			edges <- edges[!is.na(edges[, 1]), ]
-			# not label the tips
-			node_label <- nodes[!is_tip]
-			phylo <- structure(list(
-				edge = edges, 
-				node.label = node_label, 
-				tip.label = nodes[is_tip], 
-				edge.length = rep(1, nrow(edges)), 
-				Nnode = length(node_label)
-				), class = "phylo")
-			mapping <- data.frame(
-				node = index, 
-				abd = c(100, tree_table$abd),
-				node_label = nodes, 
-				stringsAsFactors = FALSE)
-			mapping$node_class <- label_levels
-			tree <- tidytree::treedata(phylo = phylo, data = tibble::as_tibble(mapping))
-			tree <- ggtree::ggtree(tree, size = 0.2, layout = 'circular')
+			# first plot background circular tree
+			tree <- private$plot_backgroud_tree(abund_table = abund_table, use_taxa_num = use_taxa_num, filter_taxa = filter_taxa, sep = sep)
 			
-			annotation <- private$generate_cladogram_annotation(marker_table, tree = tree, color = color, color_groups = color_groups)
+			# generate annotation
+			annotation <- private$generate_cladogram_annotation(marker_table, tree = tree, color = color, color_groups = color_groups, sep = sep)
+			# check again filtered groups
+			if(!is.null(use_taxa_num)){
+				if(! all(color_groups %in% unique(annotation$enrich_group))){
+					tmp_message <- color_groups[! color_groups %in% unique(annotation$enrich_group)]
+					message("Biomarkers in group(s), ", paste(tmp_message, collapse = " "), ", not found in the background tree!", 
+						" Please try to enlarge parameter use_taxa_num from ", use_taxa_num, " to a larger one ...")
+					color_groups %<>% .[. %in% unique(annotation$enrich_group)]
+				}
+			}
 			# backgroup hilight
 			annotation_info <- dplyr::left_join(annotation, tree$data, by = c("node" = "label")) %>%
 				dplyr::mutate(label = .data$node, id = .data$node.y, level = as.numeric(.data$node_class))
@@ -1345,7 +1375,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			)
 			hilights_g <- purrr::pmap(hilight_para, ggtree::geom_hilight)
 			tree <- purrr::reduce(hilights_g, `+`, .init = tree)
-
+			
 			# hilight legend
 			hilights_df <- dplyr::distinct(annotation_info, .data$enrich_group, .data$color)
 			hilights_df$x <- 0
@@ -1357,7 +1387,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 
 			# add legend
 			tree <- tree + 
-				geom_rect(aes_(xmin = ~x, xmax = ~x, ymax = ~y, ymin = ~y, fill = ~enrich_group), data = hilights_df, inherit.aes = FALSE) +
+				geom_rect(aes(xmin = x, xmax = x, ymax = y, ymin = y, fill = enrich_group), data = hilights_df, inherit.aes = FALSE) +
 				guides(fill = guide_legend(title = NULL, order = 1, override.aes = list(fill = hilights_df$color)))
 
 			# set nodes color and size
@@ -1442,6 +1472,11 @@ trans_diff <- R6Class(classname = "trans_diff",
 		}
 		),
 	private = list(
+		check_taxa_level_all = function(taxa_level){
+			if(taxa_level == "all"){
+				stop("The taxa_level parameter cannot be 'all' for this method! Please provide a taxonomic level, such as 'Genus' !")
+			}
+		},
 		# group test for lefse or rf
 		test_mark = function(dataframe, group, min_num_nonpara = 1, method = NULL){
 			d1 <- as.data.frame(t(dataframe))
@@ -1474,6 +1509,71 @@ trans_diff <- R6Class(classname = "trans_diff",
 				list(p_value = res1$p.value, med = med)
 			}
 		},
+		# plot the background tree according to raw abundance table
+		plot_backgroud_tree = function(abund_table, use_taxa_num = NULL, filter_taxa = NULL, sep = "|"){
+			# filter the taxa with unidentified classification or with space, in case of the unexpected error in the following operations
+			abund_table %<>% {.[!grepl("\\|.__\\|", rownames(.)), ]} %>%
+				{.[!grepl("\\s", rownames(.)), ]} %>%
+				# also filter uncleared classification to make it in line with the lefse above
+				{.[!grepl("Incertae_sedis|unculture", rownames(.), ignore.case = TRUE), ]}
+			
+			if(!is.null(use_taxa_num)){
+				message("Select ", use_taxa_num, " most abundant taxa as the background cladogram ...")
+				abund_table %<>% .[names(sort(apply(., 1, mean), decreasing = TRUE)[1:use_taxa_num]), ]
+			}
+			if(!is.null(filter_taxa)){
+				abund_table %<>% .[apply(., 1, mean) > (self$lefse_norm * filter_taxa), ]
+			}
+			abund_table %<>% .[sort(rownames(.)), ]
+			tree_table <- data.frame(taxa = row.names(abund_table), abd = rowMeans(abund_table), stringsAsFactors = FALSE) %>%
+				dplyr::mutate(taxa = paste("r__Root", .data$taxa, sep = sep), abd = .data$abd/max(.data$abd)*100)
+			taxa_split <- strsplit(tree_table$taxa, split = sep, fixed = TRUE)
+			nodes <- purrr::map_chr(taxa_split, utils::tail, n = 1)
+			# check whether some nodes duplicated from bad classification
+			if(any(duplicated(nodes))){
+				del <- nodes %>% .[duplicated(.)] %>% unique
+				for(i in del){
+					tree_table %<>% .[!grepl(paste0("\\|", i, "($|\\|)"), .$taxa), ]
+				}
+				taxa_split <- strsplit(tree_table$taxa, split = sep, fixed = TRUE)
+				nodes <- purrr::map_chr(taxa_split, utils::tail, n = 1)
+			}
+			# add root node
+			nodes %<>% c("r__Root", .)
+			# levels used for extending clade label
+			label_levels <- purrr::map_chr(nodes, ~ gsub("__.*$", "", .x)) %>%
+				factor(levels = rev(unlist(lapply(taxa_split, function(x) gsub("(.)__.*", "\\1", x))) %>% .[!duplicated(.)]))
+
+			# root must be a parent node
+			nodes_parent <- purrr::map_chr(taxa_split, ~ .x[length(.x) - 1]) %>% c("root", .)
+
+			# add index for nodes
+			is_tip <- !nodes %in% nodes_parent
+			index <- vector("integer", length(is_tip))
+			index[is_tip] <- 1:sum(is_tip)
+			index[!is_tip] <- (sum(is_tip) + 1):length(is_tip)
+
+			edges <- cbind(parent = index[match(nodes_parent, nodes)], child = index)
+			edges <- edges[!is.na(edges[, 1]), ]
+			# not label the tips
+			node_label <- nodes[!is_tip]
+			phylo <- structure(list(
+				edge = edges, 
+				node.label = node_label, 
+				tip.label = nodes[is_tip], 
+				edge.length = rep(1, nrow(edges)), 
+				Nnode = length(node_label)
+				), class = "phylo")
+			mapping <- data.frame(
+				node = index, 
+				abd = c(100, tree_table$abd),
+				node_label = nodes, 
+				stringsAsFactors = FALSE)
+			mapping$node_class <- label_levels
+			tree <- tidytree::treedata(phylo = phylo, data = tibble::as_tibble(mapping))
+			tree <- ggtree::ggtree(tree, size = 0.2, layout = 'circular')
+			tree
+		},
 		# generate the cladogram annotation table
 		generate_cladogram_annotation = function(marker_table, tree, color, color_groups, sep = "|") {
 			use_marker_table <- marker_table
@@ -1505,393 +1605,12 @@ trans_diff <- R6Class(classname = "trans_diff",
 			sp.df <- tree_data[match(sp2, tree_data$node),]
 			mean(range(sp.df$angle))
 		},
-		get_offset = function(x) {(x*0.2+0.2)^2},
-		# metastat input
+		get_offset = function(x){(x*0.2+0.2)^2},
+		# dependent functions in utility
 		calculate_metastat = function(inputdata, g, pflag = FALSE, threshold = NULL, B = NULL){
-			trans_data <- private$load_frequency_matrix(input = inputdata)
-			res <- private$detect_differentially_abundant_features(jobj = trans_data, g = g, pflag = pflag, threshold = threshold, B = B)
+			trans_data <- load_frequency_matrix(input = inputdata)
+			res <- detect_differentially_abundant_features(jobj = trans_data, g = g, pflag = pflag, threshold = threshold, B = B)
 			res
-		},
-		#*****************************************************************************************************
-		#Modified from raw metastat code
-		#load up the frequency matrix from a file
-		#*****************************************************************************************************
-		# Note sep
-		load_frequency_matrix = function(input){
-			# load names 
-			subjects <- array(0,dim=c(ncol(input)));
-			for(i in 1:length(subjects)) {
-				subjects[i] <- as.character(colnames(input)[i]);
-			}
-			# load taxa
-			taxa <- array(0,dim=c(nrow(input)));
-			for(i in 1:length(taxa)) {
-				taxa[i] <- as.character(rownames(input)[i]);
-			}
-			# load remaining counts
-			matrix <- array(0, dim=c(length(taxa),length(subjects)));
-			for(i in 1:length(taxa)){
-				for(j in 1:length(subjects)){ 
-					matrix[i,j] <- as.numeric(input[i,j]);
-				}
-			}
-			jobj <- list(matrix=matrix, taxa=taxa)
-			return(jobj)
-		},
-		#  Modified from metastat raw codes
-		# http://metastats.cbcb.umd.edu/detect_DA_features.r
-		#*****************************************************************************************************
-		#  Author: james robert white, whitej@umd.edu, Center for Bioinformatics and Computational Biology.
-		#  University of Maryland - College Park, MD 20740
-		#
-		#  This software is designed to identify differentially abundant features between two groups
-		#  Input is a matrix of frequency data. Several thresholding options are available.
-		#  See documentation for details.
-		#*****************************************************************************************************
-		#*****************************************************************************************************
-		#  detect_differentially_abundant_features:
-		#  the major function - inputs an R object "jobj" containing a list of feature names and the 
-		#  corresponding frequency matrix, the argument g is the first column of the second group. 
-		#  
-		#  -> set the pflag to be TRUE or FALSE to threshold by p or q values, respectively
-		#  -> threshold is the significance level to reject hypotheses by.
-		#  -> B is the number of bootstrapping permutations to use in estimating the null t-stat distribution.
-		#*****************************************************************************************************
-		#*****************************************************************************************************
-		detect_differentially_abundant_features = function(jobj, g, pflag = NULL, threshold = NULL, B = NULL){
-			#**********************************************************************************
-			# ************************ INITIALIZE COMMAND-LINE ********************************
-			# ************************        PARAMETERS       ********************************
-			#**********************************************************************************
-			qflag = FALSE;
-			if (is.null(B)){
-				B = 1000;
-			}
-			if (is.null(threshold)){
-				threshold = 0.05;
-			}
-			if (is.null(pflag)){
-				pflag = TRUE;
-				qflag = FALSE;
-			}
-			if (pflag == TRUE){
-				qflag = FALSE;
-			}
-			if (pflag == FALSE){
-				qflag = TRUE;
-			}
-			#********************************************************************************
-			# ************************ INITIALIZE PARAMETERS ********************************
-			#********************************************************************************
-			Fmatrix <- jobj$matrix;                   # the feature abundance matrix
-			taxa <- jobj$taxa;                        # the taxa/(feature) labels of the TAM
-			nrows = nrow(Fmatrix);                   
-			ncols = ncol(Fmatrix);
-			Pmatrix <- array(0, dim=c(nrows,ncols));  # the relative proportion matrix
-			C1 <- array(0, dim=c(nrows,3));           # statistic profiles for class1 and class 2
-			C2 <- array(0, dim=c(nrows,3));           # mean[1], variance[2], standard error[3]   
-			T_statistics <- array(0, dim=c(nrows,1)); # a place to store the true t-statistics 
-			pvalues <- array(0, dim=c(nrows,1));      # place to store pvalues
-			qvalues <- array(0, dim=c(nrows,1));      # stores qvalues
-			#*************************************
-			#  convert to proportions
-			#  generate Pmatrix
-			#*************************************
-			totals <- array(0, dim=c(ncol(Fmatrix)));
-			for (i in 1:ncol(Fmatrix)) {
-				# sum the ith column 
-				totals[i] = sum(Fmatrix[,i]);
-			}
-			for (i in 1:ncols) {   # for each subject
-				for (j in 1:nrows) { # for each row
-					Pmatrix[j,i] = Fmatrix[j,i]/totals[i];
-				}
-			}
-			#********************************************************************************
-			# ************************** STATISTICAL TESTING ********************************
-			#********************************************************************************
-			if (ncols == 2){  # then we have a two sample comparison
-				#************************************************************
-				#  generate p values using chisquared or fisher's exact test
-				#************************************************************
-				for (i in 1:nrows){           # for each feature
-					f11 = sum(Fmatrix[i,1]);
-					f12 = sum(Fmatrix[i,2]);
-					f21 = totals[1] - f11;
-					f22 = totals[2] - f12;
-					C1[i,1] = f11/totals[1];                       # proportion estimate
-					C1[i,2] = (C1[i,1]*(1-C1[i,1]))/(totals[1]-1); # sample variance
-					C1[i,3] = sqrt(C1[i,2]);                       # sample standard error
-					C2[i,1] = f12/totals[2];
-					C2[i,2] = (C2[i,1]*(1-C2[i,1]))/(totals[2]-1);
-					C2[i,3] = sqrt(C2[i,2]);
-					
-					#  f11  f12
-					#  f21  f22  <- contigency table format
-					contingencytable <- array(0, dim=c(2,2));
-					contingencytable[1,1] = f11;
-					contingencytable[1,2] = f12;
-					contingencytable[2,1] = f21;
-					contingencytable[2,2] = f22;
-					if (f11 > 20 && f22 > 20){
-						csqt <- stats::chisq.test(contingencytable);
-						pvalues[i] = csqt$p.value;
-					}else{
-						ft <- stats::fisher.test(contingencytable, workspace = 8e6, alternative = "two.sided", conf.int = FALSE);
-						pvalues[i] = ft$p.value;
-					}
-				}
-				#*************************************
-				#  calculate q values from p values
-				#*************************************
-				qvalues <- private$calc_qvalues(pvalues);
-			}else{ # we have multiple subjects per population
-				#*************************************
-				#  generate statistics mean, var, stderr    
-				#*************************************
-				for (i in 1:nrows){ # for each taxa
-					# find the mean of each group
-					C1[i,1] = mean(Pmatrix[i, 1:g-1]);  
-					C1[i,2] = stats::var(Pmatrix[i, 1:g-1]); # variance
-					C1[i,3] = C1[i,2]/(g-1);    # std err^2 (will change to std err at end)
-
-					C2[i,1] = mean(Pmatrix[i, g:ncols]);  
-					C2[i,2] = stats::var(Pmatrix[i, g:ncols]);  # variance
-					C2[i,3] = C2[i,2]/(ncols-g+1); # std err^2 (will change to std err at end)
-				}
-				#*************************************
-				#  two sample t-statistics
-				#*************************************
-				for (i in 1:nrows){                   # for each taxa
-					xbar_diff = C1[i,1] - C2[i,1]; 
-					denom = sqrt(C1[i,3] + C2[i,3]);
-					T_statistics[i] = xbar_diff/denom;  # calculate two sample t-statistic
-				}
-				#*************************************
-				# generate initial permuted p-values
-				#*************************************
-				pvalues <- private$permuted_pvalues(Pmatrix, T_statistics, B, g, Fmatrix);
-				#*************************************
-				#  generate p values for sparse data 
-				#  using fisher's exact test
-				#*************************************
-				for (i in 1:nrows){                   # for each taxa
-					if (sum(Fmatrix[i,1:(g-1)]) < (g-1) && sum(Fmatrix[i,g:ncols]) < (ncols-g+1)){
-						# then this is a candidate for fisher's exact test
-						f11 = sum(Fmatrix[i,1:(g-1)]);
-						f12 = sum(Fmatrix[i,g:ncols]);
-						f21 = sum(totals[1:(g-1)]) - f11;
-						f22 = sum(totals[g:ncols]) - f12;
-						#  f11  f12
-						#  f21  f22  <- contigency table format
-						contingencytable <- array(0, dim=c(2,2));
-						contingencytable[1,1] = f11;
-						contingencytable[1,2] = f12;
-						contingencytable[2,1] = f21;
-						contingencytable[2,2] = f22;
-						ft <- fisher.test(contingencytable, workspace = 8e6, alternative = "two.sided", conf.int = FALSE);
-						pvalues[i] = ft$p.value; 
-					}  
-				}
-
-				#*************************************
-				#  calculate q values from p values
-				#*************************************
-				qvalues <- private$calc_qvalues(pvalues);
-				#*************************************
-				#  convert stderr^2 to std error
-				#*************************************
-				for (i in 1:nrows){
-					C1[i,3] = sqrt(C1[i,3]);
-					C2[i,3] = sqrt(C2[i,3]);
-				}
-			}
-			#*************************************
-			#  threshold sigvalues and print
-			#*************************************
-			sigvalues <- array(0, dim=c(nrows,1));
-			if (pflag == TRUE){  # which are you thresholding by?
-				sigvalues <- pvalues;
-			}else{
-				sigvalues <- qvalues;
-			}
-			s = sum(sigvalues <= threshold);
-			Differential_matrix <- array(0, dim=c(s,9));
-			dex = 1;
-			for (i in 1:nrows){
-				if (sigvalues[i] <= threshold){
-					Differential_matrix[dex,1]   = jobj$taxa[i];
-					Differential_matrix[dex,2:4] = C1[i,];
-					Differential_matrix[dex,5:7] = C2[i,];
-					Differential_matrix[dex,8]   = pvalues[i];  
-					Differential_matrix[dex,9]   = qvalues[i];
-					dex = dex+1;  
-				}
-			}
-			# show(Differential_matrix);
-			Total_matrix <- array(0, dim=c(nrows,9));
-			for (i in 1:nrows){
-				Total_matrix[i,1]   = jobj$taxa[i];
-				Total_matrix[i,2:4] = C1[i,];
-				Total_matrix[i,5:7] = C2[i,];
-				Total_matrix[i,8]   = pvalues[i];
-				Total_matrix[i,9]   = qvalues[i];
-			}
-			colnames(Total_matrix) <- c("taxa", "mean(group1)", "variance(group1)", "std.err(group1)", "mean(group2)", "variance(group2)", "std.err(group2)", "pvalue", "qvalue")
-			Total_matrix <- Total_matrix[order(Total_matrix[, "pvalue"], decreasing = FALSE), ]
-			Total_matrix
-		},
-		#*****************************************************************************************************
-		# takes a matrix, a permutation vector, and a group division g.
-		# returns a set of ts based on the permutation.
-		#*****************************************************************************************************
-		permute_and_calc_ts = function(Imatrix, y, g){
-			nr = nrow(Imatrix);
-			nc = ncol(Imatrix);
-			# first permute the rows in the matrix
-			Pmatrix <- Imatrix[,y[1:length(y)]];
-			Ts <- private$calc_twosample_ts(Pmatrix, g, nr, nc);
-			return (Ts)
-		},
-		#*****************************************************************************************************
-		#  function to calculate qvalues.
-		#  takes an unordered set of pvalues corresponding the rows of the matrix
-		#*****************************************************************************************************
-		calc_qvalues = function(pvalues){
-			nrows = length(pvalues);
-			# create lambda vector
-			lambdas <- seq(0,0.95,0.01);
-			pi0_hat <- array(0, dim=c(length(lambdas)));
-			# calculate pi0_hat
-			for (l in 1:length(lambdas)){ # for each lambda value
-				count = 0;
-				for (i in 1:nrows){ # for each p-value in order
-					if (pvalues[i] > lambdas[l]){
-						count = count + 1; 	
-					}
-					pi0_hat[l] = count/(nrows*(1-lambdas[l]));
-				}
-			}
-			f <- unclass(stats::smooth.spline(lambdas,pi0_hat,df=3));
-			f_spline <- f$y;
-			pi0 = f_spline[length(lambdas)];   # this is the essential pi0_hat value
-			# order p-values
-			ordered_ps <- order(pvalues);
-			pvalues <- pvalues;
-			qvalues <- array(0, dim=c(nrows));
-			ordered_qs <- array(0, dim=c(nrows));
-			ordered_qs[nrows] <- min(pvalues[ordered_ps[nrows]]*pi0, 1);
-			for(i in (nrows-1):1) {
-				p = pvalues[ordered_ps[i]];
-				new = p*nrows*pi0/i;
-
-				ordered_qs[i] <- min(new,ordered_qs[i+1],1);
-			}
-			# re-distribute calculated qvalues to appropriate rows
-			for (i in 1:nrows){
-				qvalues[ordered_ps[i]] = ordered_qs[i];
-			}
-			################################
-			# plotting pi_hat vs. lambda
-			################################
-			# plot(lambdas,pi0_hat,xlab=expression(lambda),ylab=expression(hat(pi)[0](lambda)),type="p");
-			# lines(f);
-			return (qvalues);
-		},
-		##################################################################################
-		# metastat code from White et al. (2009) <doi:10.1371/journal.pcbi.1000352>.
-		#************************************************************************
-		# ************************** SUBROUTINES ********************************
-		#*****************************************************************************************************
-		#  calc two sample two statistics
-		#  g is the first column in the matrix representing the second condition
-		#*****************************************************************************************************
-		calc_twosample_ts = function(Pmatrix, g, nrows, ncols)
-		{
-			C1 <- array(0, dim=c(nrows,3));  # statistic profiles
-			C2 <- array(0, dim=c(nrows,3)); 
-			Ts <- array(0, dim=c(nrows,1));
-			if (nrows == 1){
-				C1[1,1] = mean(Pmatrix[1:g-1]);
-				C1[1,2] = stats::var(Pmatrix[1:g-1]); # variance
-				C1[1,3] = C1[1,2]/(g-1);    # std err^2
-
-				C2[1,1] = mean(Pmatrix[g:ncols]);
-				C2[1,2] = stats::var(Pmatrix[g:ncols]);  # variance
-				C2[1,3] = C2[1,2]/(ncols-g+1); # std err^2
-			}else{
-				# generate statistic profiles for both groups
-				# mean, var, stderr
-				for (i in 1:nrows){ # for each taxa
-					# find the mean of each group
-					C1[i,1] = mean(Pmatrix[i, 1:g-1]);  
-					C1[i,2] = stats::var(Pmatrix[i, 1:g-1]); # variance
-					C1[i,3] = C1[i,2]/(g-1);    # std err^2
-
-					C2[i,1] = mean(Pmatrix[i, g:ncols]);  
-					C2[i,2] = stats::var(Pmatrix[i, g:ncols]);  # variance
-					C2[i,3] = C2[i,2]/(ncols-g+1); # std err^2
-				}
-			}
-			# permutation based t-statistics
-			for (i in 1:nrows){ # for each taxa
-				xbar_diff = C1[i,1] - C2[i,1]; 
-				denom = sqrt(C1[i,3] + C2[i,3]);
-				Ts[i] = xbar_diff/denom;  # calculate two sample t-statistic 
-			}
-			return (Ts)
-		},
-		#*****************************************************************************************************
-		#  function to calculate permuted pvalues from Storey and Tibshirani(2003)
-		#  B is the number of permutation cycles
-		#  g is the first column in the matrix of the second condition 
-		#*****************************************************************************************************
-		permuted_pvalues = function(Imatrix, tstats, B, g, Fmatrix)
-		{
-			# B is the number of permutations were going to use!
-			# g is the first column of the second sample
-			# matrix stores tstats for each taxa(row) for each permuted trial(column)
-			M = nrow(Imatrix);
-			ps <- array(0, dim=c(M)); # to store the pvalues
-			if (is.null(M) || M == 0){
-				return (ps);
-			}
-			permuted_ttests <- array(0, dim=c(M, B));
-			ncols = ncol(Fmatrix);
-			# calculate null version of tstats using B permutations.
-			for (j in 1:B){
-				trial_ts <- private$permute_and_calc_ts(Imatrix, sample(1:ncol(Imatrix)), g);
-				permuted_ttests[,j] <- abs(trial_ts); 
-			}
-			# calculate each pvalue using the null ts
-			if ((g-1) < 8 || (ncols-g+1) < 8){
-				# then pool the t's together!
-				# count how many high freq taxa there are
-				hfc = 0;
-				for (i in 1:M){                   # for each taxa
-					if (sum(Fmatrix[i,1:(g-1)]) >= (g-1) || sum(Fmatrix[i,g:ncols]) >= (ncols-g+1)){
-						hfc = hfc + 1;
-					}
-				}
-				# the array pooling just the frequently observed ts  
-				cleanedpermuted_ttests <- array(0, dim=c(hfc,B));
-				hfc = 1;
-				for (i in 1:M){
-					if (sum(Fmatrix[i,1:(g-1)]) >= (g-1) || sum(Fmatrix[i,g:ncols]) >= (ncols-g+1)){
-						cleanedpermuted_ttests[hfc,] = permuted_ttests[i,];
-						hfc = hfc + 1;
-					}
-				}
-				#now for each taxa
-				for (i in 1:M){  
-					ps[i] = (1/(B*hfc))*sum(cleanedpermuted_ttests > abs(tstats[i]));
-				}
-			}else{
-				for (i in 1:M){
-					ps[i] = (1/(B+1))*(sum(permuted_ttests[i,] > abs(tstats[i]))+1);
-				}
-			}
-			return(ps)
 		}
 	),
 	lock_class = FALSE,

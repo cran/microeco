@@ -173,9 +173,9 @@ trans_network <- R6Class(classname = "trans_network",
 				# store taxonomic table for the following analysis
 				self$tax_table <- use_dataset$tax_table
 				self$data_abund <- use_abund
-				self$taxa_level <- taxa_level
 				self$data_relabund <- rel_abund
 			}
+			self$taxa_level <- taxa_level
 		},
 		#' @description
 		#' Construct network based on the correlation method or \code{SpiecEasi} package or \code{julia FlashWeave} package or \code{beemStatic} package.
@@ -276,6 +276,9 @@ trans_network <- R6Class(classname = "trans_network",
 				
 				message("---------------- ", Sys.time()," : Start ----------------")
 				if(network_method == "COR"){
+					if(is.null(self$res_cor_p)){
+						stop("The res_cor_p list in the object is NULL! Please check the created object!")
+					}
 					cortable <- self$res_cor_p$cor
 					# p adjustment for the converted vector
 					raw_p <- self$res_cor_p$p
@@ -485,13 +488,13 @@ trans_network <- R6Class(classname = "trans_network",
 		#' Calculate network modules and add module names to the network node properties.
 		#'
 		#' @param method default "cluster_fast_greedy"; the method used to find the optimal community structure of a graph;
-		#' 	 the following are available functions (options) from igraph package: "cluster_fast_greedy", "cluster_optimal",
-		#' 	 "cluster_edge_betweenness", "cluster_infomap", "cluster_label_prop", "cluster_leading_eigen",
-		#' 	 "cluster_louvain", "cluster_spinglass", "cluster_walktrap". 
-		#' 	 For the details of these functions, see the help document, such as \code{help(cluster_fast_greedy)};
-		#' 	 Note that the default "cluster_fast_greedy" method can only be used for undirected network. 
-		#' 	 If the user selects \code{network_method = "beemStatic"} in cal_network function or provides other directed network, 
-		#' 	 please use cluster_optimal or others for the modules identification.
+		#' 	 the following are available functions (options) from igraph package: \cr
+		#' 	 \code{"cluster_fast_greedy"}, \code{"cluster_walktrap"}, \code{"cluster_edge_betweenness"}, \cr
+		#' 	 \code{"cluster_infomap"}, \code{"cluster_label_prop"}, \code{"cluster_leading_eigen"}, \cr
+		#' 	 \code{"cluster_louvain"}, \code{"cluster_spinglass"}, \code{"cluster_optimal"}. \cr
+		#' 	 For the details of these functions, please see the help document, such as \code{help(cluster_fast_greedy)};
+		#' 	 Note that the default \code{"cluster_fast_greedy"} method can not be applied to directed network. 
+		#' 	 If directed network is provided, the function can automatically switch the default method from \code{"cluster_fast_greedy"} to \code{"cluster_walktrap"}.
 		#' @param module_name_prefix default "M"; the prefix of module names; module names are made of the module_name_prefix and numbers;
 		#'   numbers are assigned according to the sorting result of node numbers in modules with decreasing trend.
 		#' @return \code{res_network} with modules, stored in object.
@@ -509,6 +512,14 @@ trans_network <- R6Class(classname = "trans_network",
 			network <- self$res_network
 			if(!is.character(method)){
 				stop("The parameter method must be character!")
+			}
+			if(method == "cluster_fast_greedy" & is_directed(network)){
+				message('The default method "cluster_fast_greedy" can not be applied to directed network! ',
+					'Automatically switch to method "cluster_walktrap" ...')
+				message('Invoke cluster_walktrap function to find densely connected subgraphs ...')
+				method <- "cluster_walktrap"
+			}else{
+				message('Use ', method, ' function to partition modules ...')
 			}
 			# use NSE
 			res_member <- parse(text = paste0(method, "(network)")) %>% eval
@@ -932,7 +943,7 @@ trans_network <- R6Class(classname = "trans_network",
 		#' Fit degrees to a power law distribution. First, perform a bootstrapping hypothesis test to determine whether degrees follow a power law distribution.
 		#' If the distribution follows power law, then fit degrees to power law distribution and return the parameters.
 		#'
-		#' @param ... parameters pass to fit_power_law function in igraph package.
+		#' @param ... parameters pass to bootstrap_p function in poweRlaw package.
 		#' @return \code{res_powerlaw_p} and \code{res_powerlaw_fit}; see \code{poweRlaw::bootstrap_p} function for the bootstrapping p value details;
 		#'   see \code{igraph::fit_power_law} function for the power law fit return details.
 		#' @examples
@@ -951,7 +962,7 @@ trans_network <- R6Class(classname = "trans_network",
 			message('Estimated lower bound of degree: ', est_xmin$xmin)
 			resdispl$setXmin(est_xmin)
 			message('Perform bootstrapping ...')
-			bootstrap_res <- poweRlaw::bootstrap_p(resdispl)
+			bootstrap_res <- poweRlaw::bootstrap_p(resdispl, ...)
 			self$res_powerlaw_p <- bootstrap_res
 			message('Bootstrap result is stored in object$res_powerlaw_p ...')
 			message('Bootstrap p value: ', bootstrap_res$p)
@@ -959,7 +970,7 @@ trans_network <- R6Class(classname = "trans_network",
 				message("The p value < 0.05; Degrees do not follow power law distribution ...")
 			}else{
 				message("Degrees follow power law distribution ...")
-				res_powerlaw_fit <- fit_power_law(degree_dis + 1, xmin = est_xmin$xmin, ...)
+				res_powerlaw_fit <- fit_power_law(degree_dis + 1, xmin = est_xmin$xmin)
 				message("The estimated alpha: ", res_powerlaw_fit$alpha)
 				self$res_powerlaw_fit <- res_powerlaw_fit
 				message('Powerlaw fitting result is stored in object$res_powerlaw_fit ...')
@@ -1054,6 +1065,61 @@ trans_network <- R6Class(classname = "trans_network",
 				}
 			}
 			chorddiag::chorddiag(use_data, groupColors = groupColors, ...)
+		},
+		#' @description
+		#' Generate random networks, compare them with the empirical network and get the p value of topological properties.
+		#' The generation of random graph is based on the \code{erdos.renyi.game} function of igraph package.
+		#' The numbers of vertices and edges in the random graph are same with the empirical network stored in the object.
+		#'
+		#' @param runs default 100; simulation number of random network.
+		#' @param output_sim default FALSE; whether output each simulated network result.
+		#' @return a data.frame with the following components:
+		#' \describe{
+		#'   \item{\code{Observed}}{Topological properties of empirical network}
+		#'   \item{\code{Mean_sim}}{Mean of properties of simulated networks}
+		#'   \item{\code{SD_sim}}{SD of properties of simulated networks}
+		#'   \item{\code{p_value}}{Significance, i.e. p values}
+		#' }
+		#' When \code{output_sim = TRUE}, the columns from the five to the last are each simulated result.
+		#' @examples
+		#' \dontrun{
+		#' t1$random_network(runs = 100)
+		#' }
+		random_network = function(runs = 100, output_sim = FALSE){
+			res_network <- self$res_network
+			if(is.null(res_network)){
+				stop("Please first run cal_network function to obtain a network!")
+			}
+			if(is.null(self$res_network_attr)){
+				message("Topological properties have not been calculated! First run cal_network_attr function ...")
+				self$cal_network_attr()
+			}
+			res <- data.frame(emp = self$res_network_attr[, 1])
+			print("Start simulations:")
+			for(i in seq_len(runs)){
+				if(i %% 10 == 0){
+					print(i)
+				}
+				rand <- igraph::erdos.renyi.game(vcount(res_network), ecount(res_network), type = 'gnm')
+				suppressMessages(tmp <- trans_network$new(dataset = NULL))
+				suppressMessages(tmp$cal_network(network_method = NULL))
+				tmp$res_network <- rand
+				suppressMessages(tmp$cal_network_attr())
+				res %<>% cbind(., tmp$res_network_attr)
+			}
+			colnames(res) <- c("emp", paste0("sim", seq_len(runs)))
+			sig_right <- apply(res, 1, function(x){(sum(x >= x[1]))/length(x)})
+			sig_left <- apply(res, 1, function(x){(sum(x <= x[1]))/length(x)})
+			p_value <- sapply(seq_along(sig_right), function(x){ifelse(sig_right[x] <= sig_left[x], sig_right[x], sig_left[x])})
+			output <- data.frame(Observed = self$res_network_attr[, 1], 
+				Mean_sim = apply(res[, 2:ncol(res)], 1, mean),
+				SD_sim = apply(res[, 2:ncol(res)], 1, sd),
+				p_value = p_value
+			)
+			if(output_sim){
+				output %<>% cbind.data.frame(., res[, 2:ncol(res)])
+			}
+			output
 		},
 		#' @description
 		#' Transform classifed features to community-like microtable object for further analysis, such as module-taxa table.
