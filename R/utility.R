@@ -1,3 +1,32 @@
+# inner function to add colors when not enough to use
+expand_colors <- function(color_values, output_length){
+	if(output_length <= length(color_values)){
+		total_colors <- color_values[1:output_length]
+	}else{
+		message("Input colors are not enough to use. Add more colors automatically via color interpolation ...")
+		# generate a color list
+		ceiling_cycle_times <- ceiling(output_length/length(color_values))
+		total_cycle_times <- lapply(seq_along(color_values), function(x){
+			if((ceiling_cycle_times - 1) * length(color_values) + x <= output_length){
+				# not enough
+				ceiling_cycle_times
+			}else{
+				ceiling_cycle_times - 1
+			}
+		}) %>% unlist
+		total_color_list <- lapply(seq_along(color_values), function(x){
+			colorRampPalette(c(color_values[x], "white"))(total_cycle_times[x] + 1)
+		})
+		total_colors <- lapply(seq_len(ceiling_cycle_times), function(x){
+			unlist(lapply(total_color_list, function(y){
+				if((x + 1) <= length(y)){
+					y[x]
+				}
+			}))
+		}) %>% unlist
+	}
+	total_colors
+}
 
 #' Copy an R6 class object completely
 #'
@@ -123,16 +152,6 @@ summarySE_inter <- function(usedata = NULL, measurevar, groupvars = NULL, na.rm 
 	datac$SE <- datac$SD / sqrt(datac$N)
 	datac
 }
-
-#' A color palette for 20 elements.
-#'
-#' This is one palette option for users who have <= 20 elements to plot.
-#' The palletes of RColorBrewer package provide at most 12 discrete colors, such as "Set3" and "Paired".
-#' This palette is adapted from D3.js library and can be used as a supplement.
-#'
-#' @export
-color_palette_20 <- c("#1f77b4", "#aec7e8", "#ff7f0e", "#ffbb78", "#2ca02c", "#98df8a", "#d62728", "#ff9896", "#9467bd", "#c5b0d5", 
-	"#8c564b", "#c49c94", "#e377c2", "#f7b6d2", "#7f7f7f", "#c7c7c7", "#bcbd22", "#dbdb8d", "#17becf", "#9edae5")
 
 
 # inner function

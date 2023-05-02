@@ -292,11 +292,11 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			all_samples <- rownames(comm)
 			betaobs_vec <- as.vector(betaobs)
 			cat("Simulate betaMPD ...\n")
-			beta_rand <- sapply(seq_len(runs), function(x){
+			beta_rand <- lapply(seq_len(runs), function(x){
 				private$show_run(x = x, runs = runs)
 				rand_data <- private$null_model(null.model = null.model, comm = comm, dis = dis, tip.label = NULL, iterations = iterations)
-				as.dist(private$betampd(comm = rand_data$comm, dis = rand_data$dis, abundance.weighted = abundance.weighted))
-			}, simplify = "array")
+				as.vector(as.dist(private$betampd(comm = rand_data$comm, dis = rand_data$dis, abundance.weighted = abundance.weighted)))
+			}) %>% do.call("cbind", .)
 			message("---------------- ", Sys.time()," : End ----------------")
 			
 			beta_rand_mean <- apply(X = beta_rand, MARGIN = 1, FUN = mean, na.rm = TRUE)
@@ -369,13 +369,13 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 										 abundance.weighted = abundance.weighted, exclude.consp = exclude.conspecifics)
 				betaobs_vec <- as.vector(betaobs)
 				cat("Simulate betaMNTD ...\n")
-				beta_rand <- sapply(seq_len(runs), function(x){
+				beta_rand <- lapply(seq_len(runs), function(x){
 					private$show_run(x = x, runs = runs)
 					rand_data <- private$null_model(null.model = null.model, comm = comm, dis = NULL, tip.label = pd.big$tip.label, iterations = iterations)
-					iCAMP::bmntd.big(comm = rand_data$comm, pd.desc = pd.big$pd.file,
+					as.vector(iCAMP::bmntd.big(comm = rand_data$comm, pd.desc = pd.big$pd.file,
 						pd.spname = rand_data$tip.label, pd.wd = pd.big$pd.wd,
-						abundance.weighted = abundance.weighted, exclude.consp = exclude.conspecifics)
-				}, simplify = "array")
+						abundance.weighted = abundance.weighted, exclude.consp = exclude.conspecifics))
+				}) %>% do.call("cbind", .)
 			}else{
 				dis <- cophenetic(self$data_tree) %>% .[colnames(comm), colnames(comm)]
 				cat("Calculate observed betaMNTD ...\n")
@@ -387,17 +387,17 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 					) %>% as.dist
 				betaobs_vec <- as.vector(betaobs)
 				cat("Simulate betaMNTD ...\n")
-				beta_rand <- sapply(seq_len(runs), function(x){
+				beta_rand <- lapply(seq_len(runs), function(x){
 					private$show_run(x = x, runs = runs)
 					rand_data <- private$null_model(null.model = null.model, comm = comm, dis = dis, tip.label = NULL, iterations = iterations)
-					as.dist(private$betamntd(
+					as.vector(as.dist(private$betamntd(
 						comm = rand_data$comm, 
 						dis = rand_data$dis, 
 						abundance.weighted = abundance.weighted, 
 						exclude.conspecifics = exclude.conspecifics
 						)
-					)
-				}, simplify = "array")
+					))
+				}) %>% do.call("cbind", .)
 			}
 			beta_rand_mean <- apply(X = beta_rand, MARGIN = 1, FUN = mean, na.rm = TRUE)
 			beta_rand_sd <- apply(X = beta_rand, MARGIN = 1, FUN = sd, na.rm = TRUE)
@@ -423,12 +423,12 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			comm <- self$data_comm
 			betaobs_vec <- as.vector(vegdist(comm, method="bray"))
 			all_samples <- rownames(comm)
-			beta_rand <- sapply(seq_len(runs), function(x){
+			beta_rand <- lapply(seq_len(runs), function(x){
 				if(verbose){
 					private$show_run(x = x, runs = runs)
 				}
-				vegdist(picante::randomizeMatrix(comm, null.model = null.model), "bray")
-			}, simplify = "array") %>% as.data.frame
+				as.vector(vegdist(picante::randomizeMatrix(comm, null.model = null.model), "bray"))
+			}) %>% do.call("cbind", .) %>% as.data.frame
 			beta_rand[, (runs + 1)] <- betaobs_vec
 			beta_obs_z <- apply(X = beta_rand, MARGIN = 1, FUN = function(x){sum(x > x[length(x)])/length(x)})
 			beta_obs_z <- (beta_obs_z - 0.5) * 2
@@ -546,7 +546,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		#' 	  the function can select the data from sample_table to generate a one-column (n x 1) matrix and 
 		#' 	  provide it to the group parameter of \code{tNST} or \code{pNST} function. 
 		#' @param ... paremeters pass to \code{NST::tNST} or \code{NST::pNST} function; see the document of corresponding function for more details.
-		#' @return list stored in object.
+		#' @return res_NST stored in the object.
 		#' @examples
 		#' \dontrun{
 		#' t1$cal_NST(group = "Group", dist.method = "bray", output.rand = TRUE, SES = TRUE)
@@ -591,29 +591,66 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			}else{
 				NST::nst.panova(nst.result = self$res_NST, ...)
 			}
+		},
+		#' @description
+		#' Convert NST paired long format table to symmetric matrix form.
+		#'
+		#' @param column default 10; which column is selected for the conversion. See the columns of \code{res_NST$index.pair} stored in the object.
+		#' @return symmetric matrix.
+		#' @examples
+		#' \dontrun{
+		#' t1$cal_NST_convert(column = 10)
+		#' }
+		cal_NST_convert = function(column = 10){
+			if(is.null(self$res_NST)){
+				stop("Please first run cal_NST function!")
+			}
+			if(length(column) > 1){
+				message("The column has multiple elements! Only select the first one ...")
+				column <- column[1]
+			}
+			if(column > ncol(self$res_NST$index.pair)){
+				stop("Please provide a correct column number!")
+			}
+			message("Select the column: ", colnames(self$res_NST$index.pair)[column], " ...")
+			res <- private$fin_matrix_full(self$res_NST$index.pair[, c(1, 2, column)])
+			res <- private$fin_matrix_convert(res)			
+			res
 		}
 	),
 	private = list(
 		show_run = function(x, runs){
-			if(x %% 10 == 0){
+			if(x %% 20 == 0){
 				cat(paste0("Runs: ", x, " of ", runs,"\n"))
 			}
 		},
 		fin_matrix = function(all_samples, beta_obs_z){
 			res <- data.frame(t(combn(all_samples, 2)), beta_obs_z)
-			colnames(res) <- c("S1", "S2", "distance")
-			res1 <- rbind.data.frame(
-				res, 
-				data.frame(S1 = res$S2, S2 = res$S1, distance = res$distance), 
-				data.frame(S1 = all_samples, S2 = all_samples, distance = 0)
+			res <- private$fin_matrix_full(res)
+			res <- private$fin_matrix_convert(res, ordered_names = all_samples)			
+			res
+		},
+		fin_matrix_full = function(longdata){
+			colnames(longdata) <- c("S1", "S2", "distance")
+			sample_names <- c(longdata[, 1], longdata[, 2]) %>% unique
+			longdatafull <- rbind.data.frame(
+				longdata, 
+				data.frame(S1 = longdata$S2, S2 = longdata$S1, distance = longdata$distance), 
+				data.frame(S1 = sample_names, S2 = sample_names, distance = 0)
 				)
-			res1 <- reshape2::dcast(res1, S1~S2, value.var = "distance") %>% 
+			longdatafull
+		},
+		fin_matrix_convert = function(longdatafull, ordered_names = NULL){
+			if(is.null(ordered_names)){
+				ordered_names <- longdatafull[, 1] %>% unique
+			}
+			square_matrix <- reshape2::dcast(longdatafull, S1~S2, value.var = "distance") %>% 
 				`row.names<-`(.[,1]) %>% 
 				.[, -1, drop = FALSE] %>%
-				.[all_samples, all_samples] %>% 
+				.[ordered_names, ordered_names] %>% 
 				as.matrix
 			
-			res1
+			square_matrix
 		},
 		betampd = function(comm = NULL, dis = NULL, abundance.weighted = FALSE){
 			dis %<>% .[colnames(comm), colnames(comm)]

@@ -52,7 +52,7 @@ t1$plot_box(group = "Group")
 t1 <- trans_abund$new(dataset = dataset, taxrank = "Genus", ntaxa = 5)
 t1$plot_line(point_size = 3)
 t1 <- trans_abund$new(dataset = dataset, taxrank = "Genus", ntaxa = 5, groupmean = "Group")
-t1$plot_line(point_size = 5, errorbar_size = 1, xtext_type_hor = TRUE)
+t1$plot_line(point_size = 5, errorbar_size = 1, xtext_angle = 30)
 }
 
 ## ------------------------------------------------
@@ -62,6 +62,33 @@ t1$plot_line(point_size = 5, errorbar_size = 1, xtext_type_hor = TRUE)
 \donttest{
 t1 <- trans_abund$new(dataset = dataset, taxrank = "Phylum", ntaxa = 6, groupmean = "Group")
 t1$plot_pie(facet_nrow = 1)
+}
+
+## ------------------------------------------------
+## Method `trans_abund$plot_donut`
+## ------------------------------------------------
+
+\dontrun{
+t1 <- trans_abund$new(dataset = dataset, taxrank = "Phylum", ntaxa = 6, groupmean = "Group")
+t1$plot_donut(label = TRUE)
+}
+
+## ------------------------------------------------
+## Method `trans_abund$plot_radar`
+## ------------------------------------------------
+
+\dontrun{
+t1 <- trans_abund$new(dataset = dataset, taxrank = "Phylum", ntaxa = 6, groupmean = "Group")
+t1$plot_radar()
+}
+
+## ------------------------------------------------
+## Method `trans_abund$plot_tern`
+## ------------------------------------------------
+
+\dontrun{
+t1 <- trans_abund$new(dataset = dataset, taxrank = "Phylum", ntaxa = 6, groupmean = "Group")
+t1$plot_tern()
 }
 }
 \section{Methods}{
@@ -73,6 +100,9 @@ t1$plot_pie(facet_nrow = 1)
 \item \href{#method-trans_abund-plot_box}{\code{trans_abund$plot_box()}}
 \item \href{#method-trans_abund-plot_line}{\code{trans_abund$plot_line()}}
 \item \href{#method-trans_abund-plot_pie}{\code{trans_abund$plot_pie()}}
+\item \href{#method-trans_abund-plot_donut}{\code{trans_abund$plot_donut()}}
+\item \href{#method-trans_abund-plot_radar}{\code{trans_abund$plot_radar()}}
+\item \href{#method-trans_abund-plot_tern}{\code{trans_abund$plot_tern()}}
 \item \href{#method-trans_abund-print}{\code{trans_abund$print()}}
 \item \href{#method-trans_abund-clone}{\code{trans_abund$clone()}}
 }
@@ -93,7 +123,9 @@ t1$plot_pie(facet_nrow = 1)
   delete_part_prefix = FALSE,
   prefix = NULL,
   use_percentage = TRUE,
-  input_taxaname = NULL
+  input_taxaname = NULL,
+  high_level = NULL,
+  high_level_fix_nsub = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -107,7 +139,7 @@ t1$plot_pie(facet_nrow = 1)
 \item{\code{show}}{default 0; the relative abundance threshold for filtering the taxa with low abundance.}
 
 \item{\code{ntaxa}}{default 10; how many taxa are selected to show. Taxa are ordered by abundance from high to low. 
-This parameter does not conflict with the parameter \code{show}. Both can be used.}
+This parameter does not conflict with the parameter \code{show}. Both can be used. \code{ntaxa = NULL} means it is unavailable.}
 
 \item{\code{groupmean}}{default NULL; calculate mean abundance for each group. Select a column name in \code{microtable$sample_table}.}
 
@@ -126,11 +158,21 @@ Please alter this parameter when the prefix is not standard.}
 \item{\code{use_percentage}}{default TRUE; show the abundance percentage.}
 
 \item{\code{input_taxaname}}{default NULL; character vector; input taxa names for selecting some taxa.}
+
+\item{\code{high_level}}{default NULL; a taxonomic rank, such as "Phylum", used to add the taxonomic information of higher level.
+It is necessary for the legend with nested taxonomic levels in the bar plot.}
+
+\item{\code{high_level_fix_nsub}}{default NULL; an integer, used to fix the number of selected abundant taxa in each taxon from higher taxonomic level.
+If the total number under one taxon of higher level is less than the high_level_fix_nsub, the total number will be used.
+When \code{high_level_fix_nsub} is provided, the taxa number of higher level is calculated as: \code{ceiling(ntaxa/high_level_fix_nsub)}.
+Note that \code{ntaxa} means either the parameter \code{ntaxa} or the taxonomic number obtained by filtering according to the \code{show} parameter.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-\code{data_abund} stored in the object.
+\code{data_abund} stored in the object. The column 'all_mean_abund' reprensents mean relative abundance across all the samples.
+  So the values in one taxon are all same across all the samples.
+  If the sum of column 'Abundance' in one sample is larger than 1, the 'Abundance', 'SD' and 'SE' has been multiplied by 100.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -151,7 +193,7 @@ t1 <- trans_abund$new(dataset = dataset, taxrank = "Phylum", ntaxa = 10)
 Bar plot.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_bar(
-  color_values = RColorBrewer::brewer.pal(12, "Paired"),
+  color_values = RColorBrewer::brewer.pal(8, "Dark2"),
   bar_type = "full",
   others_color = "grey90",
   facet = NULL,
@@ -163,19 +205,20 @@ Bar plot.
   facet_color = "grey95",
   strip_text = 11,
   legend_text_italic = FALSE,
-  xtext_type_hor = TRUE,
+  xtext_angle = 0,
   xtext_size = 10,
   xtext_keep = TRUE,
   xtitle_keep = TRUE,
   ytitle_size = 17,
-  ylab_title = NULL
+  ggnested = FALSE,
+  high_level_add_other = FALSE
 )}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(12, "Paired"); colors palette for the plot.}
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the bars.}
 
 \item{\code{bar_type}}{default "full"; "full" or "notfull"; if \code{"full"}, total abundance are summed to 1 or 100 percentage.}
 
@@ -204,7 +247,7 @@ When multiple facets are used, please first install package \code{ggh4x} using t
 
 \item{\code{legend_text_italic}}{default FALSE; whether use italic in legend.}
 
-\item{\code{xtext_type_hor}}{default TRUE; x axis text horizontal, if FALSE; text slant.}
+\item{\code{xtext_angle}}{default 0; number ranging from 0 to 90; used to adjust x axis text angle to reduce text overlap;}
 
 \item{\code{xtext_size}}{default 10; x axis text size.}
 
@@ -214,12 +257,16 @@ When multiple facets are used, please first install package \code{ggh4x} using t
 
 \item{\code{ytitle_size}}{default 17; y axis title size.}
 
-\item{\code{ylab_title}}{default NULL; y axis title.}
+\item{\code{ggnested}}{default FALSE; whether use nested legend. Need \code{ggnested} package to be installed (https://github.com/gmteunisse/ggnested).
+To make it available, please assign \code{high_level} parameter when creating the object.}
+
+\item{\code{high_level_add_other}}{default FALSE; whether add 'Others' (all the unknown taxa) in each taxon of higher taxonomic level.
+Only available when \code{ggnested = TRUE}.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-ggplot2 plot.
+ggplot2 object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -257,7 +304,7 @@ Plot the heatmap.
   xtext_keep = TRUE,
   xtitle_keep = TRUE,
   grid_clean = TRUE,
-  xtext_type_hor = TRUE,
+  xtext_angle = 0,
   legend_title = "\% Relative\\nAbundance",
   pheatmap = FALSE,
   ...
@@ -309,7 +356,7 @@ When multiple facets are used, please first install package \code{ggh4x} using t
 
 \item{\code{grid_clean}}{default TRUE; whether remove grid lines.}
 
-\item{\code{xtext_type_hor}}{default TRUE; x axis text horizontal, if FALSE; text slant.}
+\item{\code{xtext_angle}}{default 0; number ranging from 0 to 90; used to adjust x axis text angle to reduce text overlap;}
 
 \item{\code{legend_title}}{default "\% Relative\\nAbundance"; legend title text.}
 
@@ -320,7 +367,7 @@ When multiple facets are used, please first install package \code{ggh4x} using t
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-ggplot2 plot or grid plot based on pheatmap.
+ggplot2 object or grid object based on pheatmap.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -351,7 +398,7 @@ Box plot.
   boxfill = TRUE,
   middlecolor = "grey95",
   middlesize = 1,
-  xtext_type_hor = FALSE,
+  xtext_angle = 0,
   xtext_size = 10,
   ytitle_size = 17,
   ...
@@ -361,7 +408,7 @@ Box plot.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the plotting.}
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the box.}
 
 \item{\code{group}}{default NULL; a column name of sample table to show abundance across groups.}
 
@@ -381,18 +428,18 @@ Box plot.
 
 \item{\code{middlesize}}{default 1; The middle line size.}
 
-\item{\code{xtext_type_hor}}{default TRUE; x axis text horizontal, if FALSE; text slant.}
+\item{\code{xtext_angle}}{default 0; number ranging from 0 to 90; used to adjust x axis text angle to reduce text overlap;}
 
 \item{\code{xtext_size}}{default 10; x axis text size.}
 
 \item{\code{ytitle_size}}{default 17; y axis title size.}
 
-\item{\code{...}}{parameters pass to \code{\link{geom_boxplot}}.}
+\item{\code{...}}{parameters pass to \code{\link{geom_boxplot}} function.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-ggplot2 plot.
+ggplot2 object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -422,7 +469,7 @@ Plot the line chart.
   line_size = 0.8,
   line_alpha = 0.8,
   line_type = 1,
-  xtext_type_hor = FALSE,
+  xtext_angle = 0,
   xtext_size = 10,
   ytitle_size = 17
 )}\if{html}{\out{</div>}}
@@ -431,7 +478,7 @@ Plot the line chart.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the plotting.}
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the points and lines.}
 
 \item{\code{plot_SE}}{default TRUE; TRUE: plot the errorbar with mean±se; FALSE: plot the errorbar with mean±sd.}
 
@@ -451,7 +498,7 @@ Plot the line chart.
 
 \item{\code{line_type}}{default 1; an integer; line type.}
 
-\item{\code{xtext_type_hor}}{default TRUE; x axis text horizontal, if FALSE; text slant.}
+\item{\code{xtext_angle}}{default 0; number ranging from 0 to 90; used to adjust x axis text angle to reduce text overlap;}
 
 \item{\code{xtext_size}}{default 10; x axis text size.}
 
@@ -460,7 +507,7 @@ Plot the line chart.
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-ggplot2 plot.
+ggplot2 object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -468,7 +515,7 @@ ggplot2 plot.
 t1 <- trans_abund$new(dataset = dataset, taxrank = "Genus", ntaxa = 5)
 t1$plot_line(point_size = 3)
 t1 <- trans_abund$new(dataset = dataset, taxrank = "Genus", ntaxa = 5, groupmean = "Group")
-t1$plot_line(point_size = 5, errorbar_size = 1, xtext_type_hor = TRUE)
+t1$plot_line(point_size = 5, errorbar_size = 1, xtext_angle = 30)
 }
 }
 \if{html}{\out{</div>}}
@@ -480,12 +527,13 @@ t1$plot_line(point_size = 5, errorbar_size = 1, xtext_type_hor = TRUE)
 \if{html}{\out{<a id="method-trans_abund-plot_pie"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_abund-plot_pie}{}}}
 \subsection{Method \code{plot_pie()}}{
-Plot pie chart.
+Pie chart.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_pie(
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),
   facet_nrow = 1,
   strip_text = 11,
+  add_label = FALSE,
   legend_text_italic = FALSE
 )}\if{html}{\out{</div>}}
 }
@@ -493,24 +541,143 @@ Plot pie chart.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the plotting.}
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for each section.}
 
 \item{\code{facet_nrow}}{default 1; how many rows in the plot.}
 
 \item{\code{strip_text}}{default 11; sample title size.}
+
+\item{\code{add_label}}{default FALSE; Whether add the percentage label in each section of pie chart.}
 
 \item{\code{legend_text_italic}}{default FALSE; whether use italic in legend.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-ggplot2 plot.
+ggplot2 object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
 t1 <- trans_abund$new(dataset = dataset, taxrank = "Phylum", ntaxa = 6, groupmean = "Group")
 t1$plot_pie(facet_nrow = 1)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_abund-plot_donut"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_abund-plot_donut}{}}}
+\subsection{Method \code{plot_donut()}}{
+Donut chart based on the \code{ggpubr::ggdonutchart} function.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_donut(
+  color_values = RColorBrewer::brewer.pal(8, "Dark2"),
+  label = TRUE,
+  facet_nrow = 1,
+  legend_text_italic = FALSE,
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the donut.}
+
+\item{\code{label}}{default TRUE; whether show the percentage label.}
+
+\item{\code{facet_nrow}}{default 1; how many rows in the plot.}
+
+\item{\code{legend_text_italic}}{default FALSE; whether use italic in legend.}
+
+\item{\code{...}}{parameters passed to \code{ggpubr::ggdonutchart}.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+combined ggplot2 objects list, generated by \code{ggpubr::ggarrange} function.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1 <- trans_abund$new(dataset = dataset, taxrank = "Phylum", ntaxa = 6, groupmean = "Group")
+t1$plot_donut(label = TRUE)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_abund-plot_radar"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_abund-plot_radar}{}}}
+\subsection{Method \code{plot_radar()}}{
+Radar chart based on the \code{ggradar} package (https://github.com/ricardo-bion/ggradar).
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_radar(
+  color_values = RColorBrewer::brewer.pal(8, "Dark2"),
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for samples.}
+
+\item{\code{...}}{parameters passed to \code{ggradar::ggradar} function except group.colours parameter.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+ggplot2 object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1 <- trans_abund$new(dataset = dataset, taxrank = "Phylum", ntaxa = 6, groupmean = "Group")
+t1$plot_radar()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_abund-plot_tern"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_abund-plot_tern}{}}}
+\subsection{Method \code{plot_tern()}}{
+Ternary diagrams based on the \code{ggtern} package.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_tern(
+  color_values = RColorBrewer::brewer.pal(8, "Dark2"),
+  color_legend_guide_size = 4
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the samples.}
+
+\item{\code{color_legend_guide_size}}{default 4; The size of legend guide for color.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+ggplot2 object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1 <- trans_abund$new(dataset = dataset, taxrank = "Phylum", ntaxa = 6, groupmean = "Group")
+t1$plot_tern()
 }
 }
 \if{html}{\out{</div>}}
