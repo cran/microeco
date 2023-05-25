@@ -210,6 +210,9 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' @param barwidth default NULL; bar width, see \code{width} in \code{\link{geom_bar}}.
 		#' @param use_alluvium default FALSE; whether add alluvium plot. If \code{TRUE}, please first install \code{ggalluvial} package.
 		#' @param clustering default FALSE; whether order samples by the clustering.
+		#' @param clustering_plot default FALSE; whether add clustering plot.
+		#'     If \code{clustering_plot = TRUE}, \code{clustering} will be also TRUE in any case for the clustering.
+		#' @param cluster_plot_width default 0.2, the dendrogram plot width; available when \code{clustering_plot = TRUE}.
 		#' @param facet_color default "grey95"; facet background color.
 		#' @param strip_text default 11; facet text size.
 		#' @param legend_text_italic default FALSE; whether use italic in legend.
@@ -218,6 +221,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' @param xtext_keep default TRUE; whether retain x text.
 		#' @param xtitle_keep default TRUE; whether retain x title.
 		#' @param ytitle_size default 17; y axis title size.
+		#' @param coord_flip default FALSE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical becomes horizontal.
 		#' @param ggnested default FALSE; whether use nested legend. Need \code{ggnested} package to be installed (https://github.com/gmteunisse/ggnested).
 		#'   To make it available, please assign \code{high_level} parameter when creating the object.
 		#' @param high_level_add_other default FALSE; whether add 'Others' (all the unknown taxa) in each taxon of higher taxonomic level.
@@ -237,7 +241,9 @@ trans_abund <- R6Class(classname = "trans_abund",
 			barwidth = NULL,
 			use_alluvium = FALSE,
 			clustering = FALSE,
-			facet_color= "grey95",
+			clustering_plot = FALSE,
+			cluster_plot_width = 0.2,
+			facet_color = "grey95",
 			strip_text = 11,
 			legend_text_italic = FALSE,
 			xtext_angle = 0,
@@ -245,6 +251,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 			xtext_keep = TRUE,
 			xtitle_keep = TRUE,
 			ytitle_size = 17,
+			coord_flip = FALSE,
 			ggnested = FALSE,
 			high_level_add_other = FALSE
 			){
@@ -312,18 +319,19 @@ trans_abund <- R6Class(classname = "trans_abund",
 				# high_level determine the colors
 				bar_colors_use <- expand_colors(color_values, length(unique(plot_data[, self$high_level])))
 			}
-			if(clustering){
+			if(clustering | clustering_plot){
 				data_clustering <- reshape2::dcast(plot_data, Sample ~ Taxonomy, value.var = "Abundance", fun.aggregate = sum) %>% 
 					`row.names<-`(.[,1]) %>% .[, -1]
-				order_x_clustering <- hclust(dist(data_clustering)) %>% {.$labels[.$order]} %>% as.character
+				tmp_hclust <- hclust(dist(data_clustering)) 
+				order_x_clustering <- tmp_hclust %>% {.$labels[.$order]} %>% as.character
 				plot_data$Sample %<>% factor(., levels = order_x_clustering)
 			}
 			if(use_alluvium){
 				p <- ggplot(plot_data, aes(
-						x = .data[["Sample"]], y = .data[["Abundance"]], 
-						fill = .data[["Taxonomy"]], color = .data[["Taxonomy"]], 
-						weight = .data[["Abundance"]], 
-						alluvium = .data[["Taxonomy"]], stratum = .data[["Taxonomy"]]
+						x = Sample, y = Abundance, 
+						fill = Taxonomy, color = Taxonomy, 
+						weight = Abundance, 
+						alluvium = Taxonomy, stratum = Taxonomy
 					)) +
 					ggalluvial::geom_flow(alpha = .4, width = 3/15) +
 					ggalluvial::geom_stratum(width = .2) +
@@ -332,7 +340,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 				if(ggnested){
 					p <- ggnested::ggnested(plot_data, aes_meco(x = "Sample", y = "Abundance", main_group = self$high_level, sub_group = "Taxonomy"), main_palette = bar_colors_use)
 				}else{
-					p <- ggplot(plot_data, aes(x = .data[["Sample"]], y = .data[["Abundance"]], fill = .data[["Taxonomy"]]))
+					p <- ggplot(plot_data, aes_meco(x = "Sample", y = "Abundance", fill = "Taxonomy"))
 				}
 				if(bar_type == "full"){
 					if(self$use_percentage == T){
@@ -349,10 +357,15 @@ trans_abund <- R6Class(classname = "trans_abund",
 			}
 			p <- p + xlab("") + ylab(self$ylabname)
 			if(!is.null(facet)){
-				if(length(facet) == 1){
-					p <- p + facet_grid(reformulate(facet, "."), scales = "free", space = "free")
+				if(coord_flip){
+					facet_formula <- reformulate(".", paste0(facet, collapse = " + "))
 				}else{
-					p <- p + ggh4x::facet_nested(reformulate(facet), nest_line = element_line(linetype = 2), scales = "free", space = "free")
+					facet_formula <- reformulate(facet, ".")
+				}
+				if(length(facet) == 1){
+					p <- p + facet_grid(facet_formula, scales = "free", space = "free")
+				}else{
+					p <- p + ggh4x::facet_nested(facet_formula, nest_line = element_line(linetype = 2), scales = "free", space = "free")
 				}
 				p <- p + theme(strip.background = element_rect(fill = facet_color, color = facet_color), strip.text = element_text(size=strip_text))
 				p <- p + scale_y_continuous(expand = c(0, 0.01))
@@ -368,14 +381,27 @@ trans_abund <- R6Class(classname = "trans_abund",
 			if(legend_text_italic == T) {
 				p <- p + theme(legend.text = element_text(face = 'italic'))
 			}
-			p <- p + private$ggplot_xtext_type(xtext_angle = xtext_angle, xtext_size = xtext_size, xtext_keep = xtext_keep)
+			if(clustering_plot){
+				if(! coord_flip){
+					message("Rotate the axis automatically to add the clustering plot ...")
+					coord_flip <- TRUE
+				}
+			}
+			p <- p + private$ggplot_xtext_type(xtext_angle = xtext_angle, xtext_size = xtext_size, xtext_keep = xtext_keep, coord_flip = coord_flip)
 			p <- p + theme(axis.title.y = element_text(size = ytitle_size))
-			if(xtitle_keep == F) {
+			if(xtitle_keep == F){
 				p <- p + theme(axis.title.x = element_blank())
 			}
 			p <- p + guides(fill = guide_legend(title = self$taxrank))
 			if(use_alluvium | ggnested){
 				p <- p + guides(color = guide_legend(title = self$taxrank))
+			}
+			if(coord_flip){
+				p <- p + coord_flip()
+			}
+			if(clustering_plot){
+				left_plot <- ggtree::ggtree(tmp_hclust, hang = 0)
+				p %<>% aplot::insert_left(left_plot, width = cluster_plot_width)
 			}
 			p
 		},
@@ -588,7 +614,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' Plot the line chart.
 		#'
 		#' @param color_values default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the points and lines.
-		#' @param plot_SE default TRUE; TRUE: plot the errorbar with mean±se; FALSE: plot the errorbar with mean±sd.
+		#' @param plot_SE default TRUE; TRUE: the errorbar is \eqn{mean±se}; FALSE: the errorbar is \eqn{mean±sd}.
 		#' @param position default position_dodge(0.1); Position adjustment, either as a string (such as "identity"), or the result of a call to a position adjustment function.
 		#' @param errorbar_size default 1; errorbar size.
 		#' @param errorbar_width default 0.1; errorbar width.
@@ -643,7 +669,6 @@ trans_abund <- R6Class(classname = "trans_abund",
 			p <- p + private$ggplot_xtext_type(xtext_angle = xtext_angle, xtext_size = xtext_size)
 			p <- p + theme(axis.title.y = element_text(size = ytitle_size)) + scale_y_continuous(expand = c(0, 0.01))
 			p <- p + scale_color_manual(values = color_values)
-			
 			p
 		},
 		#' @description
@@ -856,15 +881,23 @@ trans_abund <- R6Class(classname = "trans_abund",
 			}
 			plot_data
 		},
-		ggplot_xtext_type = function(xtext_angle, xtext_size, xtext_keep = TRUE){
-			if(xtext_keep){
-				if(xtext_angle == 0){
-					theme(axis.text.x = element_text(colour = "black", size = xtext_size))
+		ggplot_xtext_type = function(xtext_angle, xtext_size, xtext_keep = TRUE, coord_flip = FALSE){
+			if(coord_flip){
+				if(xtext_keep){
+					theme(axis.text.y = element_text(colour = "black", size = xtext_size))
 				}else{
-					theme(axis.text.x = element_text(angle = xtext_angle, colour = "black", vjust = 1, hjust = 1, size = xtext_size))
+					theme(axis.ticks.y = element_blank(), axis.text.y = element_blank())
 				}
 			}else{
-				theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
+				if(xtext_keep){
+					if(xtext_angle == 0){
+						theme(axis.text.x = element_text(colour = "black", size = xtext_size))
+					}else{
+						theme(axis.text.x = element_text(angle = xtext_angle, colour = "black", vjust = 1, hjust = 1, size = xtext_size))
+					}
+				}else{
+					theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
+				}
 			}
 		},
 		blank_theme = 

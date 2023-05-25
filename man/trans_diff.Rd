@@ -81,12 +81,13 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
   dataset = NULL,
   method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox",
     "t.test", "anova", "scheirerRayHare", "ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2",
-    "linda", "betareg", "lme")[1],
+    "linda", "maaslin2", "betareg", "lme", "glmm")[1],
   group = NULL,
   taxa_level = "all",
   filter_thres = 0,
   alpha = 0.05,
   p_adjust_method = "fdr",
+  transformation = NULL,
   lefse_subgroup = NULL,
   lefse_min_subsam = 10,
   lefse_norm = 1e+06,
@@ -105,7 +106,7 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{dataset}}{the object of \code{\link{microtable}} Class.}
+\item{\code{dataset}}{default NULL; \code{\link{microtable}} object.}
 
 \item{\code{method}}{default "lefse"; see the following available options:
 \describe{
@@ -132,15 +133,29 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
         require \code{ALDEx2} package to be installed 
         (\href{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html}{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html})}
   \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallace and generalized linear model (glm) test with \code{ALDEx2} package; 
-        see also the test parameter in \code{ALDEx2::aldex} function.}
+        see also the \code{test} parameter in \code{ALDEx2::aldex} function.}
   \item{\strong{'DESeq2'}}{Differential expression analysis based on the Negative Binomial (a.k.a. Gamma-Poisson) distribution based on the \code{DESeq2} package.}
   \item{\strong{'linda'}}{Linear Model for Differential Abundance Analysis of High-dimensional Compositional Data 
         based on the \code{linda} function of \code{MicrobiomeStat} package. 
         Here the group parameter is passed to formula parameter in \code{linda} function with the prefix '~'.
         The parameter \code{feature.dat.type = 'count'} has been fixed. Other parameters can be passed to the \code{linda} function.
-       Reference: <doi:10.1186/s13059-022-02655-5>}
+        Reference: <doi:10.1186/s13059-022-02655-5>}
+  \item{\strong{'maaslin2'}}{finding associations between metadata and potentially high-dimensional microbial multi-omics data based on the Maaslin2 package.
+        Using this option can invoke the \code{trans_env$cal_cor} function with \code{cor_method = "maaslin2"}.}
   \item{\strong{'betareg'}}{Beta Regression based on the \code{betareg} package}
-  \item{\strong{'lme'}}{lme: Linear Mixed Effect Model based on the \code{lmerTest} package}
+  \item{\strong{'lme'}}{Linear Mixed Effect Model based on the \code{lmerTest} package.
+        In the return table, the significance of fixed factors are tested by function \code{anova}.
+        The significance of 'Estimate' in each term of fixed factors comes from the model.
+        }
+  \item{\strong{'glmm'}}{Generalized linear mixed model (GLMM) based on the \code{glmmTMB} package.
+        If the relative abundance is applied, it is recommended to use beta family function, i.e. \code{family = glmmTMB::beta_family(link = "logit")}.
+        Note that beta family function limits 0 < response value < 1. 
+        If an error 'y values must be 0 < y < 1' occurs, please first transform input table like: \code{(dataset$taxa_abund$Phylum + 1e-10)/(1 + 2e-10)}.
+        For more parameters, please see \code{glmmTMB::glmmTMB} function.
+        In the return table, Conditional_R2 and Marginal_R2 represent total variance (explained by both fixed and random effects) and the variance explained by 
+        fixed effects, respectively. The significance of fixed factors are tested by Chi-square test from function \code{car::Anova}.
+        The significance of 'Estimate' in each term of fixed factors comes from the model.
+        }
 }}
 
 \item{\code{group}}{default NULL; sample group used for the comparision; a colname of input \code{microtable$sample_table};
@@ -158,6 +173,10 @@ the function will use the features in input \code{microtable$otu_table} automati
 
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for other available options; 
 "none" means disable p value adjustment; So when \code{p_adjust_method = "none"}, P.adj is same with P.unadj.}
+
+\item{\code{transformation}}{default NULL; feature abundance transformation method based on the mecodev package (https://github.com/ChiLiubio/mecodev),
+such as 'AST' for the arc sine square root transformation. Please see the \code{trans_norm} class of mecodev package. 
+Only available when \code{method} is one of "KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "betareg" and "lme".}
 
 \item{\code{lefse_subgroup}}{default NULL; sample sub group used for sub-comparision in lefse; Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>.}
 
@@ -178,7 +197,7 @@ the function will use the features in input \code{microtable$otu_table} automati
 \item{\code{ALDEx2_sig}}{default c("wi.eBH", "kw.eBH"); which column of the final result is used as the significance asterisk assignment;
 applied to method = "ALDEx2_t" or "ALDEx2_kw"; the first element is provided to "ALDEx2_t"; the second is provided to "ALDEx2_kw";
 for "ALDEx2_t", the available choice is "wi.eBH" (Expected Benjamini-Hochberg corrected P value of Wilcoxon test)
-and "we.eBH" (Expected BH corrected P value of Welch’s t test); for "ALDEx2_kw"; for "ALDEx2_t",
+and "we.eBH" (Expected BH corrected P value of Welch's t test); for "ALDEx2_kw"; for "ALDEx2_t",
 the available choice is "kw.eBH" (Expected BH corrected P value of Kruskal-Wallace test) and "glm.eBH" (Expected BH corrected P value of glm test).}
 
 \item{\code{by_group}}{default NULL; a column of sample_table used to perform the differential test 
@@ -192,25 +211,27 @@ So \code{by_ID} in sample_table should be the smallest unit of sample collection
 Same with the \code{by_ID} parameter in trans_alpha class.}
 
 \item{\code{...}}{parameters passed to \code{cal_diff} function of \code{trans_alpha} class when method is one of 
-"KW", "KW_dunn", "wilcox", "t.test", "anova", "betareg" and "lme";
+"KW", "KW_dunn", "wilcox", "t.test", "anova", "betareg", "lme" or "glmm";
 passed to \code{ANCOMBC::ancombc2} function when method is "ancombc2" (except tax_level, global and fix_formula parameters);
 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw";
 passed to \code{DESeq2::DESeq} function when method = "DESeq2";
-passed to \code{MicrobiomeStat::linda} function when method = "linda".}
+passed to \code{MicrobiomeStat::linda} function when method = "linda";
+passed to \code{trans_env$cal_cor} function when method = "maaslin2".}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
 res_diff and res_abund.\cr
-  \strong{res_abund} includes mean abudance of each taxa (Mean), standard deviation (SD), standard error (SE) and sample number (N) in the group (Group).\cr
-  \strong{res_diff} is the detailed differential test result, containing:\cr
-    \strong{"Comparison"}: The groups for the comparision, maybe all groups or paired groups. If this column is not found, all groups used;\cr
+  \strong{res_abund} includes mean abundance of each taxa (Mean), standard deviation (SD), standard error (SE) and sample number (N) in the group (Group).\cr
+  \strong{res_diff} is the detailed differential test result, may containing:\cr
+    \strong{"Comparison"}: The groups for the comparision, maybe all groups or paired groups. If this column is not found, all groups are used;\cr
     \strong{"Group"}: Which group has the maximum median or mean value across the test groups; 
        For non-parametric methods, median value; For t.test, mean value;\cr
     \strong{"Taxa"}: which taxa is used in this comparision;\cr
     \strong{"Method"}: Test method used in the analysis depending on the method input;\cr
     \strong{"LDA" or "MeanDecreaseGini"}: LDA: linear discriminant score in LEfSe; MeanDecreaseGini: mean decreasing gini index in random forest;\cr
-    \strong{"P.unadj" and "P.adj"}: raw p value; P.adj: adjusted p value;\cr
+    \strong{"P.unadj"}: original p value;\cr
+    \strong{"P.adj"}: adjusted p value;\cr
     \strong{"qvalue"}: qvalue for metastat analysis.
 }
 \subsection{Examples}{
@@ -340,6 +361,7 @@ Bar plot for indicator index, such as LDA score and P value.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_diff$plot_diff_bar(
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),
+  color_group_map = FALSE,
   use_number = 1:10,
   threshold = NULL,
   select_group = NULL,
@@ -358,6 +380,9 @@ Bar plot for indicator index, such as LDA score and P value.
 \describe{
 \item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for different groups.}
 
+\item{\code{color_group_map}}{default FALSE; whether match the colors to groups in order to fix the color in each group when part of groups are not shown in the plot.
+When \code{color_group_map = TRUE}, the group_order inside the object will be used as full groups set to guide the color extraction.}
+
 \item{\code{use_number}}{default 1:10; numeric vector; the taxa numbers used in the plot, i.e. 1:n.}
 
 \item{\code{threshold}}{default NULL; threshold value of indicators for selecting taxa, such as 3 for LDA score of LEfSe.}
@@ -370,7 +395,7 @@ The input select_group must be one of \code{object$res_diff$Comparison}.}
 \item{\code{keep_prefix}}{default TRUE; whether retain the taxonomic prefix.}
 
 \item{\code{group_order}}{default NULL; a vector to order the legend and colors in plot; 
-If NULL, the function can first check whether the group column of \code{microtable$sample_table} is factor. If yes, use the levels in it.
+If NULL, the function can first determine whether the group column of \code{microtable$sample_table} is factor. If yes, use the levels in it.
 If provided, this parameter can overwrite the levels in the group of \code{microtable$sample_table}.}
 
 \item{\code{axis_text_y}}{default 12; the size for the y axis text.}

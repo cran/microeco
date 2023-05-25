@@ -202,6 +202,8 @@ Bar plot.
   barwidth = NULL,
   use_alluvium = FALSE,
   clustering = FALSE,
+  clustering_plot = FALSE,
+  cluster_plot_width = 0.2,
   facet_color = "grey95",
   strip_text = 11,
   legend_text_italic = FALSE,
@@ -210,6 +212,7 @@ Bar plot.
   xtext_keep = TRUE,
   xtitle_keep = TRUE,
   ytitle_size = 17,
+  coord_flip = FALSE,
   ggnested = FALSE,
   high_level_add_other = FALSE
 )}\if{html}{\out{</div>}}
@@ -241,6 +244,11 @@ When multiple facets are used, please first install package \code{ggh4x} using t
 
 \item{\code{clustering}}{default FALSE; whether order samples by the clustering.}
 
+\item{\code{clustering_plot}}{default FALSE; whether add clustering plot.
+If \code{clustering_plot = TRUE}, \code{clustering} will be also TRUE in any case for the clustering.}
+
+\item{\code{cluster_plot_width}}{default 0.2, the dendrogram plot width; available when \code{clustering_plot = TRUE}.}
+
 \item{\code{facet_color}}{default "grey95"; facet background color.}
 
 \item{\code{strip_text}}{default 11; facet text size.}
@@ -256,6 +264,8 @@ When multiple facets are used, please first install package \code{ggh4x} using t
 \item{\code{xtitle_keep}}{default TRUE; whether retain x title.}
 
 \item{\code{ytitle_size}}{default 17; y axis title size.}
+
+\item{\code{coord_flip}}{default FALSE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical becomes horizontal.}
 
 \item{\code{ggnested}}{default FALSE; whether use nested legend. Need \code{ggnested} package to be installed (https://github.com/gmteunisse/ggnested).
 To make it available, please assign \code{high_level} parameter when creating the object.}
@@ -480,7 +490,7 @@ Plot the line chart.
 \describe{
 \item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the points and lines.}
 
-\item{\code{plot_SE}}{default TRUE; TRUE: plot the errorbar with mean±se; FALSE: plot the errorbar with mean±sd.}
+\item{\code{plot_SE}}{default TRUE; TRUE: the errorbar is \eqn{mean±se}; FALSE: the errorbar is \eqn{mean±sd}.}
 
 \item{\code{position}}{default position_dodge(0.1); Position adjustment, either as a string (such as "identity"), or the result of a call to a position adjustment function.}
 

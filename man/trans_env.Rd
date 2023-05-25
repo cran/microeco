@@ -155,7 +155,7 @@ t1$plot_scatterfit(x =
   dataset = NULL,
   env_cols = NULL,
   add_data = NULL,
-  character2numeric = TRUE,
+  character2numeric = FALSE,
   complete_na = FALSE
 )}\if{html}{\out{</div>}}
 }
@@ -173,7 +173,7 @@ Otherwise, please use \code{add_data} parameter.}
 This parameter should be used when the \code{microtable$sample_table} object does not have environmental data. 
 Under this circumstance, the \code{env_cols} parameter can not be used because no data can be selected.}
 
-\item{\code{character2numeric}}{default TRUE; whether convert the characters or factors to numeric attributes.}
+\item{\code{character2numeric}}{default FALSE; whether convert the characters or factors to numeric values.}
 
 \item{\code{complete_na}}{default FALSE; Whether fill the NA (missing value) in the environmental data;
 If TRUE, the function can run the interpolation with the \code{mice} package.}
@@ -198,7 +198,7 @@ t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S[, 4:11])
 \if{html}{\out{<a id="method-trans_env-cal_diff"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_env-cal_diff}{}}}
 \subsection{Method \code{cal_diff()}}{
-Test the difference of environmental variables across groups.
+Differential test of environmental variables across groups.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_diff(
   group = NULL,
@@ -612,7 +612,6 @@ t1$plot_ordination(plot_color = "Group", env_nudge_x = c(0.4, 0, 0, 0, 0, -0.2, 
 Mantel test between beta diversity matrix and environmental data.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_mantel(
-  select_env_data = NULL,
   partial_mantel = FALSE,
   add_matrix = NULL,
   use_measure = NULL,
@@ -626,9 +625,6 @@ Mantel test between beta diversity matrix and environmental data.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{select_env_data}}{default NULL; numeric or character vector to select columns in \code{data_env} of the object; 
-if not provided, automatically select the columns with numeric attributes.}
-
 \item{\code{partial_mantel}}{default FALSE; whether use partial mantel test; If TRUE, use other all measurements as the zdis in each calculation.}
 
 \item{\code{add_matrix}}{default NULL; additional distance matrix provided when the beta diversity matrix in the dataset is not used.}
@@ -669,8 +665,7 @@ Actually, it can also be applied to other correlation between any two variables 
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_cor(
   use_data = c("Genus", "all", "other")[1],
-  select_env_data = NULL,
-  cor_method = c("pearson", "spearman", "kendall")[1],
+  cor_method = c("pearson", "spearman", "kendall", "maaslin2")[1],
   p_adjust_method = "fdr",
   p_adjust_type = c("All", "Type", "Taxa", "Env")[1],
   add_abund_table = NULL,
@@ -679,7 +674,10 @@ Actually, it can also be applied to other correlation between any two variables 
   other_taxa = NULL,
   group_use = NULL,
   group_select = NULL,
-  taxa_name_full = TRUE
+  taxa_name_full = TRUE,
+  tmp_input_maaslin2 = "tmp_input",
+  tmp_output_maaslin2 = "tmp_output",
+  ...
 )}\if{html}{\out{</div>}}
 }
 
@@ -689,9 +687,9 @@ Actually, it can also be applied to other correlation between any two variables 
 \item{\code{use_data}}{default "Genus"; "Genus", "all" or "other"; "Genus" or other taxonomic name: use genus or other taxonomic abundance table in \code{taxa_abund}; 
 "all": use all merged taxonomic abundance table; "other": provide additional taxa name with \code{other_taxa} parameter which is necessary.}
 
-\item{\code{select_env_data}}{default NULL; numeric or character vector to select columns in data_env; if not provided, automatically select the columns with numeric attributes.}
-
-\item{\code{cor_method}}{default "pearson"; "pearson", "spearman" or "kendall"; correlation method.}
+\item{\code{cor_method}}{default "pearson"; "pearson", "spearman", "kendall" or "maaslin2"; correlation method.
+"pearson", "spearman" or "kendall" all refer to the correlation analysis based on the \code{cor.test} function in R.
+"maaslin2" is the method in \code{Maaslin2} package for finding associations between metadata and potentially high-dimensional microbial multi-omics data.}
 
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options.
 \code{p_adjust_method = "none"} can disable the p value adjustment.}
@@ -719,6 +717,12 @@ please see the example.}
 \item{\code{group_select}}{default NULL; the group name used; remain samples within the group.}
 
 \item{\code{taxa_name_full}}{default TRUE; Whether use the complete taxonomic name of taxa.}
+
+\item{\code{tmp_input_maaslin2}}{default "tmp_input"; the temporary folder used to save the input files for Maaslin2.}
+
+\item{\code{tmp_output_maaslin2}}{default "tmp_output"; the temporary folder used to save the output files of Maaslin2.}
+
+\item{\code{...}}{parameters passed to \code{Maaslin2} function of \code{Maaslin2} package.}
 }
 \if{html}{\out{</div>}}
 }
