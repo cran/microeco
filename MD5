@@ -1,14 +1,14 @@
-24e059d9d59c880f3f63b501649494db *DESCRIPTION
+bab89ffd88d2debacf87269b806730c5 *DESCRIPTION
 70b0e75a66033eb8af76ad621a5a7dbb *NAMESPACE
 e2f85d69d84139c112f7126af032dfb0 *R/data.R
 39ac2817a4a4ae7b840662df33baf77e *R/help.R
 6194e169da4b986151156dbfa7560f3a *R/import.R
 ebc901975951fba4ae17d977a6e76ec2 *R/microtable.R
 3247e9782d3a0a4fb3e928146e80872d *R/trans_abund.R
-8f14fd2a8f20e41f1e98e64f5a1deecd *R/trans_alpha.R
+24e707d218e15ebd49641e31f38f285d *R/trans_alpha.R
 24aaf24c748c1417e3f9f2beea6b8aa3 *R/trans_beta.R
 625882599f442b9e3f94d5c036b3c091 *R/trans_classifier.R
-8eeff23fa99b77e2f24f9fe576bbd979 *R/trans_diff.R
+a7fb46b19d1e05ab2c753b3c1a956532 *R/trans_diff.R
 af61dd1e0a968ca91ce485143a287a39 *R/trans_env.R
 48df8a28d800b18992ec4d9b2d2a215c *R/trans_func.R
 290171107fafd5ea70a797ca444237c4 *R/trans_network.R
@@ -53,7 +53,7 @@ af8c43b4a87c8017b188089281e50ecd *man/taxonomy_table_16S.Rd
 3feace9c3cf2f75ca39e5c7cd8e993c1 *man/taxonomy_table_ITS.Rd
 0f459e6f99e9de21549ad1ec39b07925 *man/tidy_taxonomy.Rd
 d539e4090c47fddfb808041a29e6cfdb *man/trans_abund.Rd
-d61c426f634980d6d9363cc87f222b01 *man/trans_alpha.Rd
+67ee048ef0f23c4e8be5f52e80893c72 *man/trans_alpha.Rd
 253dd800cb1927236dcea76395bbc923 *man/trans_beta.Rd
 975bafdf1c8701a8bb2204a471115e2c *man/trans_classifier.Rd
 bcbbb7e641cf13237ee58bfbb0b65286 *man/trans_diff.Rd
