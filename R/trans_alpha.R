@@ -33,7 +33,6 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				data_alpha <- dataset$alpha_diversity %>% 
 					cbind.data.frame(Sample = rownames(.), ., stringsAsFactors = FALSE) %>%
 					.[, !grepl("^se", colnames(.))] %>%
-					# to long format
 					reshape2::melt(id.vars = "Sample") %>%
 					`colnames<-`(c("Sample", "Measure", "Value")) %>%
 					dplyr::left_join(., rownames_to_column(dataset$sample_table), by = c("Sample" = "rowname"))
@@ -92,14 +91,16 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#'   }
 		#' @param measure default NULL; a vector; If NULL, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
 		#' 	 e.g. Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage and PD.
-		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options; 
-		#'    \code{NULL} can disable the p value adjustment.
+		#' @param p_adjust_method default "fdr" (for "KW", "wilcox", "t.test") or "holm" (for "KW_dunn"); P value adjustment method; 
+		#' 	  For \code{method = 'KW', 'wilcox' or 't.test'}, please see method parameter of \code{p.adjust} function for available options;
+		#' 	  For \code{method = 'KW_dunn'}, please see \code{dunn.test::p.adjustment.methods} for available options.
 		#' @param formula default NULL; applied to two-way or multi-factor anova when 
 		#'   method = \code{"anova"} or \code{"scheirerRayHare"} or \code{"lme"} or \code{"betareg"} or \code{"glmm"}; 
 		#'   specified set for independent variables, i.e. the latter part of a general formula, 
 		#'   such as \code{'block + N*P*K'}.
 		#' @param KW_dunn_letter default TRUE; For \code{method = 'KW_dunn'}, \code{TRUE} denotes paired significances are presented by letters;
 		#'   \code{FALSE} means significances are shown by asterisk for paired comparison.
+		#' @param alpha default 0.05; Significant level; used for generating significance letters when method is 'anova' or 'KW_dunn'.
 		#' @param return_model default FALSE; whether return the original lmer or glmm model list in the object.
 		#' @param ... parameters passed to \code{kruskal.test} (\code{method = "KW"}) or \code{wilcox.test} function (\code{method = "wilcox"}) or 
 		#'   \code{dunnTest} function of \code{FSA} package (\code{method = "KW_dunn"}) or 
@@ -122,6 +123,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			p_adjust_method = "fdr", 
 			formula = NULL,
 			KW_dunn_letter = TRUE,
+			alpha = 0.05,
 			return_model = FALSE,
 			...
 			){
@@ -215,11 +217,26 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 						stop("There are only 2 groups. Please select other method instead of KW_dunn !")
 					}
 				}
+				if(is.null(p_adjust_method)){
+					p_adjust_method <- "none"
+				}else{
+					if(p_adjust_method == "fdr"){
+						p_adjust_method <- "holm"
+					}else{
+						if(!p_adjust_method %in% c('none', 'bonferroni', 'sidak', 'holm', 'hs', 'hochberg', 'bh', 'by')){
+							stop("For KW_dunn method, p_adjust_method must be one of 'none', 'bonferroni', 'sidak', 'holm', 'hs', 'hochberg', 'bh' and 'by'!")
+						}
+					}
+				}
+				if(p_adjust_method != "none"){
+					message("P value adjustment method: ", p_adjust_method, " ...")
+				}
 				compare_result <- data.frame()
 				for(k in measure){
 					if(is.null(by_group)){
 						div_table <- data_alpha[data_alpha$Measure == k, c(group, "Value")]
-						tmp_res <- private$kdunn_test(input_table = div_table, group = group, measure = k, KW_dunn_letter = KW_dunn_letter, ...)
+						tmp_res <- private$kdunn_test(input_table = div_table, group = group, measure = k, KW_dunn_letter = KW_dunn_letter, 
+							p_adjust_method = p_adjust_method, alpha = alpha, ...)
 						compare_result %<>% rbind(., tmp_res)
 					}else{
 						for(each_group in unique_bygroups){
@@ -228,7 +245,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 								message("Skip the by_group: ", each_group, " as groups number < 3!")
 								next
 							}
-							tmp_res <- private$kdunn_test(input_table = div_table, group = group, measure = k, KW_dunn_letter = KW_dunn_letter, ...)
+							tmp_res <- private$kdunn_test(input_table = div_table, group = group, measure = k, KW_dunn_letter = KW_dunn_letter, 
+								p_adjust_method = p_adjust_method, alpha = alpha, ...)
 							tmp_res <- cbind.data.frame(by_group = each_group, tmp_res)
 							compare_result %<>% rbind(., tmp_res)
 						}
@@ -240,7 +258,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				for(k in measure){
 					if(is.null(by_group)){
 						div_table <- data_alpha[data_alpha$Measure == k, ]
-						tmp_res <- private$anova_test(input_table = div_table, group = group, measure = k, ...)
+						tmp_res <- private$anova_test(input_table = div_table, group = group, measure = k, alpha = alpha, ...)
 						compare_result %<>% rbind(., tmp_res)
 					}else{
 						for(each_group in unique_bygroups){
@@ -250,7 +268,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 								next
 							}
 							div_table <- data_alpha[data_alpha$Measure == k & all_bygroups == each_group, ]
-							tmp_res <- private$anova_test(input_table = div_table, group = group, measure = k, ...)
+							tmp_res <- private$anova_test(input_table = div_table, group = group, measure = k, alpha = alpha, ...)
 							tmp_res <- cbind.data.frame(by_group = each_group, tmp_res)
 							compare_result %<>% rbind.data.frame(., tmp_res)
 						}
@@ -728,7 +746,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 							}else{
 								res1 <- t.test(x = x_value, y = y_value, paired = TRUE, ...)
 							}
-							max_group_select <- tapply(table_compare$Value, table_compare[, group], mean) %>% {.[which.max(.)]} %>% names
+							max_group_select <- private$group_value_compare(table_compare$Value, table_compare[, group], mean)
 						}else{
 							if(method == "wilcox"){
 								if(is.null(by_ID)){
@@ -736,11 +754,11 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 								}else{
 									res1 <- suppressWarnings(wilcox.test(x = x_value, y = y_value, paired = TRUE, ...))
 								}
-								max_group_select <- tapply(table_compare$Value, table_compare[, group], median) %>% {.[which.max(.)]} %>% names
+								max_group_select <- private$group_value_compare(table_compare$Value, table_compare[, group], median)
 							}else{
 								if(method == "KW" & length(use_comp_group_num) == 1){
 									res1 <- kruskal.test(formu, data = table_compare, ...)
-									max_group_select <- tapply(table_compare$Value, table_compare[, group], median) %>% {.[which.max(.)]} %>% names
+									max_group_select <- private$group_value_compare(table_compare$Value, table_compare[, group], median)
 								}else{
 									next
 								}
@@ -749,7 +767,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					}else{
 						if(method == "KW"){
 							res1 <- kruskal.test(formu, data = table_compare, ...)
-							max_group_select <- tapply(table_compare$Value, table_compare[, group], median) %>% {.[which.max(.)]} %>% names
+							max_group_select <- private$group_value_compare(table_compare$Value, table_compare[, group], median)
 						}else{
 							next
 						}
@@ -769,28 +787,55 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			}
 			res_list
 		},
-		kdunn_test = function(input_table = NULL, group = NULL, measure = NULL, KW_dunn_letter = TRUE, ...){
+		kdunn_test = function(input_table = NULL, group = NULL, measure = NULL, KW_dunn_letter = TRUE, p_adjust_method = NULL, alpha = 0.05, ...){
 			use_method <- "Dunn's Kruskal-Wallis Multiple Comparisons"
+			raw_groups <- input_table[, group]
+			if(any(grepl("-", raw_groups))){
+				input_table[, group] %<>% gsub("-", "sub&&&sub", ., fixed = TRUE)
+			}
 			orderd_groups <- tapply(input_table[, "Value"], input_table[, group], median) %>% sort(decreasing = TRUE) %>% names
 			input_table[, group] %<>% factor(., levels = orderd_groups)
 			formu <- reformulate(group, "Value")
-			dunnTest_raw <- FSA::dunnTest(formu, data = input_table, ...)
-			max_group <- lapply(dunnTest_raw$res$Comparison, function(x){
-				group_select <- unlist(strsplit(x, split = " - "))
-				table_compare_select <- input_table[as.character(input_table[, group]) %in% group_select, ]
-				tapply(table_compare_select$Value, table_compare_select[, group], median) %>% {.[which.max(.)]} %>% names
-			}) %>% unlist
+			dunnTest_raw <- FSA::dunnTest(formu, data = input_table, method = p_adjust_method, ...)
+			dunnTest_table <- dunnTest_raw$res
+			# adjust the orders in each comparison
+			tmp <- strsplit(dunnTest_table$Comparison, split = " - ")
+			tmp <- lapply(tmp, function(x){
+				matchord <- match(x, orderd_groups)
+				if(matchord[1] > matchord[2]){
+					rev(x)
+				}else{
+					x
+				}
+			})
+			orderd_groups %<>% .[. %in% unique(unlist(tmp))]
+			dunnTest_table$Comparison <- lapply(tmp, function(x){paste0(x, collapse = " - ")}) %>% unlist
+			# generate ordered combined paired groups
+			tmp <- combn(orderd_groups, 2) %>% t %>% as.data.frame %>% apply(., 1, function(x){paste0(x, collapse = " - ")})
+			dunnTest_table <- dunnTest_table[match(tmp, dunnTest_table$Comparison), ]
 			if(KW_dunn_letter){
-				dunnTest_final <- rcompanion::cldList(P.adj ~ Comparison, data = dunnTest_raw$res, threshold = 0.05)
+				dunnTest_final <- rcompanion::cldList(P.adj ~ Comparison, data = dunnTest_table, threshold = alpha)
+				if(any(grepl("-", raw_groups))){
+					dunnTest_final$Group %<>% gsub("sub&&&sub", "-", ., fixed = TRUE)
+				}
 				dunnTest_res <- data.frame(Measure = measure, Test_method = use_method, dunnTest_final)
 			}else{
-				dunnTest_res <- data.frame(Measure = measure, Test_method = use_method, Group = max_group, dunnTest_raw$res)
+				max_group <- lapply(dunnTest_table$Comparison, function(x){
+					group_select <- unlist(strsplit(x, split = " - "))
+					table_compare_select <- input_table[as.character(input_table[, group]) %in% group_select, ]
+					private$group_value_compare(table_compare_select$Value, table_compare_select[, group], median)
+				}) %>% unlist
+				if(any(grepl("-", raw_groups))){
+					dunnTest_table$Comparison %<>% gsub("sub&&&sub", "-", ., fixed = TRUE)
+					max_group %<>% gsub("sub&&&sub", "-", ., fixed = TRUE)
+				}
+				dunnTest_res <- data.frame(Measure = measure, Test_method = use_method, Group = max_group, dunnTest_table)
 			}
 			dunnTest_res
 		},
-		anova_test = function(input_table = NULL, group = NULL, measure = NULL, ...){
+		anova_test = function(input_table = NULL, group = NULL, measure = NULL, alpha = 0.05, ...){
 			model <- aov(reformulate(group, "Value"), input_table)
-			out <- agricolae::duncan.test(model, group, main = measure, ...)
+			out <- agricolae::duncan.test(model, group, main = measure, alpha = alpha, ...)
 			res1 <- out$groups[, "groups", drop = FALSE]
 			res1$groups <- as.character(res1$groups)
 			res1 <- data.frame(rownames(res1), res1, stringsAsFactors = FALSE, check.names = FALSE)
@@ -798,6 +843,15 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			rownames(res1) <- NULL
 			res2 <- data.frame(Measure = measure, Test_method = "anova", res1)
 			res2
+		},
+		group_value_compare = function(value, group, ...){
+			group %<>% as.character
+			group_values <- tapply(value, group, ...)
+			if(any(is.na(group_values))){
+				"NA"
+			}else{
+				group_values %>% {.[which.max(.)]} %>% names
+			}
 		}
 	),
 	lock_objects = FALSE,

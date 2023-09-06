@@ -156,6 +156,7 @@ t1$plot_scatterfit(x =
   env_cols = NULL,
   add_data = NULL,
   character2numeric = FALSE,
+  standardize = FALSE,
   complete_na = FALSE
 )}\if{html}{\out{</div>}}
 }
@@ -174,6 +175,8 @@ This parameter should be used when the \code{microtable$sample_table} object doe
 Under this circumstance, the \code{env_cols} parameter can not be used because no data can be selected.}
 
 \item{\code{character2numeric}}{default FALSE; whether convert the characters or factors to numeric values.}
+
+\item{\code{standardize}}{default FALSE; whether scale environmental variables to zero mean and unit variance.}
 
 \item{\code{complete_na}}{default FALSE; Whether fill the NA (missing value) in the environmental data;
 If TRUE, the function can run the interpolation with the \code{mice} package.}
@@ -272,10 +275,11 @@ Please see \code{plot_alpha} function of \code{\link{trans_alpha}} for all the a
 \if{html}{\out{<a id="method-trans_env-cal_autocor"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_env-cal_autocor}{}}}
 \subsection{Method \code{cal_autocor()}}{
-Calculate the autocorrelations among environmental variables and plot the result.
+Calculate the autocorrelations among environmental variables.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_autocor(
   group = NULL,
+  ggpairs = TRUE,
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),
   alpha = 0.8,
   ...
@@ -287,16 +291,19 @@ Calculate the autocorrelations among environmental variables and plot the result
 \describe{
 \item{\code{group}}{default NULL; a colname of sample_table; used to perform calculations for different groups.}
 
+\item{\code{ggpairs}}{default TRUE; whether use \code{GGally::ggpairs} function to plot the correlation results.}
+
 \item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette.}
 
 \item{\code{alpha}}{default 0.8; the alpha value to add transparency in colors; useful when group is not NULL.}
 
-\item{\code{...}}{parameters passed to \code{GGally::ggpairs}.}
+\item{\code{...}}{parameters passed to \code{GGally::ggpairs} when \code{ggpairs = TRUE} or 
+passed to \code{cal_cor} of \code{trans_env} class when \code{ggpairs = FALSE}.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-\code{ggmatrix}.
+\code{ggmatrix} when \code{ggpairs = TRUE} or data.frame object when \code{ggpairs = FALSE}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -534,13 +541,14 @@ plot ordination result.
 
 \item{\code{taxa_text_italic}}{default TRUE; "italic"; whether use "italic" style for the taxa text.}
 
-\item{\code{plot_type}}{default "point"; one or more elements of "point", "ellipse", "chull" and "centroid".
-\describe{
-  \item{\strong{'point'}}{add point}
-  \item{\strong{'ellipse'}}{add confidence ellipse for points of each group}
-  \item{\strong{'chull'}}{add convex hull for points of each group}
-  \item{\strong{'centroid'}}{add centroid line of each group}
-}}
+\item{\code{plot_type}}{default "point"; plotting type of samples;
+one or more elements of "point", "ellipse", "chull", "centroid" and "none"; "none" denotes nothing.
+  \describe{
+    \item{\strong{'point'}}{add point}
+    \item{\strong{'ellipse'}}{add confidence ellipse for points of each group}
+    \item{\strong{'chull'}}{add convex hull for points of each group}
+    \item{\strong{'centroid'}}{add centroid line of each group}
+  }}
 
 \item{\code{point_size}}{default 3; point size in plot when "point" is in \code{plot_type}.}
 
@@ -666,12 +674,13 @@ Actually, it can also be applied to other correlation between any two variables 
 \if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_cor(
   use_data = c("Genus", "all", "other")[1],
   cor_method = c("pearson", "spearman", "kendall", "maaslin2")[1],
-  p_adjust_method = "fdr",
-  p_adjust_type = c("All", "Type", "Taxa", "Env")[1],
   add_abund_table = NULL,
-  by_group = NULL,
+  filter_thres = 0,
   use_taxa_num = NULL,
   other_taxa = NULL,
+  p_adjust_method = "fdr",
+  p_adjust_type = c("All", "Type", "Taxa", "Env")[1],
+  by_group = NULL,
   group_use = NULL,
   group_select = NULL,
   taxa_name_full = TRUE,
@@ -691,6 +700,17 @@ Actually, it can also be applied to other correlation between any two variables 
 "pearson", "spearman" or "kendall" all refer to the correlation analysis based on the \code{cor.test} function in R.
 "maaslin2" is the method in \code{Maaslin2} package for finding associations between metadata and potentially high-dimensional microbial multi-omics data.}
 
+\item{\code{add_abund_table}}{default NULL; additional data table to be used. Samples must be rows.}
+
+\item{\code{filter_thres}}{default 0; the abundance threshold, such as 0.0005 when the input is relative abundance.
+The features with abundances lower than filter_thres will be filtered. This parameter cannot be applied when add_abund_table parameter is provided.}
+
+\item{\code{use_taxa_num}}{default NULL; integer; a number used to select high abundant taxa; only useful when \code{use_data} parameter is a taxonomic level, e.g., "Genus".}
+
+\item{\code{other_taxa}}{default NULL; character vector containing a series of feature names; used when use_data = "other"; 
+provided names should be standard full names used to select taxa from all the tables in taxa_abund list of the microtable object;
+please see the example.}
+
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options.
 \code{p_adjust_method = "none"} can disable the p value adjustment.}
 
@@ -702,15 +722,7 @@ If \code{by_group} is provided, for each group in it separately.
 These three options are the first three colnames of return table \code{res_cor}.
 "All": adjustment for all the data together no matter whether \code{by_group} is provided. If \code{by_group} is NULL, it is same with the "Type" option.}
 
-\item{\code{add_abund_table}}{default NULL; additional data table to be used. Samples must be rows.}
-
 \item{\code{by_group}}{default NULL; one column name or number in sample_table; calculate correlations for different groups separately.}
-
-\item{\code{use_taxa_num}}{default NULL; integer; a number used to select high abundant taxa; only useful when \code{use_data} parameter is a taxonomic level, e.g., "Genus".}
-
-\item{\code{other_taxa}}{default NULL; character vector containing a series of taxa names; used when use_data = "other"; 
-the provided names should be standard full names used to select taxa from all the tables in taxa_abund list of the microtable object;
-please see the example.}
 
 \item{\code{group_use}}{default NULL; numeric or character vector to select one column in sample_table for selecting samples; together with group_select.}
 
@@ -759,6 +771,8 @@ Plot correlation heatmap.
   keep_prefix = TRUE,
   text_y_order = NULL,
   text_x_order = NULL,
+  xtext_angle = 30,
+  xtext_size = 10,
   font_family = NULL,
   cluster_ggplot = "none",
   cluster_height_rows = 0.2,
@@ -790,6 +804,10 @@ For example, \code{filter_feature = ""} can be used to remove features that only
 \item{\code{text_y_order}}{default NULL; character vector; provide customized text order for y axis; shown in the plot from the top down.}
 
 \item{\code{text_x_order}}{default NULL; character vector; provide customized text order for x axis.}
+
+\item{\code{xtext_angle}}{default 30; number ranging from 0 to 90; used to adjust x axis text angle.}
+
+\item{\code{xtext_size}}{default 10; x axis text size.}
 
 \item{\code{font_family}}{default NULL; font family used in \code{ggplot2}; only available when \code{pheatmap = FALSE}.}
 

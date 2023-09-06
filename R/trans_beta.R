@@ -3,7 +3,7 @@
 #' @description
 #' This class is a wrapper for a series of beta-diversity related analysis, 
 #' including ordination calculation and plot based on An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035>, group distance comparision, 
-#' clustering, perMANOVA based on Anderson al. (2008) <doi:10.1111/j.1442-9993.2001.01070.pp.x> and PERMDISP.
+#' clustering, perMANOVA based on Anderson al. (2008) <doi:10.1111/j.1442-9993.2001.01070.pp.x>, ANOSIM and PERMDISP.
 #'
 #' @export
 trans_beta <- R6Class(classname = "trans_beta",
@@ -22,9 +22,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			measure = NULL, 
 			group = NULL
 			){
-			if(is.null(dataset)){
-				stop("dataset is necessary !")
-			}
+			check_microtable(dataset)
 			if(!is.null(measure)){
 				if(is.null(dataset$beta_diversity)){
 					stop("No beta_diversity list found in the input dataset! Please first use cal_betadiv function in microtable class to calculate it!")
@@ -72,6 +70,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @param ncomp default 3; dimensions needed in the result.
 		#' @param trans_otu default FALSE; whether species abundance will be square transformed; only available when \code{ordination = PCA}.
 		#' @param scale_species default FALSE; whether species loading in PCA will be scaled.
+		#' @param ... parameters passed to \code{vegan::rda} function when ordination = "PCA", or \code{ape::pcoa} function when ordination = "PCoA", 
+		#' 	  or \code{vegan::metaMDS} function when when ordination = "NMDS".
 		#' @return \code{res_ordination} stored in the object.
 		#' @examples
 		#' t1$cal_ordination(ordination = "PCoA")		
@@ -79,7 +79,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 			ordination = "PCoA",
 			ncomp = 3,
 			trans_otu = FALSE, 
-			scale_species = FALSE		
+			scale_species = FALSE,
+			...
 			){
 			if(is.null(ordination)){
 				stop("Input ordination should not be NULL !")
@@ -96,25 +97,22 @@ trans_beta <- R6Class(classname = "trans_beta",
 				}else{
 					abund1 <- dataset$otu_table
 				}
-				model <- rda(t(abund1))
-				expla <- round(model$CA$eig/model$CA$tot.chi*100,1)
+				model <- rda(t(abund1), ...)
+				expla <- round(model$CA$eig/model$CA$tot.chi*100, 1)
 				scores <- scores(model, choices = 1:ncomp)$sites
 				combined <- cbind.data.frame(scores, dataset$sample_table)
-
 				if(is.null(dataset$tax_table)){
 					loading <- scores(model, choices = 1:ncomp)$species
 				}else{
 					loading <- cbind.data.frame(scores(model, choices = 1:ncomp)$species, dataset$tax_table)
 				}
 				loading <- cbind.data.frame(loading, rownames(loading))
-
 				if(scale_species == T){
 					maxx <- max(abs(scores[,plot.x]))/max(abs(loading[,plot.x]))
 					loading[, plot.x] <- loading[, plot.x] * maxx * 0.8
 					maxy <- max(abs(scores[,plot.y]))/max(abs(loading[,plot.y]))
 					loading[, plot.y] <- loading[, plot.y] * maxy * 0.8
 				}
-
 				species <- cbind(loading, loading[,plot.x]^2 + loading[,plot.y]^2)
 				colnames(species)[ncol(species)] <- "dist"
 				species <- species[with(species, order(-dist)), ]
@@ -126,7 +124,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 				}
 			}
 			if(ordination == "PCoA"){
-				model <- ape::pcoa(as.dist(self$use_matrix))
+				model <- ape::pcoa(as.dist(self$use_matrix), ...)
 				combined <- cbind.data.frame(model$vectors[,1:ncomp], dataset$sample_table)
 				pco_names <- paste0("PCo", 1:10)
 				colnames(combined)[1:ncomp] <- pco_names[1:ncomp]
@@ -136,7 +134,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 				outlist <- list(model = model, scores = combined, eig = expla)
 			}
 			if(ordination == "NMDS"){
-				model <- vegan::metaMDS(as.dist(self$use_matrix))
+				model <- vegan::metaMDS(as.dist(self$use_matrix), ...)
 				combined <- cbind.data.frame(model$points, dataset$sample_table)
 				outlist <- list(model = model, scores = combined)
 			}
@@ -328,7 +326,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 					use_formula <- reformulate(group, substitute(as.dist(use_matrix)))
 					self$res_manova <- adonis2(use_formula, data = metadata, ...)
 				}else{
-					self$res_manova <- private$paired_group_manova(
+					self$res_manova <- private$paired_group_manova_anosim(
+						test = "permanova",
 						sample_info_use = metadata, 
 						use_matrix = use_matrix, 
 						group = group, 
@@ -339,6 +338,59 @@ trans_beta <- R6Class(classname = "trans_beta",
 				}
 			}
 			message('The result is stored in object$res_manova ...')
+		},
+		#' @description
+		#' Analysis of similarities (ANOSIM) based on R vegan \code{anosim} function.
+		#'
+		#' @param group default NULL; a column name of \code{sample_table}. If NULL, search \code{group} variable stored in the object.
+		#' @param paired default FALSE; whether perform paired test between any two combined groups from all the input groups.
+		#' @param p_adjust_method default "fdr"; p.adjust method; available when \code{paired = TRUE}; see method parameter of \code{p.adjust} function for available options.
+		#' @param ... parameters passed to \code{\link{anosim}} function of \code{vegan} package.
+		#' @return \code{res_anosim} stored in object.
+		#' @examples
+		#' t1$cal_anosim()
+		cal_anosim = function(
+			group = NULL,
+			paired = FALSE,
+			p_adjust_method = "fdr",
+			...
+			){
+			if(is.null(self$use_matrix)){
+				stop("Please recreate the object and set the parameter measure!")
+			}
+			use_matrix <- self$use_matrix
+			metadata <- self$sample_table
+
+			if(is.null(group)){
+				if(is.null(self$group)){
+					stop("Please provide the group parameter!")
+				}else{
+					group <- self$group
+				}
+			}else{
+				if(! group %in% colnames(metadata)){
+					stop("Provided group must be one of colnames in sample_table!")
+				}
+			}
+			if(paired){
+				res <- private$paired_group_manova_anosim(
+					test = "anosim",
+					sample_info_use = metadata, 
+					use_matrix = use_matrix, 
+					group = group, 
+					measure = self$measure, 
+					p_adjust_method = p_adjust_method,
+					...
+				)
+			}else{
+				res <- anosim(
+					x = use_matrix, 
+					grouping = metadata[, group], 
+					...
+				)
+			}
+			self$res_anosim <- res
+			message('The original result is stored in object$res_anosim ...')
 		},
 		#' @description
 		#' A wrapper for \code{betadisper} function in vegan package for multivariate homogeneity test of groups dispersions.
@@ -659,10 +711,15 @@ trans_beta <- R6Class(classname = "trans_beta",
 			}
 			res
 		},
-		paired_group_manova = function(sample_info_use, use_matrix, group, measure, p_adjust_method, ...){
+		paired_group_manova_anosim = function(test = c("permanova", "anosim")[1], sample_info_use, use_matrix, group, measure, p_adjust_method, ...){
 			comnames <- c()
-			F <- c()
-			R2 <- c()
+			test <- match.arg(test, choices = c("permanova", "anosim"))
+			if(test == "permanova"){
+				F <- c()
+				R2 <- c()
+			}else{
+				R <- c()
+			}
 			p_value <- c()
 			matrix_total <- use_matrix[rownames(sample_info_use), rownames(sample_info_use)]
 			groupvec <- as.character(sample_info_use[, group])
@@ -670,17 +727,28 @@ trans_beta <- R6Class(classname = "trans_beta",
 			for(i in 1:ncol(all_name)) {
 				matrix_compare <- matrix_total[groupvec %in% as.character(all_name[,i]), groupvec %in% as.character(all_name[,i])]
 				sample_info_compare <- sample_info_use[groupvec %in% as.character(all_name[,i]), , drop = FALSE]
-				ad <- adonis2(reformulate(group, substitute(as.dist(matrix_compare))), data = sample_info_compare, ...)
 				comnames <- c(comnames, paste0(as.character(all_name[,i]), collapse = " vs "))
-				F %<>% c(., ad$F[1])
-				R2 %<>% c(., ad$R2[1])
-				p_value %<>% c(., ad$`Pr(>F)`[1])
+				if(test == "permanova"){
+					tmp_result <- adonis2(reformulate(group, substitute(as.dist(matrix_compare))), data = sample_info_compare, ...)
+					F %<>% c(., tmp_result$F[1])
+					R2 %<>% c(., tmp_result$R2[1])
+					p_value %<>% c(., tmp_result$`Pr(>F)`[1])
+				}else{
+					tmp_result <- anosim(x = matrix_compare, grouping = sample_info_compare[, group], ...)
+					R %<>% c(., tmp_result$statistic[1])
+					p_value %<>% c(., tmp_result$signif[1])
+				}
 			}
 			p_adjusted <- p.adjust(p_value, method = p_adjust_method)
 			significance_label <- cut(p_adjusted, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label = c("***", "**", "*", ""))
 			measure_vec <- rep(measure, length(comnames))
-			compare_result <- data.frame(comnames, measure_vec, F, R2, p_value, p_adjusted, significance_label)
-			colnames(compare_result) <- c("Groups", "measure", "F", "R2","p.value", "p.adjusted", "Significance")
+			if(test == "permanova"){
+				compare_result <- data.frame(comnames, measure_vec, F, R2, p_value, p_adjusted, significance_label)
+				colnames(compare_result) <- c("Groups", "measure", "F", "R2","p.value", "p.adjusted", "Significance")
+			}else{
+				compare_result <- data.frame(comnames, measure_vec, R, p_value, p_adjusted, significance_label)
+				colnames(compare_result) <- c("Groups", "measure", "R", "p.value", "p.adjusted", "Significance")
+			}
 			compare_result
 		}
 	),

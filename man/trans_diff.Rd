@@ -167,9 +167,11 @@ For testing at a specific rank, provide taxonomic rank name, such as "Genus".
 If the provided taxonomic name is neither 'all' nor a colname in tax_table of input dataset, 
 the function will use the features in input \code{microtable$otu_table} automatically.}
 
-\item{\code{filter_thres}}{default 0; the relative abundance threshold, such as 0.0005; only available when method != "metastat".}
+\item{\code{filter_thres}}{default 0; the abundance threshold, such as 0.0005 when the input is relative abundance; only available when method != "metastat".
+The features with abundances lower than filter_thres will be filtered.}
 
-\item{\code{alpha}}{default 0.05; differential significance threshold for method = "lefse" or "rf"; used to select taxa with significance across groups.}
+\item{\code{alpha}}{default 0.05; significance threshold to select taxa when method is "lefse" or "rf"; 
+or used to generate significance letters when method is 'anova' or 'KW_dunn' like the alpha parameter in \code{cal_diff} of \code{trans_alpha} class.}
 
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for other available options; 
 "none" means disable p value adjustment; So when \code{p_adjust_method = "none"}, P.adj is same with P.unadj.}

@@ -16,6 +16,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#'   This parameter should be used when the \code{microtable$sample_table} object does not have environmental data. 
 		#'   Under this circumstance, the \code{env_cols} parameter can not be used because no data can be selected.
 		#' @param character2numeric default FALSE; whether convert the characters or factors to numeric values.
+		#' @param standardize default FALSE; whether scale environmental variables to zero mean and unit variance.
 		#' @param complete_na default FALSE; Whether fill the NA (missing value) in the environmental data;
 		#'   If TRUE, the function can run the interpolation with the \code{mice} package.
 		#' @return \code{data_env} stored in the object.
@@ -28,6 +29,7 @@ trans_env <- R6Class(classname = "trans_env",
 			env_cols = NULL, 
 			add_data = NULL, 
 			character2numeric = FALSE, 
+			standardize = FALSE, 
 			complete_na = FALSE
 			){
 			# support all the dataset, env_cols and add_data = NULL from v0.7.0
@@ -80,6 +82,9 @@ trans_env <- R6Class(classname = "trans_env",
 				if(character2numeric){
 					env_data %<>% dropallfactors(., unfac2num = TRUE, char2num = TRUE)
 				}
+			}
+			if(standardize){
+				env_data %<>% decostand(., method = "standardize", MARGIN = 2)
 			}
 			self$data_env <- env_data
 			message("Env data is stored in object$data_env ...")
@@ -149,47 +154,56 @@ trans_env <- R6Class(classname = "trans_env",
 			res_diff_tmp$plot_alpha(...)
 		},
 		#' @description
-		#' Calculate the autocorrelations among environmental variables and plot the result.
+		#' Calculate the autocorrelations among environmental variables.
 		#'
 		#' @param group default NULL; a colname of sample_table; used to perform calculations for different groups.
+		#' @param ggpairs default TRUE; whether use \code{GGally::ggpairs} function to plot the correlation results.
 		#' @param color_values default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette.
 		#' @param alpha default 0.8; the alpha value to add transparency in colors; useful when group is not NULL.
-		#' @param ... parameters passed to \code{GGally::ggpairs}.
-		#' @return \code{ggmatrix}.
+		#' @param ... parameters passed to \code{GGally::ggpairs} when \code{ggpairs = TRUE} or 
+		#' 	  passed to \code{cal_cor} of \code{trans_env} class when \code{ggpairs = FALSE}.
+		#' @return \code{ggmatrix} when \code{ggpairs = TRUE} or data.frame object when \code{ggpairs = FALSE}.
 		#' @examples
 		#' \dontrun{
 		#' # Spearman correlation
 		#' t1$cal_autocor(upper = list(continuous = GGally::wrap("cor", method= "spearman")))
 		#' }
-		cal_autocor = function(group = NULL, color_values = RColorBrewer::brewer.pal(8, "Dark2"), alpha = 0.8, ...){
+		cal_autocor = function(group = NULL, ggpairs = TRUE, color_values = RColorBrewer::brewer.pal(8, "Dark2"), alpha = 0.8, ...){
 			if(!requireNamespace("GGally", quietly = TRUE)){
 				stop("Please first install GGally with the command: install.packages('GGally') !")
 			}
 			if(is.null(self$data_env)){
 				stop("The data_env is NULL! Please check the data input when creating the object !")
 			}else{
-				env_data <- self$data_env
-				env_data <- private$check_numeric(env_data)
+				env_data <- private$check_numeric(self$data_env)
 			}
-			if(is.null(group)){
-				g <- GGally::ggpairs(env_data, ...)
-			}else{
-				sample_table <- self$dataset$sample_table
-				if(! group %in% colnames(sample_table)){
-					stop("Please provide a correct group name!")
-				}
-				merge_data <- cbind.data.frame(sample_table[, group, drop = FALSE], env_data[rownames(sample_table), ])
-				g <- GGally::ggpairs(merge_data, aes_meco(colour = group, alpha = alpha),  ...)
-				# Loop through each plot changing relevant scales 
-				for(i in 1:g$nrow){
-					for(j in 1:g$ncol){
-						g[i, j] <- g[i, j] + 
-							scale_fill_manual(values = color_values) +
-							scale_color_manual(values = color_values)
+			if(ggpairs){
+				if(is.null(group)){
+					g <- GGally::ggpairs(env_data, ...)
+				}else{
+					sample_table <- self$dataset$sample_table
+					if(! group %in% colnames(sample_table)){
+						stop("Please provide a correct group name!")
+					}
+					merge_data <- cbind.data.frame(sample_table[, group, drop = FALSE], env_data[rownames(sample_table), ])
+					g <- GGally::ggpairs(merge_data, aes_meco(colour = group, alpha = alpha),  ...)
+					# Loop through each plot changing relevant scales 
+					for(i in 1:g$nrow){
+						for(j in 1:g$ncol){
+							g[i, j] <- g[i, j] + 
+								scale_fill_manual(values = color_values) +
+								scale_color_manual(values = color_values)
+						}
 					}
 				}
+				g
+			}else{
+				tmp <- suppressMessages(trans_env$new(dataset = self$dataset, add_data = env_data))
+				suppressMessages(tmp$cal_cor(add_abund_table = env_data, by_group = group, ...))
+				res <- tmp$res_cor
+				colnames(res)[1:3] <- c("group", "Env1", "Env2")
+				res
 			}
-			g
 		},
 		#' @description
 		#' Redundancy analysis (RDA) and Correspondence Analysis (CCA) based on the \code{vegan} package.
@@ -282,12 +296,9 @@ trans_env <- R6Class(classname = "trans_env",
 						self$dataset$add_rownames2taxonomy(use_name = "OTU")
 					}
 				}else{
-					if(! taxa_level %in% colnames(self$dataset$tax_table)){
-						stop("The taxa_level provided is neither OTU nor one of the column names of dataset$tax_table!")
-					}else{
-						newdat <- self$dataset$merge_taxa(taxa_level)
-						use_abund <- newdat$otu_table
-					}
+					check_tax_level(taxa_level, self$dataset)
+					newdat <- self$dataset$merge_taxa(taxa_level)
+					use_abund <- newdat$otu_table
 				}
 				if(!is.null(taxa_filter_thres)){
 					use_abund <- use_abund[apply(use_abund, 1, sum)/sum(use_abund) > taxa_filter_thres, ]
@@ -398,11 +409,11 @@ trans_env <- R6Class(classname = "trans_env",
 			scrs <- scores(res_ordination)
 			scrs$biplot <- scores(res_ordination, choices = c(1, 2), "bp", scaling = "sites")
 			df_sites <- cbind.data.frame(scrs$sites, self$dataset$sample_table[rownames(scrs$sites), ])
-			colnames(df_sites)[1:2] <- c("x","y")
+			colnames(df_sites)[1:2] <- c("x", "y")
 			
 			multiplier <- vegan:::ordiArrowMul(scrs$biplot)
 			df_arrows<- scrs$biplot * multiplier
-			colnames(df_arrows)<-c("x","y")
+			colnames(df_arrows) <- c("x", "y")
 			df_arrows <- as.data.frame(df_arrows)
 			eigval <- res_ordination$CCA$eig/sum(res_ordination$CCA$eig)
 			eigval <- round(100 * eigval, 1)
@@ -410,24 +421,27 @@ trans_env <- R6Class(classname = "trans_env",
 			eigval[2] <- paste0("RDA2", " [", eigval[2], "%]")
 
 			if(self$ordination_method != "dbRDA"){
-				scrs$biplot_spe <- scores(res_ordination, choices=c(1, 2), "sp", scaling="species")
+				scrs$biplot_spe <- scores(res_ordination, choices = c(1, 2), "sp", scaling = "species")
 				df_species <- scrs$species
-				colnames(df_species)[1:2] <- c("x","y")
+				colnames(df_species)[1:2] <- c("x", "y")
 				multiplier_spe <- vegan:::ordiArrowMul(scrs$biplot_spe)
 				df_arrows_spe <- scrs$biplot_spe * multiplier_spe
-				colnames(df_arrows_spe) <- c("x","y")
+				colnames(df_arrows_spe) <- c("x", "y")
 				df_arrows_spe <- dropallfactors(cbind.data.frame(
 					df_arrows_spe, 
 					self$dataset$tax_table[rownames(df_arrows_spe), self$taxa_level, drop = FALSE]
 					))
 				df_arrows_spe %<>% .[!grepl("__$|__uncultured|sp$", .[, 3]), ]
-				df_arrows_spe <- df_arrows_spe %>% 
+				sorted_names <- df_arrows_spe %>% 
 					{.[,1]^2 + .[,2]^2} %>% 
 					`names<-`(rownames(df_arrows_spe)) %>% 
-					sort(., decreasing = TRUE) %>% 
-					.[1:show_taxa] %>% 
-					names %>% 
-					df_arrows_spe[., ]
+					sort(., decreasing = TRUE)
+				
+				if(!is.null(show_taxa)){
+					if(show_taxa < nrow(df_arrows_spe)){
+						df_arrows_spe %<>% .[names(sorted_names[1:show_taxa]), ]
+					}
+				}
 			}else{
 				df_species <- NULL
 				df_arrows_spe <- NULL
@@ -461,7 +475,8 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param env_text_size default 3.7; environmental variable text size.
 		#' @param taxa_text_size default 3; taxa text size.
 		#' @param taxa_text_italic default TRUE; "italic"; whether use "italic" style for the taxa text.
-		#' @param plot_type default "point"; one or more elements of "point", "ellipse", "chull" and "centroid".
+		#' @param plot_type default "point"; plotting type of samples;
+		#' one or more elements of "point", "ellipse", "chull", "centroid" and "none"; "none" denotes nothing.
 		#'   \describe{
 		#'     \item{\strong{'point'}}{add point}
 		#'     \item{\strong{'ellipse'}}{add confidence ellipse for points of each group}
@@ -542,11 +557,10 @@ trans_env <- R6Class(classname = "trans_env",
 					stop("Plot ellipse or chull or centroid need groups! Please provide plot_color parameter!")
 				}
 			}
-			if(! all(plot_type %in% c("point", "ellipse", "chull", "centroid"))){
-				message("There maybe a typo in your plot_type input! plot_type should be one or more from 'point', 'ellipse', 'chull' and 'centroid'!")
+			if(! all(plot_type %in% c("point", "ellipse", "chull", "centroid", "none"))){
+				message("There maybe a typo in plot_type input! It must be one or more from 'point', 'ellipse', 'chull', 'centroid' and 'none'!")
 			}
 			df_sites <- self$res_ordination_trans$df_sites
-			
 			p <- ggplot()
 			p <- p + theme_bw()
 			p <- p + theme(panel.grid=element_blank())
@@ -789,6 +803,13 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param cor_method default "pearson"; "pearson", "spearman", "kendall" or "maaslin2"; correlation method.
 		#' 	  "pearson", "spearman" or "kendall" all refer to the correlation analysis based on the \code{cor.test} function in R.
 		#' 	  "maaslin2" is the method in \code{Maaslin2} package for finding associations between metadata and potentially high-dimensional microbial multi-omics data.
+		#' @param add_abund_table default NULL; additional data table to be used. Samples must be rows.
+		#' @param filter_thres default 0; the abundance threshold, such as 0.0005 when the input is relative abundance.
+		#' 	  The features with abundances lower than filter_thres will be filtered. This parameter cannot be applied when add_abund_table parameter is provided.
+		#' @param use_taxa_num default NULL; integer; a number used to select high abundant taxa; only useful when \code{use_data} parameter is a taxonomic level, e.g., "Genus".
+		#' @param other_taxa default NULL; character vector containing a series of feature names; used when use_data = "other"; 
+		#' 	  provided names should be standard full names used to select taxa from all the tables in taxa_abund list of the microtable object;
+		#' 	  please see the example.
 		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options.
 		#' 	  \code{p_adjust_method = "none"} can disable the p value adjustment.
 		#' @param p_adjust_type default "All"; "All", "Type", "Taxa" or "Env"; P value adjustment type.
@@ -798,12 +819,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' 	  If \code{by_group} is provided, for each group in it separately.
 		#' 	  These three options are the first three colnames of return table \code{res_cor}.
 		#' 	  "All": adjustment for all the data together no matter whether \code{by_group} is provided. If \code{by_group} is NULL, it is same with the "Type" option.
-		#' @param add_abund_table default NULL; additional data table to be used. Samples must be rows.
 		#' @param by_group default NULL; one column name or number in sample_table; calculate correlations for different groups separately.
-		#' @param use_taxa_num default NULL; integer; a number used to select high abundant taxa; only useful when \code{use_data} parameter is a taxonomic level, e.g., "Genus".
-		#' @param other_taxa default NULL; character vector containing a series of taxa names; used when use_data = "other"; 
-		#' 	  the provided names should be standard full names used to select taxa from all the tables in taxa_abund list of the microtable object;
-		#' 	  please see the example.
 		#' @param group_use default NULL; numeric or character vector to select one column in sample_table for selecting samples; together with group_select.
 		#' @param group_select default NULL; the group name used; remain samples within the group.
 		#' @param taxa_name_full default TRUE; Whether use the complete taxonomic name of taxa.
@@ -821,12 +837,13 @@ trans_env <- R6Class(classname = "trans_env",
 		cal_cor = function(
 			use_data = c("Genus", "all", "other")[1],
 			cor_method = c("pearson", "spearman", "kendall", "maaslin2")[1],
-			p_adjust_method = "fdr",
-			p_adjust_type = c("All", "Type", "Taxa", "Env")[1],
 			add_abund_table = NULL,
-			by_group = NULL,
+			filter_thres = 0,
 			use_taxa_num = NULL,
 			other_taxa = NULL,
+			p_adjust_method = "fdr",
+			p_adjust_type = c("All", "Type", "Taxa", "Env")[1],
+			by_group = NULL,
 			group_use = NULL,
 			group_select = NULL,
 			taxa_name_full = TRUE,
@@ -846,10 +863,7 @@ trans_env <- R6Class(classname = "trans_env",
 			if(!is.null(add_abund_table)){
 				abund_table <- add_abund_table
 			}else{
-				if(is.null(self$dataset$taxa_abund)){
-					message('Invoke cal_abund function to calculate taxonomic abundance automatically ...')
-					self$dataset$cal_abund()
-				}
+				check_taxa_abund(self$dataset)
 				if(use_data %in% names(self$dataset$taxa_abund)){
 					abund_table <- self$dataset$taxa_abund[[use_data]]
 				}else{
@@ -869,6 +883,8 @@ trans_env <- R6Class(classname = "trans_env",
 				if(nrow(abund_table) == 0){
 					stop("No available feature! Please check the input data!")
 				}
+				filter_output <- filter_lowabund_feature(abund_table = abund_table, filter_thres = filter_thres)
+				abund_table <- filter_output$abund_table
 				if(use_data %in% names(self$dataset$taxa_abund) & !is.null(use_taxa_num)){
 					if(nrow(abund_table) > use_taxa_num){
 						abund_table %<>% .[1:use_taxa_num, ] 
@@ -964,6 +980,8 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param keep_prefix default TRUE; whether retain the taxonomic prefix.
 		#' @param text_y_order default NULL; character vector; provide customized text order for y axis; shown in the plot from the top down.
 		#' @param text_x_order default NULL; character vector; provide customized text order for x axis.
+		#' @param xtext_angle default 30; number ranging from 0 to 90; used to adjust x axis text angle. 
+		#' @param xtext_size default 10; x axis text size.
 		#' @param font_family default NULL; font family used in \code{ggplot2}; only available when \code{pheatmap = FALSE}.
 		#' @param cluster_ggplot default "none"; add clustering dendrogram for \code{ggplot2} based heatmap. Available options: "none", "row", "col" or "both". 
 		#'   "none": no any clustering used; "row": add clustering for rows; "col": add clustering for columns; "both": add clustering for both rows and columns.
@@ -988,6 +1006,8 @@ trans_env <- R6Class(classname = "trans_env",
 			keep_prefix = TRUE,
 			text_y_order = NULL,
 			text_x_order = NULL,
+			xtext_angle = 30,
+			xtext_size = 10,
 			font_family = NULL,
 			cluster_ggplot = "none",
 			cluster_height_rows = 0.2,
@@ -1133,9 +1153,10 @@ trans_env <- R6Class(classname = "trans_env",
 				legend_fill <- ifelse(self$cor_method == "maaslin2", paste0("maaslin2\ncoef"), paste0(toupper(substring(self$cor_method, 1, 1)), substring(self$cor_method, 2)))
 				p <- p + geom_text(aes(label = Significance), color="black", size=4) + 
 					labs(y = NULL, x = "Measure", fill = legend_fill) +
-					theme(axis.text.x = element_text(angle = 40, colour = "black", vjust = 1, hjust = 1, size = 10)) +
 					theme(strip.background = element_rect(fill = "grey85", colour = "white"), axis.title = element_blank()) +
-					theme(strip.text=element_text(size=11), panel.border = element_blank(), panel.grid = element_blank())
+					theme(strip.text = element_text(size = 11), panel.border = element_blank(), panel.grid = element_blank())
+				p <- p + ggplot_xtext_anglesize(xtext_angle, xtext_size)
+				
 				if(length(unique(use_data$Type)) == 1){
 					if(cluster_ggplot == "none"){
 						p <- p + scale_y_discrete(limits = lim_y, position = text_y_position) + scale_x_discrete(limits = lim_x)

@@ -1,3 +1,62 @@
+
+
+# check taxa_abund in microtable object
+check_taxa_abund <- function(obj, ...){
+	if(is.null(obj$taxa_abund)){
+		message("No taxa_abund list found. Calculate it with cal_abund function ...")
+		obj$cal_abund(...)
+	}
+}
+
+# check microtable object in class
+check_microtable <- function(obj){
+	if(is.null(obj)){
+		stop("The dataset must be provided!")
+	}
+	if(! inherits(obj, "microtable")){
+		stop("The input dataset must be microtable object! Please check it!")
+	}
+}
+
+# check provided taxonomic levels: obj either microtable object or taxonomic table
+check_tax_level <- function(tax_level, obj){
+	if(inherits(obj, "microtable")){
+		if(is.null(obj$tax_table)){
+			stop("No tax_table found in the microtable object!")
+		}
+		check_table <- obj$tax_table
+	}else{
+		check_table <- obj
+	}
+	if(! tax_level %in% colnames(check_table)){
+		stop("Provided taxonomic level is not found in the tax_table of microtable object!")
+	}
+}
+
+ggplot_xtext_anglesize <- function(xtext_angle, xtext_size){
+	if(xtext_angle == 0){
+		theme(axis.text.x = element_text(colour = "black", size = xtext_size))
+	}else{
+		theme(axis.text.x = element_text(angle = xtext_angle, colour = "black", vjust = 1, hjust = 1, size = xtext_size))
+	}
+}
+
+filter_lowabund_feature <- function(abund_table, filter_thres){
+	output <- list()
+	if(filter_thres > 0){
+		mean_abund <- apply(abund_table, 1, mean)
+		if(filter_thres > max(mean_abund)){
+			stop("Parameter filter_thres is larger than the maximum of mean abundances of features!")
+		}
+		abund_table <- abund_table[mean_abund >= filter_thres, ]
+		filter_features <- mean_abund[mean_abund < filter_thres]
+		message("Filter out ", length(filter_features), " features with low abundance ...")
+		output[["filter_features"]] <- filter_features
+	}
+	output[["abund_table"]] <- abund_table
+	output
+}
+
 # inner function to add colors when not enough to use
 expand_colors <- function(color_values, output_length){
 	if(output_length <= length(color_values)){
@@ -28,11 +87,11 @@ expand_colors <- function(color_values, output_length){
 	total_colors
 }
 
-#' Copy an R6 class object completely
+#' Copy an R6 class object
 #'
 #' @param x R6 class object
-#' @param deep default TRUE; deep copy
-#' @return identical but unrelated R6 object.
+#' @param deep default TRUE; TRUE means deep copy, i.e. copied object is unlinked with the original one.
+#' @return identical but unlinked R6 object
 #' @examples
 #' data("dataset")
 #' clone(dataset)
@@ -45,7 +104,7 @@ clone <- function(x, deep = TRUE){
 #' Remove all factors in a data frame
 #'
 #' @param x data frame
-#' @param unfac2num default FALSE; whether try to convert all character to numeric; if FALSE, only try to convert column with factor attribute.
+#' @param unfac2num default FALSE; whether try to convert all character columns to numeric; if FALSE, only try to convert column with factor attribute.
 #'   Note that this can only transform the columns that may be transformed to numeric without using factor.
 #' @param char2num default FALSE; whether force all the character to be numeric class by using factor as an intermediate.
 #' @return data frame without factor
@@ -86,7 +145,7 @@ trycharnum <- function(x){
 #' @param taxonomy_table a data.frame with taxonomic information.
 #' @param column default "all"; "all" or a number; 'all' represents cleaning up all the columns; a number represents cleaning up this column.
 #' @param pattern default see the function parameter; the characters (regular expression) to be cleaned up or replaced; cleaned up when parameter replacement = "", 
-#'   replaced when parameter replacement has something; Note that the capital and small letters are not distinguished.
+#'   replaced when parameter replacement has something; Note that the capital and small letters are not distinguished when \code{ignore.case = TRUE}.
 #' @param replacement default ""; the characters used to replace the character in pattern parameter.
 #' @param ignore.case default TRUE; if FALSE, the pattern matching is case sensitive and if TRUE, case is ignored during matching.
 #' @param na_fill default ""; used to replace the NA.
@@ -98,7 +157,7 @@ trycharnum <- function(x){
 #' @export
 tidy_taxonomy <- function(taxonomy_table, 
 	column = "all",
-	pattern = c(".*uncultur.*", ".*unknown.*", ".*unidentif.*", ".*unclassified.*", ".*No blast hit.*", ".*sp\\.$",
+	pattern = c(".*Unassigned.*", ".*uncultur.*", ".*unknown.*", ".*unidentif.*", ".*unclassified.*", ".*No blast hit.*", ".*sp\\.$",
 		".*metagenome.*", ".*cultivar.*", ".*archaeon$", "__synthetic.*", ".*\\sbacterium$", ".*bacterium\\s.*", ".*Incertae.sedis.*"),
 	replacement = "",
 	ignore.case = TRUE,
@@ -141,8 +200,8 @@ summarySE_inter <- function(usedata = NULL, measurevar, groupvars = NULL, na.rm 
 	if(more){
 	datac %<>% dplyr::summarise(N = length2(!!sym(measurevar), na.rm = na.rm), Mean = mean(!!sym(measurevar), na.rm = na.rm), SD = stats::sd(!!sym(measurevar), na.rm = na.rm), 
 				Median = stats::median(!!sym(measurevar), na.rm = na.rm), Min = min(!!sym(measurevar), na.rm = na.rm), Max = max(!!sym(measurevar), na.rm = na.rm),
-				quantile25 = unname(stats::quantile(!!sym(measurevar),  probs = 0.25)),
-				quantile75 = unname(stats::quantile(!!sym(measurevar),  probs = 0.75))
+				quantile25 = unname(stats::quantile(!!sym(measurevar), probs = 0.25)),
+				quantile75 = unname(stats::quantile(!!sym(measurevar), probs = 0.75))
 				)
 	}else{
 		datac %<>% dplyr::summarise(N = length2(!!sym(measurevar), na.rm = na.rm), Mean = mean(!!sym(measurevar), na.rm = na.rm), 
@@ -242,7 +301,7 @@ StatCorLm <- ggproto("StatCorLm", Stat,
 	data.frame(label = as.character(as.expression(res)))
 }
 
-aes_meco <- function (x, y, ...){
+aes_meco <- function(x, y, ...){
     mapping <- list(...)
     if (!missing(x)) 
         mapping["x"] <- list(x)
@@ -273,17 +332,15 @@ new_aesthetic <- function (x, env = globalenv()){
 }
 
 ##################################################################################
-##################################################################################
-
 # metastat code from White et al. (2009) <doi:10.1371/journal.pcbi.1000352>.
 #************************************************************************
 # ************************** SUBROUTINES ********************************
 #************************************************************************
 
-#*****************************************************************************************************
+#*********************************************************************************
 #  calc two sample two statistics
 #  g is the first column in the matrix representing the second condition
-#*****************************************************************************************************
+#*********************************************************************************
 calc_twosample_ts <- function(Pmatrix, g, nrows, ncols)
 {
 	C1 <- array(0, dim=c(nrows,3));  # statistic profiles

@@ -54,13 +54,8 @@ trans_abund <- R6Class(classname = "trans_abund",
 			high_level = NULL,
 			high_level_fix_nsub = NULL
 			){
-			if(is.null(dataset)){
-				stop("No dataset provided!")
-			}
-			if(is.null(dataset$taxa_abund)){
-				message('The taxa_abund in dataset is NULL. Calculate it now ...')
-				dataset$cal_abund()
-			}
+			check_microtable(dataset)
+			check_taxa_abund(dataset)
 			sample_table <- dataset$sample_table
 			if("Sample" %in% colnames(sample_table)){
 				colnames(sample_table)[colnames(sample_table) == "Sample"] <- "Sample_replace"
@@ -98,12 +93,10 @@ trans_abund <- R6Class(classname = "trans_abund",
 			# add the mean abundance of all samples
 			all_mean_abund <- data.frame(Taxonomy = names(mean_abund), all_mean_abund = mean_abund)
 			rownames(all_mean_abund) <- NULL
-			# add sample table
 			abund_data %<>% {suppressWarnings(dplyr::left_join(., rownames_to_column(sample_table), by = c("Sample" = "rowname")))}
 			# calculate mean vlaues for each group
 			if(!is.null(groupmean)){
 				message(paste0(groupmean, " column is used to calculate mean abundance ..."))
-				# abund_data[, groupmean] %<>% as.character
 				abund_data <- microeco:::summarySE_inter(abund_data, measurevar = "Abundance", groupvars = c("Taxonomy", groupmean), more = group_morestats)
 				colnames(abund_data)[colnames(abund_data) == "Mean"] <- "Abundance"
 				colnames(abund_data)[colnames(abund_data) == groupmean] <- "Sample"
@@ -140,9 +133,8 @@ trans_abund <- R6Class(classname = "trans_abund",
 			if(ntaxa_use > sum(mean_abund > show)){
 				ntaxa_use <- sum(mean_abund > show)
 			}
-			# filter useless taxa
 			use_taxanames %<>% .[!grepl("unidentified|unculture|Incertae.sedis", .)]
-			# identify used taxa
+			# determine used taxa
 			if(is.null(input_taxaname)){
 				if(is.null(high_level_fix_nsub)){
 					if(length(use_taxanames) > ntaxa_use){
@@ -172,7 +164,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 				data_taxanames_highlevel <- as.character(names(sort(tmp, decreasing = TRUE)))
 				self$data_taxanames_highlevel <- data_taxanames_highlevel
 			}
-			# ylab title for different cases; more clear
+			# ylab title for different cases
 			if(ntaxa_theshold < sum(mean_abund > show) | show == 0){
 				if(use_percentage == T){
 					abund_data$Abundance %<>% {. * 100}
@@ -890,11 +882,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 				}
 			}else{
 				if(xtext_keep){
-					if(xtext_angle == 0){
-						theme(axis.text.x = element_text(colour = "black", size = xtext_size))
-					}else{
-						theme(axis.text.x = element_text(angle = xtext_angle, colour = "black", vjust = 1, hjust = 1, size = xtext_size))
-					}
+					ggplot_xtext_anglesize(xtext_angle, xtext_size)
 				}else{
 					theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
 				}
