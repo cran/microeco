@@ -1,4 +1,4 @@
-19822cb5c601a8a83db79154bfb19120 *DESCRIPTION
+98b8200774ddfdbc2fecb5e96f47a039 *DESCRIPTION
 70b0e75a66033eb8af76ad621a5a7dbb *NAMESPACE
 a0112422157c37844ef95eb2cad49681 *R/data.R
 39ac2817a4a4ae7b840662df33baf77e *R/help.R
@@ -10,8 +10,8 @@ c1606c80bd82ce397bb364b4c20de602 *R/microtable.R
 f4c0174f58808d9451081395b06eb79e *R/trans_classifier.R
 da29af9e30c0c91f1bbc50e3f36f6e2d *R/trans_diff.R
 c480cb428e2d1ffa0c8ec40577746f6f *R/trans_env.R
-780ae084b39639f5c37282aac36ed613 *R/trans_func.R
-290171107fafd5ea70a797ca444237c4 *R/trans_network.R
+870d0454f54706ac740af369c4815d1c *R/trans_func.R
+c143fc534a00df516d5cd20f333c8f34 *R/trans_network.R
 d12e2512dff6899f152b41eea6c89e5b *R/trans_nullmodel.R
 42ed14fff1e09e6f21fcee7877e7a90f *R/trans_venn.R
 6df5f1e6394d84465e92b437ed403e9d *R/utility.R
@@ -58,7 +58,7 @@ d539e4090c47fddfb808041a29e6cfdb *man/trans_abund.Rd
 975bafdf1c8701a8bb2204a471115e2c *man/trans_classifier.Rd
 e6924056820037740cfe1f3a67a583d7 *man/trans_diff.Rd
 805075a691bb4698f7c772b0c84350e3 *man/trans_env.Rd
-2e91d948363af95841ad12aab8dc27cf *man/trans_func.Rd
+8db785a9574d0e80314b3f346913eac4 *man/trans_func.Rd
 20132a6c3a6466813e9f0fac75ddf1a4 *man/trans_network.Rd
 1a51520d9cb0ae203ddbc21ae6fd88f1 *man/trans_nullmodel.Rd
 0b145b5957a19024b72c9b365996fb87 *man/trans_venn.Rd
