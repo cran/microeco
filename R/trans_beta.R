@@ -202,7 +202,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 				}
 			}
 			if(! all(plot_type %in% c("point", "ellipse", "chull", "centroid"))){
-				message("There maybe a typo in your plot_type input! plot_type should be one or more from 'point', 'ellipse', 'chull' and 'centroid'!")
+				message("There maybe a typo in the input plot_type! plot_type should be one or more of 'point', 'ellipse', 'chull' and 'centroid'!")
 			}
 			combined <- self$res_ordination$scores
 			eig <- self$res_ordination$eig
@@ -740,7 +740,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 				}
 			}
 			p_adjusted <- p.adjust(p_value, method = p_adjust_method)
-			significance_label <- cut(p_adjusted, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label = c("***", "**", "*", ""))
+			significance_label <- generate_p_siglabel(p_adjusted)
 			measure_vec <- rep(measure, length(comnames))
 			if(test == "permanova"){
 				compare_result <- data.frame(comnames, measure_vec, F, R2, p_value, p_adjusted, significance_label)

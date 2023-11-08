@@ -104,17 +104,9 @@ trans_network <- R6Class(classname = "trans_network",
 				use_abund <- use_dataset$otu_table %>% {.[rel_abund > filter_thres, ]}
 				rel_abund %<>% {. * 100} %>% .[rownames(use_abund)]
 				
-				# check filtered data
-				if(nrow(use_abund) == 0){
-					stop("After filtering, no feature is remained! Please try to lower filter_thres!")
-				}else{
-					if(nrow(use_abund) == 1){
-						stop("After filtering, only one feature is remained! Please try to lower filter_thres!")
-					}else{
-						message("After filtering, ", nrow(use_abund), " features are remained ...")
-						use_abund %<>% t %>% as.data.frame
-					}
-				}
+				private$check_filter_number(use_abund, param = "filter_thres")
+				use_abund %<>% t %>% as.data.frame
+				
 				if((!is.null(cor_method)) & (!is.null(env_cols) | !is.null(add_data))){
 					use_abund <- cbind.data.frame(use_abund, env_data)
 				}
@@ -151,7 +143,6 @@ trans_network <- R6Class(classname = "trans_network",
 							}
 							bootres <- SpiecEasi::sparccboot(use_abund, ncpus = nThreads, R = SparCC_simu_num)
 							cor_result <- SpiecEasi::pval.sparccboot(bootres)
-							# reshape the results
 							use_names <- colnames(bootres$data)
 							com_res <- t(combn(use_names, 2))
 							res <- cbind.data.frame(com_res, cor = cor_result$cors, p = cor_result$pvals, stringsAsFactors = FALSE)
@@ -228,7 +219,8 @@ trans_network <- R6Class(classname = "trans_network",
 		#'   the threshold used to limit the number of interactions (stability); same with the t.stab parameter in showInteraction function of beemStatic package.
 		#' @param add_taxa_name default "Phylum"; one or more taxonomic rank name; used to add taxonomic rank name to network node properties.
 		#' @param delete_unlinked_nodes default TRUE; whether delete the nodes without any link.
-		#' @param usename_rawtaxa_when_taxalevel_notOTU default FALSE; whether replace the name of nodes using the taxonomic information.
+		#' @param usename_rawtaxa_when_taxalevel_notOTU default FALSE; whether use OTU name as representatives of taxa when \code{taxa_level != "OTU"}.
+		#'   Default \code{FALSE} means using taxonomic information of \code{taxa_level} instead of OTU name.
 		#' @param ... parameters pass to \code{SpiecEasi::spiec.easi} when \code{network_method = "SpiecEasi"};
 		#'   pass to \code{NetCoMi::netConstruct} when \code{network_method = "gcoda"}; 
 		#'   pass to \code{beemStatic::func.EM} when \code{network_method = "beemStatic"}.
@@ -280,7 +272,6 @@ trans_network <- R6Class(classname = "trans_network",
 						stop("The res_cor_p list in the object is NULL! Please check the created object!")
 					}
 					cortable <- self$res_cor_p$cor
-					# p adjustment for the converted vector
 					raw_p <- self$res_cor_p$p
 					if(ncol(cortable) != ncol(raw_p)){
 						stop("Correlation table and p value table have different column numbers !")
@@ -288,17 +279,14 @@ trans_network <- R6Class(classname = "trans_network",
 					raw_vector_p <- raw_p %>% as.dist %>% as.numeric
 					message("Perform p value adjustment with ", COR_p_adjust, " method ...")
 					adp_raw <- p.adjust(raw_vector_p, method = COR_p_adjust)
-					# to matrix
 					use_names <- colnames(raw_p)
 					names_combn <- t(combn(use_names, 2))
 					table_convert <- cbind.data.frame(names_combn, adjust.p = adp_raw, stringsAsFactors = FALSE)
 					adp <- private$vec2mat(datatable = table_convert, use_names = use_names, value_var = "adjust.p", rep_value = 0)
-					# make sure same names between cortable and adp
 					if(! identical(colnames(cortable), colnames(adp))){
 						adp <- adp[colnames(cortable), colnames(cortable)]
 					}
 					if(COR_optimization == T){
-						#find out threshold of correlation 
 						message("Start COR optimizing ...")
 						tc1 <- private$rmt(cortable, low_thres = COR_optimization_low_high[1], high_thres = COR_optimization_low_high[2], seq_by = COR_optimization_seq)
 						message("The optimized COR threshold: ", tc1, "...\n")
@@ -327,9 +315,7 @@ trans_network <- R6Class(classname = "trans_network",
 					}
 					SpiecEasi_method <- match.arg(SpiecEasi_method, c("glasso", "mb"))
 					use_abund <- self$data_abund %>% as.matrix
-					# calculate SpiecEasi network, reference https://github.com/zdk123/SpiecEasi
 					spieceasi_fit <- SpiecEasi::spiec.easi(use_abund, method = SpiecEasi_method, ...)
-					# use the way from NetCoMi package
 					if(SpiecEasi_method == "glasso"){
 						assoMat <- stats::cov2cor(as.matrix(getOptCov(spieceasi_fit))) * SpiecEasi::getRefit(spieceasi_fit)
 					}else{
@@ -353,13 +339,12 @@ trans_network <- R6Class(classname = "trans_network",
 				if(network_method == "FlashWeave"){
 					use_abund <- self$data_abund
 					oldwd <- getwd()
-					# make sure working directory can not be changed by the function when quit.
+					# working directory is not changed when quit
 					on.exit(setwd(oldwd))
 
 					if(is.null(FlashWeave_tempdir)){
 						tem_dir <- tempdir()
 					}else{
-						# check the directory
 						tem_dir <- FlashWeave_tempdir
 						if(!dir.exists(tem_dir)){
 							stop("The input temporary directory: ", tem_dir, " does not exist!")
@@ -369,9 +354,9 @@ trans_network <- R6Class(classname = "trans_network",
 					write.table(use_abund, "taxa_table_FlashWeave.tsv", sep = "\t", quote = FALSE, row.names = FALSE)
 					L1 <- "using FlashWeave\n"
 					L2 <- 'data_path = "taxa_table_FlashWeave.tsv"\n'
-					if(FlashWeave_meta_data == T){
+					if(FlashWeave_meta_data){
 						if(is.null(self$data_env)){
-							stop("FlashWeave_meta_data is TRUE, but object$env_data not found! 
+							stop("FlashWeave_meta_data is TRUE, but object$data_env not found! 
 								Please use env_cols or add_data parameter of trans_network$new to provide the metadata when creating the object!")
 						}
 						meta_data <- self$data_env
@@ -380,7 +365,7 @@ trans_network <- R6Class(classname = "trans_network",
 					}else{
 						L3 <- "\n"
 					}
-					if(FlashWeave_meta_data == T){
+					if(FlashWeave_meta_data){
 						L4 <- paste0(gsub(",$|,\\s+$", "", paste0("netw_results = learn_network(data_path, meta_data_path, ", FlashWeave_other_para)), ")\n")
 					}else{
 						L4 <- paste0(gsub(",$|,\\s+$", "", paste0("netw_results = learn_network(data_path, ", FlashWeave_other_para)), ")\n")
@@ -413,14 +398,14 @@ trans_network <- R6Class(classname = "trans_network",
 					beem.out <- func.EM(use_abund, ...)
 					self$res_beemStatic_raw <- beem.out
 					message('beemStatic result is stored in object$res_beemStatic_raw ...')
-					# modified based on the showInteraction function
+					# based on the showInteraction function
 					b <- t(beem2param(beem.out)$b.est)
 					diag(b) <- 0
 					if(!is.null(beem.out$resample)){
 						b[t(beem.out$resample$b.stab < beemStatic_t_stab)] <- 0
 					}
 					b[abs(b) < beemStatic_t_strength] <- 0
-					network <- graph.adjacency(b, mode='directed', weighted='weight')
+					network <- graph.adjacency(b, mode = 'directed', weighted = 'weight')
 					V(network)$name <- rownames(use_abund)
 				}
 				if(ecount(network) == 0){
@@ -432,21 +417,15 @@ trans_network <- R6Class(classname = "trans_network",
 				E(network)$weight <- abs(E(network)$weight)
 				message("---------------- ", Sys.time()," : Finish ----------------")
 				
-				nodes_raw <- data.frame(cbind(V(network), V(network)$name))
-				# delete uncultured taxa when the taxa level is not OTU
 				if(taxa_level != "OTU"){
 					delete_nodes <- taxa_table %>% 
 						.[grepl("__$|uncultured", .[, taxa_level]), ] %>% 
 						rownames %>% 
-						.[. %in% rownames(nodes_raw)]
+						.[. %in% V(network)$name]
 					network %<>% delete_vertices(delete_nodes)
-					nodes_raw <- data.frame(cbind(V(network), V(network)$name))
 				}
 				if(delete_unlinked_nodes){
-					edges <- t(sapply(1:ecount(network), function(x) ends(network, x)))
-					delete_nodes <- rownames(nodes_raw) %>% 
-						.[! . %in% as.character(c(edges[,1], edges[,2]))]
-					network %<>% delete_vertices(delete_nodes)	
+					network <- private$rm_unlinked_node(network)	
 				}
 				V(network)$taxa <- V(network)$name
 				if(!is.null(add_taxa_name)){
@@ -464,8 +443,10 @@ trans_network <- R6Class(classname = "trans_network",
 						message('Skip adding taxonomy to node as tax_table is not found ...')
 					}
 				}
+				V(network)$RelativeAbundance <- self$data_relabund[V(network)$name]
+
 				if(taxa_level != "OTU"){
-					if(usename_rawtaxa_when_taxalevel_notOTU == T){
+					if(usename_rawtaxa_when_taxalevel_notOTU){
 						network <- set_vertex_attr(network, taxa_level, value = V(network)$name %>% 
 							taxa_table[., taxa_level] %>% 
 							gsub("^.__", "", .))
@@ -475,8 +456,6 @@ trans_network <- R6Class(classname = "trans_network",
 							gsub("^.__", "", .))
 					}
 				}
-				# add abundance to the node property
-				V(network)$RelativeAbundance <- self$data_relabund[V(network)$name]
 				
 				self$res_network <- network
 				message('The result network is stored in object$res_network ...')
@@ -569,11 +548,10 @@ trans_network <- R6Class(classname = "trans_network",
 		#' Get the node property table. The properties may include the node names, modules allocation, degree, betweenness, abundance, 
 		#'   taxonomy, within-module connectivity and among-module connectivity <doi:10.1016/j.geoderma.2022.115866>.
 		#'
-		#' Authors: Chi Liu, Umer Zeeshan Ijaz
-		#'
 		#' @param node_roles default TRUE; whether calculate node roles, i.e. Module hubs, Network hubs, Connectors and Peripherals <doi:10.1016/j.geoderma.2022.115866>.
-		#' @return \code{res_node_table} in object; Abundance expressed as a percentage; z denotes within-module connectivity;
-		#'   p denotes among-module connectivity.
+		#' @return \code{res_node_table} in object; Abundance expressed as a percentage; 
+		#'   betweenness_centrality: betweenness centrality; betweenness_centrality: closeness centrality; eigenvector_centrality: eigenvector centrality; 
+		#'  z: within-module connectivity; p: among-module connectivity.
 		#' @examples
 		#' \donttest{
 		#' t1$get_node_table(node_roles = TRUE)
@@ -586,7 +564,10 @@ trans_network <- R6Class(classname = "trans_network",
 			sum_abund <- self$data_relabund
 			node_table <- data.frame(name = V(network)$name) %>% `rownames<-`(.[, 1])
 			node_table$degree <- igraph::degree(network)[rownames(node_table)]
-			node_table$betweenness <- betweenness(network)[rownames(node_table)]
+			node_table$betweenness_centrality <- igraph::betweenness(network)[rownames(node_table)]
+			node_table$closeness_centrality <- igraph::closeness(network)[rownames(node_table)]
+			eigenvec_centralraw <- igraph::eigen_centrality(network)
+			node_table$eigenvector_centrality <- eigenvec_centralraw$vector[rownames(node_table)]
 			# Same with the above operation to make the names corresponded
 			if(self$taxa_level != "OTU"){
 				# create a replace_table to match the taxa name and marker name when taxa_level is not "OTU"
@@ -628,17 +609,11 @@ trans_network <- R6Class(classname = "trans_network",
 			private$check_igraph()
 			private$check_network()
 			network <- self$res_network
-			# another way:
-			# res_edge_table <- as_data_frame(network, what = "edges")
-			edges <- t(sapply(1:ecount(network), function(x) ends(network, x)))
-			edge_label <- E(network)$label
-			if(!is.null(E(network)$weight)){
-				edge_weight <- E(network)$weight
-			}else{
-				edge_weight <- rep(NA, times = length(edge_label))
+			res_edge_table <- igraph::as_data_frame(network, what = "edges")
+			colnames(res_edge_table)[1:2] <- c("node1", "node2")
+			if(! "weight" %in% colnames(res_edge_table)){
+				res_edge_table$weight <- NA
 			}
-			res_edge_table <- data.frame(edges, edge_label, edge_weight)
-			colnames(res_edge_table) <- c("node1", "node2", "label", "weight")
 			self$res_edge_table <- res_edge_table
 			message('Result is stored in object$res_edge_table ...')
 		},
@@ -830,6 +805,7 @@ trans_network <- R6Class(classname = "trans_network",
 		#' @param label_text_size default 4; The text size of the label.
 		#' @param label_text_color default "grey50"; The text color of the label.
 		#' @param label_text_italic default FALSE; whether use italic style for the label text.
+		#' @param label_text_parse default FALSE; whether parse the label text. See the parse parameter in \code{ggrepel::geom_text_repel} function.
 		#' @param plot_module default FALSE; for use_type=1; whether plot the modules information.
 		#' @param x_lim default c(0, 1); for use_type=1; x axis range when roles_color_background = FALSE.
 		#' @param use_level default "Phylum"; for use_type=2; used taxonomic level in x axis.
@@ -856,6 +832,7 @@ trans_network <- R6Class(classname = "trans_network",
 			label_text_size = 4, 
 			label_text_color = "grey50", 
 			label_text_italic = FALSE,
+			label_text_parse = FALSE,
 			plot_module = FALSE,
 			x_lim = c(0, 1),
 			use_level = "Phylum",
@@ -881,7 +858,8 @@ trans_network <- R6Class(classname = "trans_network",
 					add_label_text = add_label_text, 
 					label_text_size = label_text_size, 
 					label_text_color = label_text_color, 
-					label_text_italic = label_text_italic,				
+					label_text_italic = label_text_italic,
+					label_text_parse = label_text_parse,
 					module = plot_module,
 					x_lim = x_lim,
 					...
@@ -908,6 +886,7 @@ trans_network <- R6Class(classname = "trans_network",
 		#' @param node default NULL; provide the node names that you want to use in the sub-network.
 		#' @param edge default NULL; provide the edge name needed; must be one of "+" or "-".
 		#' @param rm_single default TRUE; whether remove the nodes without any edge in the sub-network.
+		#'   So this function can also be used to remove the nodes withou any edge when node and edge are both NULL.
 		#' @return a new network
 		#' @examples
 		#' \donttest{
@@ -929,16 +908,11 @@ trans_network <- R6Class(classname = "trans_network",
 				sub_network <- delete_edges(network, which(label_raw != edge))
 			}
 			if(is.null(node) & is.null(edge)){
-				stop("Please provide the retained nodes name using node parameter!")
+				sub_network <- network
 			}
 			# whether remove the single node without edges
 			if(rm_single == T){
-				nodes_raw <- V(sub_network)$name
-				edges <- t(sapply(1:ecount(sub_network), function(x) ends(sub_network, x)))
-				delete_nodes <- nodes_raw %>% .[! . %in% as.character(c(edges[,1], edges[,2]))]
-				if(length(delete_nodes) > 0){
-					sub_network %<>% delete_vertices(delete_nodes)
-				}
+				sub_network <- private$rm_unlinked_node(sub_network)
 			}
 			sub_network
 		},
@@ -998,39 +972,63 @@ trans_network <- R6Class(classname = "trans_network",
 			private$check_igraph()
 			private$check_network()
 			network <- self$res_network
-			link_table <- data.frame(t(sapply(1:ecount(network), function(x) ends(network, x))), label = E(network)$label, stringsAsFactors = FALSE)
-			# check the edge label
-			if(! any(c("+", "-") %in% link_table[, 3])){
-				stop("Please check the edge labels! The labels should be + or - !")
+			
+			if(self$taxa_level != "OTU"){
+				replace_table <- data.frame(V(network)$name, V(network)$taxa, stringsAsFactors = FALSE) %>% `row.names<-`(.[, 2])
+				taxa_table %<>% .[rownames(.) %in% replace_table[, 2], ]
+				rownames(taxa_table) <- replace_table[rownames(taxa_table), 1]
 			}
-			if("+" %in% link_table[, 3]){
-				link_table_1 <- link_table[link_table[, 3] %in% "+", ]
-				self$res_sum_links_pos <- private$sum_link(taxa_table = taxa_table, link_table = link_table_1, taxa_level = taxa_level)
-				message('The positive results are stored in object$res_sum_links_pos ...')
-			}else{
-				message('No positive edges found ...')
+			if(is.null(self$res_edge_table)){
+				self$get_edge_table()
 			}
-			if("-" %in% link_table[, 3]){
-				link_table_1 <- link_table[link_table[, 3] %in% "-", ]
-				self$res_sum_links_neg <- private$sum_link(taxa_table = taxa_table, link_table = link_table_1, taxa_level = taxa_level)
-				message('The negative results are stored in object$res_sum_links_neg ...')
-			}else{
-				message('No negative edges found ...')
+			link_table <- self$res_edge_table
+			
+			if(is.null(E(network)$label)){
+				message('No edge label found. All edges are viewed as positive links ...')
+				self$res_sum_links_pos <- private$sum_link(taxa_table = taxa_table, link_table = link_table, taxa_level = taxa_level)
+				message('Results are stored in object$res_sum_links_pos ...')
+			}else{				
+				if(! any(c("+", "-") %in% link_table[, 3])){
+					stop("Please check the edge labels! The labels should be + or - !")
+				}
+				if("+" %in% link_table[, 3]){
+					link_table_use <- link_table[link_table[, 3] %in% "+", ]
+					self$res_sum_links_pos <- private$sum_link(taxa_table = taxa_table, link_table = link_table_use, taxa_level = taxa_level)
+					message('The positive results are stored in object$res_sum_links_pos ...')
+				}else{
+					message('No positive edges found ...')
+				}
+				if("-" %in% link_table[, 3]){
+					link_table_use <- link_table[link_table[, 3] %in% "-", ]
+					self$res_sum_links_neg <- private$sum_link(taxa_table = taxa_table, link_table = link_table_use, taxa_level = taxa_level)
+					message('The negative results are stored in object$res_sum_links_neg ...')
+				}else{
+					message('No negative edges found ...')
+				}
 			}
 		},
 		#' @description
-		#' Plot the summed linkages among taxa using chorddiag package <https://github.com/mattflor/chorddiag>.
+		#' Plot the summed linkages among taxa.
 		#'
 		#' @param plot_pos default TRUE; If TRUE, plot the summed positive linkages; If FALSE, plot the summed negative linkages.
 		#' @param plot_num default NULL; number of taxa presented in the plot.
 		#' @param color_values default RColorBrewer::brewer.pal(8, "Dark2"); colors palette for taxa.
-		#' @param ... parameters pass to \code{chorddiag::chorddiag} function.
-		#' @return chorddiag plot
+		#' @param method default c("chorddiag", "circlize")[1]; chorddiag package <https://github.com/mattflor/chorddiag> or circlize package.
+		#' @param ... pass to \code{chorddiag::chorddiag} function when \code{method = "chorddiag"} or 
+		#'	 \code{circlize::chordDiagram} function when \code{method = "circlize"}.
+		#'	 Note that for \code{circlize::chordDiagram} function, \code{keep.diagonal}, \code{symmetric} and \code{self.link} parameters have been fixed to fit the input data.
+		#' @return please see the invoked function.
 		#' @examples
 		#' \dontrun{
-		#' test1$plot_sum_links(plot_pos = TRUE, plot_num = 10)
+		#' test1$plot_sum_links(method = "chorddiag", plot_pos = TRUE, plot_num = 10)
+		#' test1$plot_sum_links(method = "circlize", transparency = 0.2, 
+		#' 	  annotationTrackHeight = circlize::mm_h(c(5, 5)))
 		#' }
-		plot_sum_links = function(plot_pos = TRUE, plot_num = NULL, color_values = RColorBrewer::brewer.pal(8, "Dark2"), ...){
+		plot_sum_links = function(plot_pos = TRUE, plot_num = NULL, color_values = RColorBrewer::brewer.pal(8, "Dark2"),
+			method = c("chorddiag", "circlize")[1],
+			...){
+			method <- match.arg(method, c("chorddiag", "circlize"))
+			
 			if(is.null(self$res_sum_links_pos) & is.null(self$res_sum_links_neg)){
 				stop("Please first run cal_sum_links function!")
 			}
@@ -1064,8 +1062,14 @@ trans_network <- R6Class(classname = "trans_network",
 						". Only select ", length(color_values), " taxa ...")
 					use_data %<>% .[1:length(color_values), 1:length(color_values)]
 				}
+				color_values %<>% .[1:nrow(use_data)]
 			}
-			chorddiag::chorddiag(use_data, groupColors = color_values, ...)
+			if(method == "chorddiag"){
+				chorddiag::chorddiag(use_data, groupColors = color_values, ...)
+			}else{
+				circlize::chordDiagram(use_data, grid.col = color_values, keep.diagonal = TRUE, symmetric = TRUE, 
+					self.link = 1, ...)
+			}
 		},
 		#' @description
 		#' Generate random networks, compare them with the empirical network and get the p value of topological properties.
@@ -1183,6 +1187,15 @@ trans_network <- R6Class(classname = "trans_network",
 		}
 		),
 	private = list(
+		check_filter_number = function(input, param = "filter_thres"){
+			if(nrow(input) == 0){
+				stop("After filtering, no feature is remained! Please try to lower ", param, "!")
+			}
+			if(nrow(input) == 1){
+				stop("After filtering, only one feature is remained! Please try to lower ", param, "!")
+			}
+			message("After filtering, ", nrow(input), " features are remained ...")
+		},
 		check_NetCoMi = function(){
 			if(!require("NetCoMi")){
 				stop("NetCoMi package is not installed! Please see https://github.com/stefpeschel/NetCoMi ")
@@ -1274,17 +1287,18 @@ trans_network <- R6Class(classname = "trans_network",
 			require("rgexf")
 			nodes <- data.frame(cbind(V(network), V(network)$name))
 			edges <- get.edges(network, 1:ecount(network))
-			vAttrNames <- setdiff(list.vertex.attributes(network), "name")
-			nodesAtt <- data.frame(sapply(vAttrNames, function(attr) sub("&", "&", get.vertex.attribute(network, attr))))
-			eAttrNames <- setdiff(list.edge.attributes(network), "weight")
-			edgesAtt <- data.frame(sapply(eAttrNames, function(attr) sub("&", "&", get.edge.attribute(network, attr))))
+			node_attr_name <- setdiff(list.vertex.attributes(network), "name")
+			node_attr <- data.frame(sapply(node_attr_name, function(attr) sub("&", "&", get.vertex.attribute(network, attr))))
+			node_attr$RelativeAbundance %<>% as.numeric
+			edge_attr_name <- setdiff(list.edge.attributes(network), "weight")
+			edge_attr <- data.frame(sapply(edge_attr_name, function(attr) sub("&", "&", get.edge.attribute(network, attr))))
 			# combine all graph attributes into a meta-data
 			graphAtt <- sapply(list.graph.attributes(network), function(attr) sub("&", "&",get.graph.attribute(network, attr)))
 			output_gexf <- write.gexf(nodes, edges,
 				edgesLabel = as.data.frame(E(network)$label),
 				edgesWeight = E(network)$weight,
-				nodesAtt = nodesAtt,
-				edgesAtt = edgesAtt,
+				nodesAtt = node_attr,
+				edgesAtt = edge_attr,
 				meta=c(list(creator="trans_network class", description="igraph -> gexf converted file", keywords="igraph, gexf, R, rgexf"), graphAtt))
 			cat(output_gexf$graph, file = filepath)
 		},
@@ -1379,7 +1393,7 @@ trans_network <- R6Class(classname = "trans_network",
 			for(i in total_degree$taxa){
 				ki <- subset(total_degree$total_links, total_degree$taxa == i)
 				taxa_each_mod_degree <- subset(among_mc$mod_links, among_mc$taxa == i)
-				p[i] <- 1 - (sum((taxa_each_mod_degree)**2)/ki**2)
+				p[i] <- 1 - (sum((taxa_each_mod_degree)^2)/ki^2)
 			}
 			as.data.frame(p)
 		},
@@ -1407,9 +1421,9 @@ trans_network <- R6Class(classname = "trans_network",
 			}
 			zp
 		},
-		plot_roles_1 = function(node_roles, roles_color_background, add_label = FALSE, add_label_group = "Network hubs", add_label_text = "name", 
-			label_text_size = 4, label_text_color = "grey50", label_text_italic = FALSE,
-			roles_color_values = NULL, module = FALSE, x_lim = c(0, 1), ...
+		plot_roles_1 = function(node_roles, roles_color_background, add_label, add_label_group, add_label_text, 
+			label_text_size, label_text_color, label_text_italic, label_text_parse,
+			roles_color_values, module, x_lim, ...
 			){
 			if(module == T){
 				all_modules <- unique(as.character(node_roles$module))
@@ -1459,14 +1473,15 @@ trans_network <- R6Class(classname = "trans_network",
 					}else{
 						if(label_text_italic == T){
 							label_data[, add_label_text] %<>% paste0("italic('", .,"')")
+							label_text_parse <- TRUE
 						}
 						p <- p + ggrepel::geom_text_repel(
 							data = label_data, 
-							aes_meco("p", "z", label = add_label_text), 
+							aes(.data[["p"]], .data[["z"]], label = .data[[add_label_text]]), 
 							size = label_text_size, 
 							color = label_text_color, 
 							segment.alpha = .01, 
-							parse = TRUE
+							parse = label_text_parse
 						)
 					}
 				}
@@ -1563,6 +1578,15 @@ trans_network <- R6Class(classname = "trans_network",
 				as.matrix
 			res[is.na(res)] <- 0			
 			res
+		},
+		rm_unlinked_node = function(input_network){
+			nodes_raw <- V(input_network)$name
+			edges <- t(sapply(1:ecount(input_network), function(x) ends(input_network, x)))
+			delete_nodes <- nodes_raw %>% .[! . %in% as.character(c(edges[,1], edges[,2]))]
+			if(length(delete_nodes) > 0){
+				input_network %<>% delete_vertices(delete_nodes)
+			}
+			input_network
 		}
 	),
 	lock_class = FALSE,

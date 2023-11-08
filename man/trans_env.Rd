@@ -2,7 +2,7 @@
 % Please edit documentation in R/trans_env.R
 \name{trans_env}
 \alias{trans_env}
-\title{Create \code{trans_env} object to analyze the effects of environmental factors on communities.}
+\title{Create \code{trans_env} object to analyze the association between environmental factor and microbial community.}
 \description{
 This class is a wrapper for a series of operations associated with environmental measurements, including redundancy analysis, 
 mantel test, correlation analysis and linear fitting.
@@ -766,6 +766,7 @@ Plot correlation heatmap.
   color_palette = NULL,
   pheatmap = FALSE,
   filter_feature = NULL,
+  filter_env = NULL,
   ylab_type_italic = FALSE,
   keep_full_name = FALSE,
   keep_prefix = TRUE,
@@ -779,6 +780,8 @@ Plot correlation heatmap.
   cluster_height_cols = 0.2,
   text_y_position = "right",
   mylabels_x = NULL,
+  na.value = "grey50",
+  trans = "identity",
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -792,8 +795,11 @@ Plot correlation heatmap.
 
 \item{\code{pheatmap}}{default FALSE; whether use pheatmap package to plot the heatmap.}
 
-\item{\code{filter_feature}}{default NULL; character vector; used to filter features that only have significance labels in the \code{filter_feature} vector. 
+\item{\code{filter_feature}}{default NULL; character vector; used to filter features that only have labels in the \code{filter_feature} vector. 
 For example, \code{filter_feature = ""} can be used to remove features that only have "", no any "*".}
+
+\item{\code{filter_env}}{default NULL; character vector; used to filter environmental variables that only have labels in the \code{filter_env} vector. 
+For example, \code{filter_env = ""} can be used to remove features that only have "", no any "*".}
 
 \item{\code{ylab_type_italic}}{default FALSE; whether use italic type for y lab text.}
 
@@ -822,6 +828,11 @@ Only available when \code{pheatmap = FALSE}.}
 \item{\code{text_y_position}}{default "right"; "left" or "right"; the y axis text position for ggplot2 based heatmap.}
 
 \item{\code{mylabels_x}}{default NULL; provide x axis text labels additionally; only available when \code{pheatmap = TRUE}.}
+
+\item{\code{na.value}}{default "grey50"; the color for the missing values when \code{pheatmap = FALSE}.}
+
+\item{\code{trans}}{default "identity"; the transformation for continuous scales in the legend when \code{pheatmap = FALSE}; 
+see the \code{trans} item in \code{ggplot2::scale_colour_gradientn}.}
 
 \item{\code{...}}{paremeters passed to \code{ggplot2::geom_tile} or \code{pheatmap::pheatmap}, depending on the parameter \code{pheatmap} is FALSE or TRUE.}
 }

@@ -148,7 +148,9 @@ t1$cal_sum_links(taxa_level = "Phylum")
 ## ------------------------------------------------
 
 \dontrun{
-test1$plot_sum_links(plot_pos = TRUE, plot_num = 10)
+test1$plot_sum_links(method = "chorddiag", plot_pos = TRUE, plot_num = 10)
+test1$plot_sum_links(method = "circlize", transparency = 0.2, 
+	  annotationTrackHeight = circlize::mm_h(c(5, 5)))
 }
 
 ## ------------------------------------------------
@@ -385,7 +387,8 @@ the threshold used to limit the number of interactions (stability); same with th
 
 \item{\code{delete_unlinked_nodes}}{default TRUE; whether delete the nodes without any link.}
 
-\item{\code{usename_rawtaxa_when_taxalevel_notOTU}}{default FALSE; whether replace the name of nodes using the taxonomic information.}
+\item{\code{usename_rawtaxa_when_taxalevel_notOTU}}{default FALSE; whether use OTU name as representatives of taxa when \code{taxa_level != "OTU"}.
+Default \code{FALSE} means using taxonomic information of \code{taxa_level} instead of OTU name.}
 
 \item{\code{...}}{parameters pass to \code{SpiecEasi::spiec.easi} when \code{network_method = "SpiecEasi"};
 pass to \code{NetCoMi::netConstruct} when \code{network_method = "gcoda"}; 
@@ -521,8 +524,6 @@ t1$cal_network_attr()
 \subsection{Method \code{get_node_table()}}{
 Get the node property table. The properties may include the node names, modules allocation, degree, betweenness, abundance, 
   taxonomy, within-module connectivity and among-module connectivity <doi:10.1016/j.geoderma.2022.115866>.
-
-Authors: Chi Liu, Umer Zeeshan Ijaz
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$get_node_table(node_roles = TRUE)}\if{html}{\out{</div>}}
 }
@@ -535,8 +536,9 @@ Authors: Chi Liu, Umer Zeeshan Ijaz
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-\code{res_node_table} in object; Abundance expressed as a percentage; z denotes within-module connectivity;
-  p denotes among-module connectivity.
+\code{res_node_table} in object; Abundance expressed as a percentage; 
+  betweenness_centrality: betweenness centrality; betweenness_centrality: closeness centrality; eigenvector_centrality: eigenvector centrality; 
+ z: within-module connectivity; p: among-module connectivity.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -717,6 +719,7 @@ Plot the classification and importance of nodes, see object$res_node_table for t
   label_text_size = 4,
   label_text_color = "grey50",
   label_text_italic = FALSE,
+  label_text_parse = FALSE,
   plot_module = FALSE,
   x_lim = c(0, 1),
   use_level = "Phylum",
@@ -751,6 +754,8 @@ Plot the classification and importance of nodes, see object$res_node_table for t
 \item{\code{label_text_color}}{default "grey50"; The text color of the label.}
 
 \item{\code{label_text_italic}}{default FALSE; whether use italic style for the label text.}
+
+\item{\code{label_text_parse}}{default FALSE; whether parse the label text. See the parse parameter in \code{ggrepel::geom_text_repel} function.}
 
 \item{\code{plot_module}}{default FALSE; for use_type=1; whether plot the modules information.}
 
@@ -806,7 +811,8 @@ Subset of the network.
 
 \item{\code{edge}}{default NULL; provide the edge name needed; must be one of "+" or "-".}
 
-\item{\code{rm_single}}{default TRUE; whether remove the nodes without any edge in the sub-network.}
+\item{\code{rm_single}}{default TRUE; whether remove the nodes without any edge in the sub-network.
+So this function can also be used to remove the nodes withou any edge when node and edge are both NULL.}
 }
 \if{html}{\out{</div>}}
 }
@@ -893,12 +899,13 @@ t1$cal_sum_links(taxa_level = "Phylum")
 \if{html}{\out{<a id="method-trans_network-plot_sum_links"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_network-plot_sum_links}{}}}
 \subsection{Method \code{plot_sum_links()}}{
-Plot the summed linkages among taxa using chorddiag package <https://github.com/mattflor/chorddiag>.
+Plot the summed linkages among taxa.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$plot_sum_links(
   plot_pos = TRUE,
   plot_num = NULL,
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),
+  method = c("chorddiag", "circlize")[1],
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -912,17 +919,23 @@ Plot the summed linkages among taxa using chorddiag package <https://github.com/
 
 \item{\code{color_values}}{default RColorBrewer::brewer.pal(8, "Dark2"); colors palette for taxa.}
 
-\item{\code{...}}{parameters pass to \code{chorddiag::chorddiag} function.}
+\item{\code{method}}{default c("chorddiag", "circlize")[1]; chorddiag package <https://github.com/mattflor/chorddiag> or circlize package.}
+
+\item{\code{...}}{pass to \code{chorddiag::chorddiag} function when \code{method = "chorddiag"} or 
+\code{circlize::chordDiagram} function when \code{method = "circlize"}.
+Note that for \code{circlize::chordDiagram} function, \code{keep.diagonal}, \code{symmetric} and \code{self.link} parameters have been fixed to fit the input data.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-chorddiag plot
+please see the invoked function.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
-test1$plot_sum_links(plot_pos = TRUE, plot_num = 10)
+test1$plot_sum_links(method = "chorddiag", plot_pos = TRUE, plot_num = 10)
+test1$plot_sum_links(method = "circlize", transparency = 0.2, 
+	  annotationTrackHeight = circlize::mm_h(c(5, 5)))
 }
 }
 \if{html}{\out{</div>}}

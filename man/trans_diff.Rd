@@ -88,6 +88,7 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
   alpha = 0.05,
   p_adjust_method = "fdr",
   transformation = NULL,
+  remove_unknown = TRUE,
   lefse_subgroup = NULL,
   lefse_min_subsam = 10,
   lefse_norm = 1e+06,
@@ -180,6 +181,8 @@ or used to generate significance letters when method is 'anova' or 'KW_dunn' lik
 such as 'AST' for the arc sine square root transformation. Please see the \code{trans_norm} class of mecodev package. 
 Only available when \code{method} is one of "KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "betareg" and "lme".}
 
+\item{\code{remove_unknown}}{default TRUE; whether remove unknown features that donot have clear classification information.}
+
 \item{\code{lefse_subgroup}}{default NULL; sample sub group used for sub-comparision in lefse; Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>.}
 
 \item{\code{lefse_min_subsam}}{default 10; sample numbers required in the subgroup test.}
@@ -234,7 +237,7 @@ res_diff and res_abund.\cr
     \strong{"LDA" or "MeanDecreaseGini"}: LDA: linear discriminant score in LEfSe; MeanDecreaseGini: mean decreasing gini index in random forest;\cr
     \strong{"P.unadj"}: original p value;\cr
     \strong{"P.adj"}: adjusted p value;\cr
-    \strong{"qvalue"}: qvalue for metastat analysis.
+    \strong{Others}: qvalue: qvalue in metastat analysis.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -367,12 +370,18 @@ Bar plot for indicator index, such as LDA score and P value.
   use_number = 1:10,
   threshold = NULL,
   select_group = NULL,
-  simplify_names = TRUE,
+  keep_full_name = FALSE,
   keep_prefix = TRUE,
   group_order = NULL,
   axis_text_y = 12,
   coord_flip = TRUE,
   xtext_angle = 45,
+  xtext_size = 10,
+  heatmap_cell = "P.unadj",
+  heatmap_sig = "Significance",
+  heatmap_x = "Factors",
+  heatmap_y = "Taxa",
+  heatmap_lab_fill = "P value",
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -392,9 +401,9 @@ When \code{color_group_map = TRUE}, the group_order inside the object will be us
 \item{\code{select_group}}{default NULL; this is used to select the paired group when multiple comparisions are generated;
 The input select_group must be one of \code{object$res_diff$Comparison}.}
 
-\item{\code{simplify_names}}{default TRUE; whether use the simplified taxonomic name.}
+\item{\code{keep_full_name}}{default FALSE; whether keep the taxonomic full lineage names.}
 
-\item{\code{keep_prefix}}{default TRUE; whether retain the taxonomic prefix.}
+\item{\code{keep_prefix}}{default TRUE; whether retain the taxonomic prefix, such as "g__".}
 
 \item{\code{group_order}}{default NULL; a vector to order the legend and colors in plot; 
 If NULL, the function can first determine whether the group column of \code{microtable$sample_table} is factor. If yes, use the levels in it.
@@ -407,7 +416,20 @@ If provided, this parameter can overwrite the levels in the group of \code{micro
 \item{\code{xtext_angle}}{default 45; number ranging from 0 to 90; used to make x axis text generate angle to reduce text overlap; 
 only available when coord_flip = FALSE.}
 
-\item{\code{...}}{parameters pass to \code{\link{geom_bar}}}
+\item{\code{xtext_size}}{default 10; the text size of x axis.}
+
+\item{\code{heatmap_cell}}{default "P.unadj"; the column of data for the cell of heatmap when formula with multiple factors is found in the method.}
+
+\item{\code{heatmap_sig}}{default "Significance"; the column of data for the significance label of heatmap.}
+
+\item{\code{heatmap_x}}{default "Factors"; the column of data for the x axis of heatmap.}
+
+\item{\code{heatmap_y}}{default "Taxa"; the column of data for the y axis of heatmap.}
+
+\item{\code{heatmap_lab_fill}}{default "P value"; legend title of heatmap.}
+
+\item{\code{...}}{parameters passing to \code{\link{geom_bar}} for the bar plot or 
+the \code{plot_cor} function in \code{\link{trans_env}} class for the heatmap of multiple factors when formula is found in the method.}
 }
 \if{html}{\out{</div>}}
 }

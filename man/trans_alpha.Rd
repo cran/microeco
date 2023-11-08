@@ -80,7 +80,7 @@ among groups (\code{group} parameter) for each group (\code{by_group} parameter)
 such as the data of plant compartments for different plant species (ID). 
 So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.}
 
-\item{\code{order_x}}{default NULL; a \code{sample_table} column name or a vector containg sample names; if provided, order samples by using \code{factor}.}
+\item{\code{order_x}}{default NULL; a \code{sample_table} column name or a vector with sample names; if provided, order samples by using \code{factor}.}
 }
 \if{html}{\out{</div>}}
 }
@@ -103,7 +103,7 @@ t1 <- trans_alpha$new(dataset = dataset, group = "Group")
 \if{html}{\out{<a id="method-trans_alpha-cal_diff"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_alpha-cal_diff}{}}}
 \subsection{Method \code{cal_diff()}}{
-Differential test of alpha diversity.
+Differential test on alpha diversity.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_alpha$cal_diff(
   method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lme",
@@ -113,6 +113,7 @@ Differential test of alpha diversity.
   formula = NULL,
   KW_dunn_letter = TRUE,
   alpha = 0.05,
+  anova_post_test = "duncan.test",
   return_model = FALSE,
   ...
 )}\if{html}{\out{</div>}}
@@ -123,8 +124,8 @@ Differential test of alpha diversity.
 \describe{
 \item{\code{method}}{default "KW"; see the following available options:
 \describe{
-  \item{\strong{'KW'}}{KW: Kruskal-Wallis Rank Sum Test for all groups (>= 2)}
-  \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons, see \code{dunnTest} function in \code{FSA} package}
+  \item{\strong{'KW'}}{Kruskal-Wallis Rank Sum Test for all groups (>= 2)}
+  \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons; see \code{dunnTest} function in \code{FSA} package}
   \item{\strong{'wilcox'}}{Wilcoxon Rank Sum Test for all paired groups}
   \item{\strong{'t.test'}}{Student's t-Test for all paired groups}
   \item{\strong{'anova'}}{Duncan's new multiple range test for one-way anova; see \code{duncan.test} function of \code{agricolae} package.
@@ -136,8 +137,8 @@ Differential test of alpha diversity.
   \item{\strong{'glmm'}}{Generalized linear mixed model (GLMM) based on the \code{glmmTMB} package}
 }}
 
-\item{\code{measure}}{default NULL; a vector; If NULL, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
-e.g. Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage and PD.}
+\item{\code{measure}}{default NULL; character vector; If NULL, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
+e.g. c("Observed", "Chao1", "Shannon").}
 
 \item{\code{p_adjust_method}}{default "fdr" (for "KW", "wilcox", "t.test") or "holm" (for "KW_dunn"); P value adjustment method; 
 For \code{method = 'KW', 'wilcox' or 't.test'}, please see method parameter of \code{p.adjust} function for available options;
@@ -153,15 +154,18 @@ such as \code{'block + N*P*K'}.}
 
 \item{\code{alpha}}{default 0.05; Significant level; used for generating significance letters when method is 'anova' or 'KW_dunn'.}
 
+\item{\code{anova_post_test}}{default "duncan.test". Other available options include "LSD.test" and "HSD.test". 
+All those are the function names in \code{agricolae} package.}
+
 \item{\code{return_model}}{default FALSE; whether return the original lmer or glmm model list in the object.}
 
-\item{\code{...}}{parameters passed to \code{kruskal.test} (\code{method = "KW"}) or \code{wilcox.test} function (\code{method = "wilcox"}) or 
-\code{dunnTest} function of \code{FSA} package (\code{method = "KW_dunn"}) or 
-\code{agricolae::duncan.test} (\code{method = "anova"}, one-way) or 
-\code{rcompanion::scheirerRayHare} (\code{method = "scheirerRayHare"}) or 
-\code{lmerTest::lmer} (\code{method = "lme"}) or 
-\code{betareg::betareg} (\code{method = "betareg"}) or 
-\code{glmmTMB::glmmTMB} (\code{method = "glmm"}).}
+\item{\code{...}}{parameters passed to \code{kruskal.test} (when \code{method = "KW"}) or \code{wilcox.test} function (when \code{method = "wilcox"}) or 
+\code{dunnTest} function of \code{FSA} package (when \code{method = "KW_dunn"}) or 
+\code{agricolae::duncan.test}/\code{agricolae::LSD.test}/\code{agricolae::HSD.test} (when \code{method = "anova"}, one-way anova) or 
+\code{rcompanion::scheirerRayHare} (when \code{method = "scheirerRayHare"}) or 
+\code{lmerTest::lmer} (when \code{method = "lme"}) or 
+\code{betareg::betareg} (when \code{method = "betareg"}) or 
+\code{glmmTMB::glmmTMB} (when \code{method = "glmm"}).}
 }
 \if{html}{\out{</div>}}
 }
@@ -195,7 +199,7 @@ Plot the alpha diversity.
   add_sig = TRUE,
   add_sig_label = "Significance",
   add_sig_text_size = 3.88,
-  use_boxplot = TRUE,
+  add_sig_label_num_dec = 4,
   boxplot_add = "jitter",
   order_x_mean = FALSE,
   y_start = 0.1,
@@ -204,6 +208,17 @@ Plot the alpha diversity.
   xtext_size = 15,
   ytitle_size = 17,
   barwidth = 0.9,
+  use_boxplot = TRUE,
+  plot_SE = TRUE,
+  errorbar_size = 1,
+  errorbar_width = 0.2,
+  point_size = 3,
+  point_alpha = 0.8,
+  add_line = FALSE,
+  line_size = 0.8,
+  line_type = 1,
+  line_color = "grey50",
+  line_alpha = 0.5,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -213,8 +228,7 @@ Plot the alpha diversity.
 \describe{
 \item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); color pallete for groups.}
 
-\item{\code{measure}}{default Shannon; one alpha diversity measurement; see names of alpha_diversity of dataset, 
-e.g., Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage, PD.}
+\item{\code{measure}}{default "Shannon"; one alpha diversity index in the object.}
 
 \item{\code{group}}{default NULL; group name used for the plot.}
 
@@ -226,7 +240,7 @@ such as 'P.adj' or 'Significance'.}
 
 \item{\code{add_sig_text_size}}{default 3.88; the size of text in added label.}
 
-\item{\code{use_boxplot}}{default TRUE; TRUE: boxplot; FALSE: mean-se plot.}
+\item{\code{add_sig_label_num_dec}}{default 4; reserved decimal places when the parameter \code{add_sig_label} use numeric column, like 'P.adj'.}
 
 \item{\code{boxplot_add}}{default "jitter"; points type, see the add parameter in \code{ggpubr::ggboxplot}.}
 
@@ -245,6 +259,29 @@ this parameter is also used to label the letters of anova result with the fixed 
 \item{\code{ytitle_size}}{default 17; y axis title size.}
 
 \item{\code{barwidth}}{default 0.9; the bar width in plot; applied when by_group is not NULL.}
+
+\item{\code{use_boxplot}}{default TRUE; TRUE denotes boxplot by using the data_alpha table in the object. 
+FALSE represents mean-sd or mean-se plot by invoking the data_stat table in the object.}
+
+\item{\code{plot_SE}}{default TRUE; TRUE: the errorbar is \eqn{mean±se}; FALSE: the errorbar is \eqn{mean±sd}.}
+
+\item{\code{errorbar_size}}{default 1; errorbar size. Available when \code{use_boxplot = FALSE}.}
+
+\item{\code{errorbar_width}}{default 0.2; errorbar width. Available when \code{use_boxplot = FALSE} and \code{by_group} is NULL.}
+
+\item{\code{point_size}}{default 3; point size for taxa. Available when \code{use_boxplot = FALSE}.}
+
+\item{\code{point_alpha}}{default 0.8; point transparency. Available when \code{use_boxplot = FALSE}.}
+
+\item{\code{add_line}}{default FALSE; whether add line. Available when \code{use_boxplot = FALSE}.}
+
+\item{\code{line_size}}{default 0.8; line size when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.}
+
+\item{\code{line_type}}{default 1; an integer; line type when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.}
+
+\item{\code{line_color}}{default "grey50"; line color when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE} and \code{by_group} is NULL.}
+
+\item{\code{line_alpha}}{default 0.5; line transparency when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.}
 
 \item{\code{...}}{parameters pass to \code{ggpubr::ggboxplot} function.}
 }

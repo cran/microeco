@@ -14,7 +14,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @param by_ID default NULL; a column of \code{sample_table} used to perform paired t test or paired wilcox test for the paired data,
 		#'   such as the data of plant compartments for different plant species (ID). 
 		#'   So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.
-		#' @param order_x default NULL; a \code{sample_table} column name or a vector containg sample names; if provided, order samples by using \code{factor}.
+		#' @param order_x default NULL; a \code{sample_table} column name or a vector with sample names; if provided, order samples by using \code{factor}.
 		#' @return \code{data_alpha} and \code{data_stat} stored in the object.
 		#' @examples
 		#' \donttest{
@@ -46,24 +46,15 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				self$data_alpha <- data_alpha
 				message('The transformed diversity data is stored in object$data_alpha ...')
 			}
-			if(! is.null(by_group)){
-				if(! by_group %in% colnames(data_alpha)){
-					stop("Provided by_group: ", by_group, " is not found in dataset$sample_table!")
-				}
-			}
-			if(! is.null(by_ID)){
-				if(! by_ID %in% colnames(data_alpha)){
-					stop("Provided by_ID: ", by_ID, " is not found in dataset$sample_table!")
-				}
-			}
+			check_table_variable(data_alpha, by_group, "by_group", "dataset$sample_table")
+			check_table_variable(data_alpha, by_ID, "by_ID", "dataset$sample_table")
+			
 			if(! is.null(group)){
 				if(is.null(dataset)){
 					stop("Parameter dataset not provided, but group is provided!")
 				}
-				if(! group %in% colnames(data_alpha)){
-					stop("Provided group: ", group, " is not found in dataset$sample_table!")
-				}
-				self$data_stat <- microeco:::summarySE_inter(data_alpha, measurevar = "Value", groupvars = c(group, "Measure"))
+				check_table_variable(data_alpha, group, "group", "dataset$sample_table")
+				self$data_stat <- microeco:::summarySE_inter(data_alpha, measurevar = "Value", groupvars = c(group, by_group, "Measure"))
 				message('The group statistics are stored in object$data_stat ...')
 			}else{
 				self$data_stat <- NULL
@@ -73,12 +64,12 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			self$by_ID <- by_ID
 		},
 		#' @description
-		#' Differential test of alpha diversity.
+		#' Differential test on alpha diversity.
 		#'
 		#' @param method default "KW"; see the following available options:
 		#'   \describe{
-		#'     \item{\strong{'KW'}}{KW: Kruskal-Wallis Rank Sum Test for all groups (>= 2)}
-		#'     \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons, see \code{dunnTest} function in \code{FSA} package}
+		#'     \item{\strong{'KW'}}{Kruskal-Wallis Rank Sum Test for all groups (>= 2)}
+		#'     \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons; see \code{dunnTest} function in \code{FSA} package}
 		#'     \item{\strong{'wilcox'}}{Wilcoxon Rank Sum Test for all paired groups}
 		#'     \item{\strong{'t.test'}}{Student's t-Test for all paired groups}
 		#'     \item{\strong{'anova'}}{Duncan's new multiple range test for one-way anova; see \code{duncan.test} function of \code{agricolae} package.
@@ -89,8 +80,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#'     \item{\strong{'betareg'}}{Beta Regression for Rates and Proportions based on the \code{betareg} package}
 		#'     \item{\strong{'glmm'}}{Generalized linear mixed model (GLMM) based on the \code{glmmTMB} package}
 		#'   }
-		#' @param measure default NULL; a vector; If NULL, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
-		#' 	 e.g. Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage and PD.
+		#' @param measure default NULL; character vector; If NULL, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
+		#' 	 e.g. c("Observed", "Chao1", "Shannon").
 		#' @param p_adjust_method default "fdr" (for "KW", "wilcox", "t.test") or "holm" (for "KW_dunn"); P value adjustment method; 
 		#' 	  For \code{method = 'KW', 'wilcox' or 't.test'}, please see method parameter of \code{p.adjust} function for available options;
 		#' 	  For \code{method = 'KW_dunn'}, please see \code{dunn.test::p.adjustment.methods} for available options.
@@ -101,14 +92,16 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @param KW_dunn_letter default TRUE; For \code{method = 'KW_dunn'}, \code{TRUE} denotes paired significances are presented by letters;
 		#'   \code{FALSE} means significances are shown by asterisk for paired comparison.
 		#' @param alpha default 0.05; Significant level; used for generating significance letters when method is 'anova' or 'KW_dunn'.
+		#' @param anova_post_test default "duncan.test". Other available options include "LSD.test" and "HSD.test". 
+		#'   All those are the function names in \code{agricolae} package.
 		#' @param return_model default FALSE; whether return the original lmer or glmm model list in the object.
-		#' @param ... parameters passed to \code{kruskal.test} (\code{method = "KW"}) or \code{wilcox.test} function (\code{method = "wilcox"}) or 
-		#'   \code{dunnTest} function of \code{FSA} package (\code{method = "KW_dunn"}) or 
-		#'   \code{agricolae::duncan.test} (\code{method = "anova"}, one-way) or 
-		#'   \code{rcompanion::scheirerRayHare} (\code{method = "scheirerRayHare"}) or 
-		#'   \code{lmerTest::lmer} (\code{method = "lme"}) or 
-		#'   \code{betareg::betareg} (\code{method = "betareg"}) or 
-		#'   \code{glmmTMB::glmmTMB} (\code{method = "glmm"}).
+		#' @param ... parameters passed to \code{kruskal.test} (when \code{method = "KW"}) or \code{wilcox.test} function (when \code{method = "wilcox"}) or 
+		#'   \code{dunnTest} function of \code{FSA} package (when \code{method = "KW_dunn"}) or 
+		#'   \code{agricolae::duncan.test}/\code{agricolae::LSD.test}/\code{agricolae::HSD.test} (when \code{method = "anova"}, one-way anova) or 
+		#'   \code{rcompanion::scheirerRayHare} (when \code{method = "scheirerRayHare"}) or 
+		#'   \code{lmerTest::lmer} (when \code{method = "lme"}) or 
+		#'   \code{betareg::betareg} (when \code{method = "betareg"}) or 
+		#'   \code{glmmTMB::glmmTMB} (when \code{method = "glmm"}).
 		#' @return \code{res_diff}, stored in object with the format \code{data.frame}.
 		#' @examples
 		#' \donttest{
@@ -124,6 +117,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			formula = NULL,
 			KW_dunn_letter = TRUE,
 			alpha = 0.05,
+			anova_post_test = "duncan.test",
 			return_model = FALSE,
 			...
 			){
@@ -254,11 +248,16 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				}
 			}
 			if(method == "anova" & is.null(formula)){
+				if(!require("agricolae")){
+					stop("Please first install the agricolae package!")
+				}
+				anova_post_test <- match.arg(anova_post_test, c("duncan.test", "LSD.test", "HSD.test"))
+				message("Perform post hoc test with the method: ", anova_post_test, " ...")
 				compare_result <- data.frame()
 				for(k in measure){
 					if(is.null(by_group)){
 						div_table <- data_alpha[data_alpha$Measure == k, ]
-						tmp_res <- private$anova_test(input_table = div_table, group = group, measure = k, alpha = alpha, ...)
+						tmp_res <- private$anova_test(input_table = div_table, group = group, measure = k, post_test = anova_post_test, alpha = alpha, ...)
 						compare_result %<>% rbind(., tmp_res)
 					}else{
 						for(each_group in unique_bygroups){
@@ -268,7 +267,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 								next
 							}
 							div_table <- data_alpha[data_alpha$Measure == k & all_bygroups == each_group, ]
-							tmp_res <- private$anova_test(input_table = div_table, group = group, measure = k, alpha = alpha, ...)
+							tmp_res <- private$anova_test(input_table = div_table, group = group, measure = k, post_test = anova_post_test, alpha = alpha, ...)
 							tmp_res <- cbind.data.frame(by_group = each_group, tmp_res)
 							compare_result %<>% rbind.data.frame(., tmp_res)
 						}
@@ -311,7 +310,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					}
 					compare_result %<>% rbind(., tmp1)
 				}
-				compare_result$Significance <- cut(compare_result$P.unadj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label = c("***", "**", "*", "ns"))
+				compare_result$Significance <- generate_p_siglabel(compare_result$P.unadj, nonsig = "ns")
 				method <- paste0(method, "-formula")
 			}
 			if(method %in% c("lme", "glmm")){
@@ -369,10 +368,11 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					self$res_model <- res_model
 					message("The original ", method, " models list is stored in object$res_model ...")
 				}
+				method <- paste0(method, "-formula")
 			}
 			if(! method %in% c("anova", paste0(c("anova", "scheirerRayHare", "betareg"), "-formula"), "lme", "glmm")){
 				if("P.adj" %in% colnames(compare_result)){
-					compare_result$Significance <- cut(compare_result$P.adj, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label = c("***", "**", "*", "ns"))
+					compare_result$Significance <- generate_p_siglabel(compare_result$P.adj, nonsig = "ns")
 					compare_result$Significance %<>% as.character
 				}
 			}
@@ -385,15 +385,14 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' Plot the alpha diversity.
 		#'
 		#' @param color_values default \code{RColorBrewer::brewer.pal}(8, "Dark2"); color pallete for groups.
-		#' @param measure default Shannon; one alpha diversity measurement; see names of alpha_diversity of dataset, 
-		#'   e.g., Observed, Chao1, ACE, Shannon, Simpson, InvSimpson, Fisher, Coverage, PD.
+		#' @param measure default "Shannon"; one alpha diversity index in the object.
 		#' @param group default NULL; group name used for the plot.
 		#' @param add_sig default TRUE; wheter add significance label using the result of \code{cal_diff} function, i.e. \code{object$res_diff};
 		#'   This is manily designed to add post hoc test of anova or other significances to make the label mapping easy.
 		#' @param add_sig_label default "Significance"; select a colname of \code{object$res_diff} for the label text when 'Letter' is not in the table, 
 		#'   such as 'P.adj' or 'Significance'.
 		#' @param add_sig_text_size default 3.88; the size of text in added label.
-		#' @param use_boxplot default TRUE; TRUE: boxplot; FALSE: mean-se plot.
+		#' @param add_sig_label_num_dec default 4; reserved decimal places when the parameter \code{add_sig_label} use numeric column, like 'P.adj'.
 		#' @param boxplot_add default "jitter"; points type, see the add parameter in \code{ggpubr::ggboxplot}.
 		#' @param order_x_mean default FALSE; whether order x axis by the means of groups from large to small.
 		#' @param y_start default 0.1; the y axis value from which to add the significance asterisk label; 
@@ -404,6 +403,18 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @param xtext_size default 15; x axis text size.
 		#' @param ytitle_size default 17; y axis title size.
 		#' @param barwidth default 0.9; the bar width in plot; applied when by_group is not NULL.
+		#' @param use_boxplot default TRUE; TRUE denotes boxplot by using the data_alpha table in the object. 
+		#' 	  FALSE represents mean-sd or mean-se plot by invoking the data_stat table in the object.
+		#' @param plot_SE default TRUE; TRUE: the errorbar is \eqn{mean±se}; FALSE: the errorbar is \eqn{mean±sd}.
+		#' @param errorbar_size default 1; errorbar size. Available when \code{use_boxplot = FALSE}.
+		#' @param errorbar_width default 0.2; errorbar width. Available when \code{use_boxplot = FALSE} and \code{by_group} is NULL.
+		#' @param point_size default 3; point size for taxa. Available when \code{use_boxplot = FALSE}.
+		#' @param point_alpha default 0.8; point transparency. Available when \code{use_boxplot = FALSE}.
+		#' @param add_line default FALSE; whether add line. Available when \code{use_boxplot = FALSE}.
+		#' @param line_size default 0.8; line size when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.
+		#' @param line_type default 1; an integer; line type when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.
+		#' @param line_color default "grey50"; line color when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE} and \code{by_group} is NULL.
+		#' @param line_alpha default 0.5; line transparency when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.
 		#' @param ... parameters pass to \code{ggpubr::ggboxplot} function.
 		#' @return ggplot.
 		#' @examples
@@ -422,7 +433,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			add_sig = TRUE,
 			add_sig_label = "Significance",
 			add_sig_text_size = 3.88,
-			use_boxplot = TRUE,
+			add_sig_label_num_dec = 4,
 			boxplot_add = "jitter",
 			order_x_mean = FALSE,
 			y_start = 0.1,
@@ -431,6 +442,17 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			xtext_size = 15,
 			ytitle_size = 17,
 			barwidth = 0.9,
+			use_boxplot = TRUE,
+			plot_SE = TRUE,
+			errorbar_size = 1,
+			errorbar_width = 0.2,
+			point_size = 3,
+			point_alpha = 0.8,
+			add_line = FALSE,
+			line_size = 0.8, 
+			line_type = 1,
+			line_color = "grey50",
+			line_alpha = 0.5, 
 			...
 			){
 			cal_diff_method <- self$cal_diff_method
@@ -472,7 +494,12 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					}	
 				}
 			}
+			
 			use_data <- self$data_alpha[self$data_alpha$Measure == measure, ]
+			if(!use_boxplot){
+				use_data_plot <- self$data_stat[self$data_stat$Measure == measure, ]
+			}
+			
 			if(order_x_mean){
 				if(is.null(by_group)){
 					mean_orders <- names(sort(tapply(use_data$Value, use_data[, group], mean), decreasing = TRUE))
@@ -487,9 +514,15 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					}) %>% unlist
 				}
 				use_data[, group] %<>% factor(., levels = mean_orders)
+				if(!use_boxplot){
+					use_data_plot[, group] %<>% factor(., levels = mean_orders)
+				}
 			}else{
 				if(!is.factor(use_data[, group])){
 					use_data[, group] %<>% as.factor
+					if(!use_boxplot){
+						use_data_plot[, group] %<>% as.factor
+					}
 				}
 				if(!is.null(by_group)){
 					if(!is.factor(use_data[, by_group])){
@@ -513,20 +546,36 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 						)
 				}
 			}else{
-				p <- ggplot(use_data, aes_meco(x = group, y = "Value")) + 
-					theme_minimal() +
-					stat_summary(fun.data = mean_se, fun.args = list(mult = 1), geom = "errorbar", width = 0.2) +
-					stat_summary(fun = mean, geom = "point", size = rel(3)) + 
-					theme(
-						axis.title = element_text(face = "bold",size = rel(1.8)),
-						axis.line.x = element_line(colour="black"),
-						axis.line.y = element_line(colour="black"),
-						axis.ticks = element_line(),
-						panel.grid.major = element_line(colour="#f0f0f0"),
-						panel.grid.minor = element_blank(),
-						plot.margin=unit(c(10,5,5,5),"mm")
-						)
+				colnames(use_data_plot)[colnames(use_data_plot) == "Mean"] <- "Value"
+				if(is.null(by_group)){
+					p <- ggplot(use_data_plot, aes(x = .data[[group]], y = .data[["Value"]], color = .data[[group]], group = 1))
+					if(plot_SE){
+						p <- p + geom_errorbar(aes(ymin = Value - SE, ymax = Value + SE), linewidth = errorbar_size, width = errorbar_width)
+					}else{
+						p <- p + geom_errorbar(aes(ymin = Value - SD, ymax = Value + SD), linewidth = errorbar_size, width = errorbar_width)
+					}
+					p <- p + geom_point(size = point_size, alpha = point_alpha)
+				}else{
+					p <- ggplot(use_data_plot, aes(x = .data[[by_group]], y = .data[["Value"]], color = .data[[group]], group = .data[[group]]))
+					if(plot_SE){
+						p <- p + geom_errorbar(aes(ymin = Value - SE, ymax = Value + SE), position = position_dodge2(width = barwidth), linewidth = errorbar_size)
+					}else{
+						p <- p + geom_errorbar(aes(ymin = Value - SD, ymax = Value + SD), position = position_dodge2(width = barwidth), linewidth = errorbar_size)
+					}
+					p <- p + geom_point(size = point_size, alpha = point_alpha, position = position_dodge2(width = barwidth))						
+				}
+				if(add_line){
+					if(is.null(by_group)){
+						p <- p + geom_line(colour = line_color, linewidth = line_size, alpha = line_alpha, 
+							linetype = line_type)
+					}else{
+						p <- p + geom_line(linewidth = line_size, alpha = line_alpha, 
+							linetype = line_type, position = position_dodge2(width = barwidth))
+					}
+				}
+				p <- p + scale_color_manual(values = color_values) + theme_bw()
 			}
+			
 			if(add_sig){
 				diff_res <- self$res_diff
 				if(cal_diff_method %in% c("KW", "KW_dunn", "wilcox", "t.test", "anova")){
@@ -581,7 +630,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 								stringsAsFactors = FALSE
 							)
 						}
-						p <- p + geom_text(aes(x = x, y = y, label = add), data = textdata, size = add_sig_text_size)
+						p <- p + geom_text(aes(x = x, y = y, label = add), data = textdata, size = add_sig_text_size, inherit.aes = FALSE)
 					}else{
 						use_diff_data <- diff_res %>% .[.$Measure == measure, ]
 						# check group numbers
@@ -596,7 +645,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 								stop("Please provide a correct add_sig_label parameter! Must be a colname of object$res_diff !")
 							}
 							if(is.numeric(use_diff_data[, add_sig_label])){
-								use_diff_data[, add_sig_label] %<>% round(., 4)
+								use_diff_data[, add_sig_label] %<>% round(., add_sig_label_num_dec) %>% as.character
 							}
 							annotations <- c()
 							y_position <- c()
@@ -646,7 +695,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 								y_position = y_position, 
 								xmin = x_min, 
 								xmax = x_max,
-								textsize = add_sig_text_size
+								textsize = add_sig_text_size,
+								color = "black"
 							)
 						}else{
 							if(is.null(by_group)){
@@ -681,18 +731,18 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					}
 				}
 			}
-			if(is.null(by_group)){
-				p <- p + theme(legend.position="none")
-			}
 			p <- p + ylab(measure) + xlab("")
 			p <- p + theme(
 					axis.text.x = element_text(colour = "black", size = xtext_size),
-					axis.title.y= element_text(size = ytitle_size),
+					axis.title.y = element_text(size = ytitle_size),
 					axis.text.y = element_text(size = rel(1.1)),
 					axis.title.x = element_blank()
 					)
 			if(!is.null(xtext_angle)){
-				p <- p + theme(axis.text.x = element_text(angle = xtext_angle, colour = "black", vjust = 1, hjust = 1, size = xtext_size))
+				p <- p + theme(axis.text.x = element_text(angle = xtext_angle, vjust = 1, hjust = 1))
+			}
+			if(is.null(by_group)){
+				p <- p + theme(legend.position = "none")
 			}
 			p
 		},
@@ -814,7 +864,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			tmp <- combn(orderd_groups, 2) %>% t %>% as.data.frame %>% apply(., 1, function(x){paste0(x, collapse = " - ")})
 			dunnTest_table <- dunnTest_table[match(tmp, dunnTest_table$Comparison), ]
 			if(KW_dunn_letter){
-				dunnTest_final <- rcompanion::cldList(P.adj ~ Comparison, data = dunnTest_table, threshold = alpha)
+				dunnTest_final <- rcompanion::cldList(P.adj ~ Comparison, data = dunnTest_table, threshold = alpha,
+					remove.space = TRUE, remove.equal = FALSE, remove.zero = FALSE)
 				if(any(grepl("-", raw_groups))){
 					dunnTest_final$Group %<>% gsub("sub&&&sub", "-", ., fixed = TRUE)
 				}
@@ -833,16 +884,17 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			}
 			dunnTest_res
 		},
-		anova_test = function(input_table = NULL, group = NULL, measure = NULL, alpha = 0.05, ...){
+		anova_test = function(input_table, group, measure, post_test, alpha, ...){
 			model <- aov(reformulate(group, "Value"), input_table)
-			out <- agricolae::duncan.test(model, group, main = measure, alpha = alpha, ...)
+			post_test_function <- get(post_test)
+			out <- post_test_function(model, group, main = measure, alpha = alpha, ...)
 			res1 <- out$groups[, "groups", drop = FALSE]
 			res1$groups <- as.character(res1$groups)
 			res1 <- data.frame(rownames(res1), res1, stringsAsFactors = FALSE, check.names = FALSE)
 			colnames(res1) <- c("Group", "Letter")
 			rownames(res1) <- NULL
-			res2 <- data.frame(Measure = measure, Test_method = "anova", res1)
-			res2
+			res <- data.frame(Measure = measure, Test_method = "anova", res1)
+			res
 		},
 		group_value_compare = function(value, group, ...){
 			group %<>% as.character
