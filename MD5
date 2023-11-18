@@ -1,11 +1,11 @@
-8d3bccba283be14bc09fe33c3b888426 *DESCRIPTION
+9a4658a4c67c88d2f78340020d3b6e31 *DESCRIPTION
 70b0e75a66033eb8af76ad621a5a7dbb *NAMESPACE
 a0112422157c37844ef95eb2cad49681 *R/data.R
 39ac2817a4a4ae7b840662df33baf77e *R/help.R
 6194e169da4b986151156dbfa7560f3a *R/import.R
-0f4740e44c89154fca9a762f194f329c *R/microtable.R
-de423f0697a1c0a12ff011bc8c8635ce *R/trans_abund.R
-67823c46f667a03140a453abe98c9d1f *R/trans_alpha.R
+7da28556a243251c28a34c96c8db876f *R/microtable.R
+19d0eaa6ff58240806d8d9743f146ec7 *R/trans_abund.R
+4934abf688b0238b2fd377769836f35e *R/trans_alpha.R
 2a206a427f488c57d0b3e79f86ecc598 *R/trans_beta.R
 f4c0174f58808d9451081395b06eb79e *R/trans_classifier.R
 38a272b465d55096ccdfcbfa519aa9f3 *R/trans_diff.R
@@ -16,7 +16,7 @@ f4c0174f58808d9451081395b06eb79e *R/trans_classifier.R
 42ed14fff1e09e6f21fcee7877e7a90f *R/trans_venn.R
 c8d55aace79a4517df5228ee8480ab18 *R/utility.R
 e659c859ac19d1a43fd092258de17cff *data/Tax4Fun2_KEGG.RData
-40c21938565ca5b09be4fba3a318ab90 *data/dataset.RData
+7fca5aa06bb3f35624aa1303c127dc1b *data/dataset.RData
 aa756c1686cec3c93182a56dc5cbf515 *data/env_data_16S.RData
 912117bc9c8087d6842fb411a19e6ae6 *data/fungi_func_FUNGuild.RData
 dee883b23491a1cf8d042e3366a48958 *data/fungi_func_FungalTraits.RData
@@ -52,8 +52,8 @@ c2fe8553b8ca3d28ba07f972e11c5f30 *man/prok_func_NJC19_list.Rd
 25818d4f5725a9c4a33be7c3dbbfccca *man/taxonomy_table_16S.Rd
 aecd39d720f0242e8cf2f95cffdbe1f1 *man/taxonomy_table_ITS.Rd
 69216d8b62072db51e83822c3c17df19 *man/tidy_taxonomy.Rd
-d5460918608d18fc0c852c375abcc832 *man/trans_abund.Rd
-153a4df9f3e213e5cd8dbc060d196cf7 *man/trans_alpha.Rd
+9d11e927e27fedfb4fdb385644157676 *man/trans_abund.Rd
+9466162b0674e1b5f059143f733e2acc *man/trans_alpha.Rd
 9576b11b19795632b17cc236b9d42210 *man/trans_beta.Rd
 975bafdf1c8701a8bb2204a471115e2c *man/trans_classifier.Rd
 bb361b08d01ebda9dfe3555b074346d4 *man/trans_diff.Rd
