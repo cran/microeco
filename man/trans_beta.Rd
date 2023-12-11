@@ -197,7 +197,9 @@ Plot the ordination result.
   ellipse_chull_fill = TRUE,
   ellipse_chull_alpha = 0.1,
   ellipse_level = 0.9,
-  ellipse_type = "t"
+  ellipse_type = "t",
+  NMDS_stress_pos = c(1, 1),
+  NMDS_stress_text_prefix = ""
 )}\if{html}{\out{</div>}}
 }
 
@@ -241,6 +243,15 @@ Plot the ordination result.
 \item{\code{ellipse_level}}{default .9; confidence level of ellipse when "ellipse" is in \code{plot_type} parameter.}
 
 \item{\code{ellipse_type}}{default "t"; ellipse type when "ellipse" is in \code{plot_type} parameter; see type in \code{\link{stat_ellipse}}.}
+
+\item{\code{NMDS_stress_pos}}{default c(1, 1); a numerical vector with two values used to represent the insertion position of the stress text. 
+The first one denotes the x-axis, while the second one corresponds to the y-axis. 
+The assigned position is determined by multiplying the respective value with the maximum point on the corresponding coordinate axis. 
+Thus, the x-axis position is equal to \code{max(points of x axis) * NMDS_stress_pos[1]}, 
+and the y-axis position is equal to \code{max(points of y axis) * NMDS_stress_pos[2]}. Negative values can also be utilized for the negative part of the axis.
+\code{NMDS_stress_pos = NULL} denotes no stress text to show.}
+
+\item{\code{NMDS_stress_text_prefix}}{default ""; If NMDS_stress_pos is not NULL, this parameter can be used to add text in front of the stress value.}
 }
 \if{html}{\out{</div>}}
 }

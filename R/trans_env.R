@@ -409,7 +409,7 @@ trans_env <- R6Class(classname = "trans_env",
 			colnames(df_sites)[1:2] <- c("x", "y")
 			
 			multiplier <- vegan:::ordiArrowMul(scrs$biplot)
-			df_arrows<- scrs$biplot * multiplier
+			df_arrows <- scrs$biplot * multiplier
 			colnames(df_arrows) <- c("x", "y")
 			df_arrows <- as.data.frame(df_arrows)
 			eigval <- res_ordination$CCA$eig/sum(res_ordination$CCA$eig)
@@ -1082,12 +1082,15 @@ trans_env <- R6Class(classname = "trans_env",
 					`row.names<-`(.[,1]) %>% 
 					.[, -1, drop = FALSE]
 				sig_data[is.na(sig_data)] <- ""
-				if(length(unique(use_data$Type)) == 1 & pheatmap == F){
+				if(pheatmap == F){
 					row_cluster <- hclust(dist(clu_data)) 
 					lim_y <- row_cluster %>% {.$labels[.$order]}
 					col_cluster <- hclust(dist(t(clu_data)))
 					lim_x <- col_cluster %>% {.$labels[.$order]}
 				}
+			}else{
+				lim_y <- NULL
+				lim_x <- NULL
 			}
 			# the input text_y_order or text_x_order has priority
 			if(!is.null(text_y_order) | !is.null(text_x_order)){
@@ -1095,15 +1098,11 @@ trans_env <- R6Class(classname = "trans_env",
 					cluster_ggplot <- "none"
 					message("Change cluster_ggplot to none, as text_y_order and/or text_x_order provided!")
 				}
-				if(!is.null(text_y_order) & !is.null(text_x_order)){
+				if(!is.null(text_y_order)){
 					lim_y <- rev(text_y_order)
+				}
+				if(!is.null(text_x_order)){
 					lim_x <- text_x_order
-				}else{
-					if(!is.null(text_y_order) & is.null(text_x_order)){
-						lim_y <- rev(text_y_order)
-					}else{
-						lim_x <- text_x_order
-					}
 				}
 			}
 			if(pheatmap == T){
@@ -1172,12 +1171,10 @@ trans_env <- R6Class(classname = "trans_env",
 					theme(strip.background = element_rect(fill = "grey85", colour = "white"), axis.title = element_blank()) +
 					theme(strip.text = element_text(size = 11), panel.border = element_blank(), panel.grid = element_blank())
 				p <- p + ggplot_xtext_anglesize(xtext_angle, xtext_size)
+				p <- p + scale_y_discrete(limits = lim_y, position = text_y_position) + scale_x_discrete(limits = lim_x)
 				
 				if(length(unique(use_data$Type)) == 1){
-					if(cluster_ggplot == "none"){
-						p <- p + scale_y_discrete(limits = lim_y, position = text_y_position) + scale_x_discrete(limits = lim_x)
-					}else{
-						p <- p + scale_y_discrete(limits = lim_y, position = text_y_position) + scale_x_discrete(limits = lim_x)
+					if(cluster_ggplot != "none"){
 						if(cluster_ggplot %in% c("row", "both")){
 							row_plot <- ggtree::ggtree(row_cluster, hang = 0)
 							p %<>% aplot::insert_left(row_plot, width = cluster_height_rows)
@@ -1454,9 +1451,9 @@ trans_env <- R6Class(classname = "trans_env",
 			mindis <- min(arr_dis)
 			k <- (b-a)/(maxdis - mindis) 
 			norDis <- a + k * (arr_dis - mindis)
-			per <- abs(arr[,1]/arr[,2])
+			per <- abs(arr[, 1]/arr[, 2])
 			newx <- (((norDis*per^2) / (per^2 + 1)) ^ (1/2)) * sapply(arr[, 1], function(y) ifelse(y > 0, 1, -1))
-			newy <- (newx/per) * sapply(arr[, 2], function(y) ifelse(y > 0, 1, -1))
+			newy <- (abs(newx)/per) * sapply(arr[, 2], function(y) ifelse(y > 0, 1, -1))
 			res <- data.frame(newx, newy)
 			colnames(res) <- colnames(arr)
 			res
