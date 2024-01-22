@@ -637,10 +637,19 @@ microtable <- R6Class(classname = "microtable",
 		#' @description
 		#' Calculate alpha diversity.
 		#'
-		#' @param measures default NULL; one or more indexes of \code{c("Observed", "Coverage", "Chao1", "ACE", "Shannon", "Simpson", "InvSimpson", "Fisher", "PD")}; 
-		#'   If null, use all those measures. 'Shannon', 'Simpson' and 'InvSimpson' are calculated based on \code{vegan::diversity} function;
-		#'   'Chao1' and 'ACE' depend on the function \code{vegan::estimateR}; 'PD' depends on the function \code{picante::pd}.
-		#' @param PD default FALSE; whether Faith's phylogenetic diversity should be calculated.
+		#' @param measures default NULL; one or more indexes in \code{c("Observed", "Coverage", "Chao1", "ACE", "Shannon", "Simpson", "InvSimpson", "Fisher", "Pielou")}; 
+		#'   The default NULL represents that all the measures are calculated. 'Shannon', 'Simpson' and 'InvSimpson' are calculated based on \code{vegan::diversity} function;
+		#'   'Chao1' and 'ACE' depend on the function \code{vegan::estimateR}.
+		#'   'Fisher' index relies on the function \code{vegan::fisher.alpha}.
+		#'   "Observed" means the observed species number in the community.
+		#'   "Coverage" represents good's coverage. It is defined:
+		#' 	   	     \deqn{Coverage = 1 - \frac{f1}{n}} 
+		#'    where \emph{n} is the total abundance of a sample, and \emph{f1} is the number of singleton (species with abundance 1) in the sample.
+		#'   "Pielou" denotes the Pielou evenness index. It is defined:
+		#' 	   	     \deqn{J = \frac{H'}{\ln(S)}}
+		#'    where \emph{H'} is Shannon index, and \emph{S} is the species number.
+		#' @param PD default FALSE; whether Faith's phylogenetic diversity is calculated. The calculation depends on the function \code{picante::pd}.
+		#'   Note that the phylogenetic tree (\code{phylo_tree} object in the data) is required for PD.
 		#' @return alpha_diversity stored in object.
 		#' @examples
 		#' \donttest{
@@ -650,8 +659,8 @@ microtable <- R6Class(classname = "microtable",
 		cal_alphadiv = function(measures = NULL, PD = FALSE){
 			# modified based on the alpha diversity analysis of phyloseq package
 			OTU <- as.data.frame(t(self$otu_table), check.names = FALSE)
-			renamevec    <-     c("Observed", "Coverage", "Chao1", "ACE", "Shannon", "Simpson", "InvSimpson", "Fisher")
-			names(renamevec) <- c("S.obs", "coverage", "S.chao1", "S.ACE", "shannon", "simpson", "invsimpson", "fisher")
+			renamevec    <-     c("Observed", "Coverage", "Chao1", "ACE", "Shannon", "Simpson", "InvSimpson", "Fisher", "Pielou")
+			names(renamevec) <- c("S.obs", "coverage", "S.chao1", "S.ACE", "shannon", "simpson", "invsimpson", "fisher", "pielou")
 			if(is.null(measures)){
 				use_measures <- as.character(renamevec)
 			}else{
@@ -693,6 +702,9 @@ microtable <- R6Class(classname = "microtable",
 					}
 				}
 			}
+			if("Pielou" %in% use_measures){
+				outlist <- c(outlist, list(pielou = vegan::diversity(OTU, index = "shannon")/log(vegan::specnumber(OTU))))
+			}
 			if("Coverage" %in% use_measures){
 				outlist <- c(outlist, list(coverage = private$goods(OTU)))
 			}
@@ -720,15 +732,16 @@ microtable <- R6Class(classname = "microtable",
 			write.csv(self$alpha_diversity, file = paste0(dirpath, "/", "alpha_diversity.csv"), row.names = TRUE)
 		},
 		#' @description
-		#' Calculate beta diversity, including Bray-Curtis, Jaccard, and UniFrac.
+		#' Calculate beta diversity dissimilarity matrix, such as Bray-Curtis, Jaccard, and UniFrac.
 		#' See An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035> and Lozupone et al. (2005) <doi:10.1128/AEM.71.12.8228–8235.2005>.
 		#'
-		#' @param method default NULL; a character vector with one or more elements; If default, "bray" and "jaccard" will be used; 
-		#'   see \code{\link{vegdist}} function and \code{method} parameter in \code{vegan} package. 
-		#' @param unifrac default FALSE; whether UniFrac index should be calculated.
-		#' @param binary default FALSE; TRUE is used for jaccard and unweighted unifrac; optional for other indexes.
+		#' @param method default NULL; a character vector with one or more elements; "bray" and "jaccard" are used when \code{method = NULL}; 
+		#'   see the \code{method} parameter in \code{\link{vegdist}} function for more available options. 
+		#' @param unifrac default FALSE; whether UniFrac indexes (weighted and unweighted) are calculated. Phylogenetic tree is necessary when \code{unifrac = TRUE}.
+		#' @param binary default FALSE; Whether convert abundance to binary data (presence/absence) when \code{method} is not "jaccard". 
+		#'   TRUE is used for "jaccard" automatically.
 		#' @param ... parameters passed to \code{\link{vegdist}} function.
-		#' @return beta_diversity list stored in object.
+		#' @return beta_diversity list stored in the object.
 		#' @examples
 		#' \donttest{
 		#' m1$cal_betadiv(unifrac = FALSE)

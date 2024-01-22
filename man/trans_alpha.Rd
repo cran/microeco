@@ -106,7 +106,7 @@ Differential test on alpha diversity.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_alpha$cal_diff(
   method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lme",
-    "betareg", "glmm")[1],
+    "betareg", "glmm", "glmm_beta")[1],
   measure = NULL,
   p_adjust_method = "fdr",
   formula = NULL,
@@ -135,6 +135,10 @@ Differential test on alpha diversity.
   \item{\strong{'lme'}}{Linear Mixed Effect Model based on the \code{lmerTest} package}
   \item{\strong{'betareg'}}{Beta Regression for Rates and Proportions based on the \code{betareg} package}
   \item{\strong{'glmm'}}{Generalized linear mixed model (GLMM) based on the \code{glmmTMB} package}
+  \item{\strong{'glmm_beta'}}{Generalized linear mixed model (GLMM) with a family function of beta distribution. 
+        This is an extension of the GLMM model in \code{'glmm'} option. 
+        The only difference is in \code{glmm_beta} the family function is fixed with the beta distribution function, 
+        facilitating the fitting for proportional data (ranging from 0 to 1). The link function is fixed with \code{"logit"}.}
 }}
 
 \item{\code{measure}}{default NULL; character vector; If NULL, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
@@ -190,7 +194,9 @@ t1$cal_diff(method = "anova")
 \if{html}{\out{<a id="method-trans_alpha-plot_alpha"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_alpha-plot_alpha}{}}}
 \subsection{Method \code{plot_alpha()}}{
-Plot the alpha diversity.
+Plot the alpha diversity. Box plot is used for the visualization of alpha diversity when the \code{group} is found in the object.
+Heatmap is employed automatically to show the significances of differential test 
+		when the formula is found in the \code{res_diff} table of the object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_alpha$plot_alpha(
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),
@@ -219,6 +225,11 @@ Plot the alpha diversity.
   line_type = 1,
   line_color = "grey50",
   line_alpha = 0.5,
+  heatmap_cell = "P.unadj",
+  heatmap_sig = "Significance",
+  heatmap_x = "Factors",
+  heatmap_y = "Measure",
+  heatmap_lab_fill = "P value",
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -283,7 +294,18 @@ FALSE represents mean-sd or mean-se plot by invoking the data_stat table in the 
 
 \item{\code{line_alpha}}{default 0.5; line transparency when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.}
 
-\item{\code{...}}{parameters pass to \code{ggpubr::ggboxplot} function.}
+\item{\code{heatmap_cell}}{default "P.unadj"; the column of \code{res_diff} table for the cell of heatmap when formula with multiple factors is found in the method.}
+
+\item{\code{heatmap_sig}}{default "Significance"; the column of \code{res_diff} for the significance label of heatmap.}
+
+\item{\code{heatmap_x}}{default "Factors"; the column of \code{res_diff} for the x axis of heatmap.}
+
+\item{\code{heatmap_y}}{default "Taxa"; the column of \code{res_diff} for the y axis of heatmap.}
+
+\item{\code{heatmap_lab_fill}}{default "P value"; legend title of heatmap.}
+
+\item{\code{...}}{parameters passing to \code{ggpubr::ggboxplot} function when box plot is used or 
+\code{plot_cor} function in \code{\link{trans_env}} class for the heatmap of multiple factors when formula is found in the res_diff of the object.}
 }
 \if{html}{\out{</div>}}
 }

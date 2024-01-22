@@ -755,11 +755,20 @@ Calculate alpha diversity.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{measures}}{default NULL; one or more indexes of \code{c("Observed", "Coverage", "Chao1", "ACE", "Shannon", "Simpson", "InvSimpson", "Fisher", "PD")}; 
-If null, use all those measures. 'Shannon', 'Simpson' and 'InvSimpson' are calculated based on \code{vegan::diversity} function;
-'Chao1' and 'ACE' depend on the function \code{vegan::estimateR}; 'PD' depends on the function \code{picante::pd}.}
+\item{\code{measures}}{default NULL; one or more indexes in \code{c("Observed", "Coverage", "Chao1", "ACE", "Shannon", "Simpson", "InvSimpson", "Fisher", "Pielou")}; 
+The default NULL represents that all the measures are calculated. 'Shannon', 'Simpson' and 'InvSimpson' are calculated based on \code{vegan::diversity} function;
+'Chao1' and 'ACE' depend on the function \code{vegan::estimateR}.
+'Fisher' index relies on the function \code{vegan::fisher.alpha}.
+"Observed" means the observed species number in the community.
+"Coverage" represents good's coverage. It is defined:
+              \deqn{Coverage = 1 - \frac{f1}{n}} 
+ where \emph{n} is the total abundance of a sample, and \emph{f1} is the number of singleton (species with abundance 1) in the sample.
+"Pielou" denotes the Pielou evenness index. It is defined:
+              \deqn{J = \frac{H'}{\ln(S)}}
+ where \emph{H'} is Shannon index, and \emph{S} is the species number.}
 
-\item{\code{PD}}{default FALSE; whether Faith's phylogenetic diversity should be calculated.}
+\item{\code{PD}}{default FALSE; whether Faith's phylogenetic diversity is calculated. The calculation depends on the function \code{picante::pd}.
+Note that the phylogenetic tree (\code{phylo_tree} object in the data) is required for PD.}
 }
 \if{html}{\out{</div>}}
 }
@@ -799,7 +808,7 @@ Save alpha diversity table to the computer.
 \if{html}{\out{<a id="method-microtable-cal_betadiv"></a>}}
 \if{latex}{\out{\hypertarget{method-microtable-cal_betadiv}{}}}
 \subsection{Method \code{cal_betadiv()}}{
-Calculate beta diversity, including Bray-Curtis, Jaccard, and UniFrac.
+Calculate beta diversity dissimilarity matrix, such as Bray-Curtis, Jaccard, and UniFrac.
 See An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035> and Lozupone et al. (2005) <doi:10.1128/AEM.71.12.8228–8235.2005>.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{microtable$cal_betadiv(method = NULL, unifrac = FALSE, binary = FALSE, ...)}\if{html}{\out{</div>}}
@@ -808,19 +817,20 @@ See An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035> and Lozupone et al. (2
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{method}}{default NULL; a character vector with one or more elements; If default, "bray" and "jaccard" will be used; 
-see \code{\link{vegdist}} function and \code{method} parameter in \code{vegan} package.}
+\item{\code{method}}{default NULL; a character vector with one or more elements; "bray" and "jaccard" are used when \code{method = NULL}; 
+see the \code{method} parameter in \code{\link{vegdist}} function for more available options.}
 
-\item{\code{unifrac}}{default FALSE; whether UniFrac index should be calculated.}
+\item{\code{unifrac}}{default FALSE; whether UniFrac indexes (weighted and unweighted) are calculated. Phylogenetic tree is necessary when \code{unifrac = TRUE}.}
 
-\item{\code{binary}}{default FALSE; TRUE is used for jaccard and unweighted unifrac; optional for other indexes.}
+\item{\code{binary}}{default FALSE; Whether convert abundance to binary data (presence/absence) when \code{method} is not "jaccard". 
+TRUE is used for "jaccard" automatically.}
 
 \item{\code{...}}{parameters passed to \code{\link{vegdist}} function.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-beta_diversity list stored in object.
+beta_diversity list stored in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}

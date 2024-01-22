@@ -414,6 +414,7 @@ trans_func <- R6Class(classname = "trans_func",
 				}
 			}
 			self$res_spe_func_perc_trans <- trans_perc
+			message('Transformed long format table is stored in object$res_spe_func_perc_trans ...')
 		},
 		#' @description
 		#' Plot the percentages of species with specific trait in communities.
@@ -434,7 +435,7 @@ trans_func <- R6Class(classname = "trans_func",
 			color_gradient_high = "#9E0142"
 			){
 			if(is.null(self$res_spe_func_perc_trans)){
-				message("The res_spe_func_perc_trans object is not found! First run the trans_spe_func_perc function to get it ...")
+				message("The res_spe_func_perc_trans object is not found. Run the trans_spe_func_perc function to get it ...")
 				self$trans_spe_func_perc()
 			}
 			plot_data <- self$res_spe_func_perc_trans
@@ -516,8 +517,8 @@ trans_func <- R6Class(classname = "trans_func",
 		#'   if blast_tool_path is NULL, search the tools in the environmental path variable.
 		#' @param path_to_reference_data default "Tax4Fun2_ReferenceData_v2"; the path that points to files used in the prediction; 
 		#'   The directory must contain the Ref99NR or Ref100NR folder; 
-		#'   download Ref99NR.zip from \href{https://cloudstor.aarnet.edu.au/plus/s/DkoZIyZpMNbrzSw/download}{https://cloudstor.aarnet.edu.au/plus/s/DkoZIyZpMNbrzSw/download} or 
-		#'   Ref100NR.zip from \href{https://cloudstor.aarnet.edu.au/plus/s/jIByczak9ZAFUB4/download}{https://cloudstor.aarnet.edu.au/plus/s/jIByczak9ZAFUB4/download}.
+		#'   download Ref99NR.zip from "https://cloudstor.aarnet.edu.au/plus/s/DkoZIyZpMNbrzSw/download" or 
+		#'   Ref100NR.zip from "https://cloudstor.aarnet.edu.au/plus/s/jIByczak9ZAFUB4/download".
 		#' @param path_to_temp_folder default NULL; The temporary folder to store the logfile, intermediate file and result files; if NULL, 
 		#' 	 use the default temporary in the computer system.
 		#' @param database_mode default 'Ref99NR'; "Ref99NR" or "Ref100NR"; Ref99NR: 99\% clustering reference database; Ref100NR: no clustering.

@@ -1,7 +1,25 @@
 
 
-generate_p_siglabel <- function(x, nonsig = ""){
-	cut(x, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label = c("***", "**", "*", nonsig))
+convert_diff2transenv <- function(diff_table, heatmap_x, heatmap_y, heatmap_cell, heatmap_sig, heatmap_lab_fill){
+	# heatmap for multi-factor
+	check_table_variable(diff_table, heatmap_x, "heatmap_x", "object$res_diff")
+	check_table_variable(diff_table, heatmap_y, "heatmap_y", "object$res_diff")
+	check_table_variable(diff_table, heatmap_cell, "heatmap_cell", "object$res_diff")
+	check_table_variable(diff_table, heatmap_sig, "heatmap_sig", "object$res_diff")
+	diff_table <- diff_table[!is.na(diff_table[, heatmap_cell]), ]
+	if("ns" %in% diff_table[, heatmap_sig]){
+		diff_table[, heatmap_sig] <- gsub("ns", "", diff_table[, heatmap_sig])
+	}
+	colnames(diff_table)[colnames(diff_table) == heatmap_x] <- "Env"
+	colnames(diff_table)[colnames(diff_table) == heatmap_y] <- "Taxa"
+	colnames(diff_table)[colnames(diff_table) == heatmap_cell] <- "Correlation"
+	colnames(diff_table)[colnames(diff_table) == heatmap_sig] <- "Significance"
+	diff_table$Type = "All"
+
+	suppressMessages(tmp_trans_env <- trans_env$new(dataset = NULL))
+	tmp_trans_env$cor_method <- heatmap_lab_fill
+	tmp_trans_env$res_cor <- diff_table
+	tmp_trans_env
 }
 
 check_table_variable <- function(input_table, variable, var_char, table_char){
@@ -10,6 +28,10 @@ check_table_variable <- function(input_table, variable, var_char, table_char){
 			stop("Provided ", var_char, ": ", variable, " is not found in ", table_char, "!")
 		}	
 	}
+}
+
+generate_p_siglabel <- function(x, nonsig = ""){
+	cut(x, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), label = c("***", "**", "*", nonsig))
 }
 
 check_taxa_abund <- function(obj, ...){
@@ -150,12 +172,13 @@ trycharnum <- function(x){
 #'
 #' @param taxonomy_table a data.frame with taxonomic information.
 #' @param column default "all"; "all" or a number; 'all' represents cleaning up all the columns; a number represents cleaning up this column.
-#' @param pattern default see the function parameter; the characters (regular expression) to be cleaned up or replaced; cleaned up when parameter replacement = "", 
+#' @param pattern default c(".*unassigned.*", ".*uncultur.*", ".*unknown.*", ".*unidentif.*", ".*unclassified.*", ".*No blast hit.*", ".*Incertae.sedis.*"); 
+#'   the characters (regular expressions) to be removed or replaced; removed when parameter \code{replacement = ""}, 
 #'   replaced when parameter replacement has something; Note that the capital and small letters are not distinguished when \code{ignore.case = TRUE}.
-#' @param replacement default ""; the characters used to replace the character in pattern parameter.
+#' @param replacement default ""; the characters used to replace the character in \code{pattern} parameter.
 #' @param ignore.case default TRUE; if FALSE, the pattern matching is case sensitive and if TRUE, case is ignored during matching.
-#' @param na_fill default ""; used to replace the NA.
-#' @return taxonomic table.
+#' @param na_fill default ""; used to replace \code{NA}.
+#' @return data.frame
 #' @format \code{\link{data.frame}} object.
 #' @examples
 #' data("taxonomy_table_16S")
@@ -163,8 +186,7 @@ trycharnum <- function(x){
 #' @export
 tidy_taxonomy <- function(taxonomy_table, 
 	column = "all",
-	pattern = c(".*Unassigned.*", ".*uncultur.*", ".*unknown.*", ".*unidentif.*", ".*unclassified.*", ".*No blast hit.*", ".*sp\\.$",
-		".*metagenome.*", ".*cultivar.*", ".*archaeon$", "__synthetic.*", ".*\\sbacterium$", ".*bacterium\\s.*", ".*Incertae.sedis.*"),
+	pattern = c(".*unassigned.*", ".*uncultur.*", ".*unknown.*", ".*unidentif.*", ".*unclassified.*", ".*No blast hit.*", ".*Incertae.sedis.*"),
 	replacement = "",
 	ignore.case = TRUE,
 	na_fill = ""
