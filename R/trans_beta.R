@@ -68,8 +68,10 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @param ordination default "PCoA"; "PCA", "DCA", "PCoA" or "NMDS". PCA: principal component analysis; DCA: detrended correspondence analysis; 
 		#' 	  PCoA: principal coordinates analysis; NMDS: non-metric multidimensional scaling.
 		#' @param ncomp default 3; dimensions shown in the results.
-		#' @param trans_otu default FALSE; whether species abundance will be square transformed; only available when \code{ordination} is "PCA" or "DCA".
+		#' @param trans default FALSE; whether species abundance will be square transformed; only available when \code{ordination} is "PCA" or "DCA".
 		#' @param scale_species default FALSE; whether species loading in PCA or DCA is scaled.
+		#' @param scale_species_ratio default 0.8; the ratio to scale up the loading; multiply by the maximum distance between samples and origin. 
+		#' 	  Only available when \code{scale_species = TURE}.
 		#' @param ... parameters passed to \code{vegan::rda} function when \code{ordination = "PCA"}, 
 		#' 	  or \code{vegan::decorana} function when \code{ordination = "DCA"}, 
 		#' 	  or \code{ape::pcoa} function when \code{ordination = "PCoA"}, 
@@ -80,8 +82,9 @@ trans_beta <- R6Class(classname = "trans_beta",
 		cal_ordination = function(
 			ordination = "PCoA",
 			ncomp = 3,
-			trans_otu = FALSE, 
+			trans = FALSE, 
 			scale_species = FALSE,
+			scale_species_ratio = 0.8,
 			...
 			){
 			if(is.null(ordination)){
@@ -94,7 +97,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			if(ordination %in% c("PCA", "DCA")){
 				plot.x <- switch(ordination, PCA = "PC1", DCA = "DCA1")
 				plot.y <- switch(ordination, PCA = "PC2", DCA = "DCA2")
-				if(trans_otu == T){
+				if(trans == T){
 					abund <- sqrt(dataset$otu_table)
 				}else{
 					abund <- dataset$otu_table
@@ -110,19 +113,16 @@ trans_beta <- R6Class(classname = "trans_beta",
 				scores_sites <- scores(model, choices = 1:ncomp, display = "sites")
 				combined <- cbind.data.frame(scores_sites, dataset$sample_table)
 				loading <- scores(model, choices = 1:ncomp, display = "species")
-				if(!is.null(dataset$tax_table)){
-					loading <- cbind.data.frame(loading, dataset$tax_table[rownames(loading), ])
-				}
-				if(scale_species == T){
+				loading %<>% as.data.frame
+				loading[, "dist"] <- loading[, plot.x]^2 + loading[, plot.y]^2
+				loading <- loading[order(loading[, "dist"], decreasing = TRUE), ]
+				if(scale_species){
 					maxx <- max(abs(scores_sites[, plot.x]))/max(abs(loading[, plot.x]))
-					loading[, plot.x] %<>% {. * maxx * 0.8}
-					maxy <- max(abs(scores_sites[,plot.y]))/max(abs(loading[,plot.y]))
-					loading[, plot.y] %<>% {. * maxy * 0.8}
+					loading[, plot.x] %<>% {. * maxx * scale_species_ratio}
+					maxy <- max(abs(scores_sites[, plot.y]))/max(abs(loading[, plot.y]))
+					loading[, plot.y] %<>% {. * maxy * scale_species_ratio}
 				}
-				species <- cbind(loading, loading[, plot.x]^2 + loading[, plot.y]^2)
-				colnames(species)[ncol(species)] <- "dist"
-				species <- species[with(species, order(-dist)), ]
-				outlist <- list(model = model, scores = combined, loading = species, eig = expla)
+				outlist <- list(model = model, scores = combined, loading = loading, eig = expla)
 			}
 			if(ordination %in% c("PCoA", "NMDS")){
 				if(is.null(self$use_matrix)){
@@ -180,6 +180,12 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#'   and the y-axis position is equal to \code{max(points of y axis) * NMDS_stress_pos[2]}. Negative values can also be utilized for the negative part of the axis.
 		#'   \code{NMDS_stress_pos = NULL} denotes no stress text to show.
 		#' @param NMDS_stress_text_prefix default ""; If NMDS_stress_pos is not NULL, this parameter can be used to add text in front of the stress value.
+		#' @param loading_arrow default FALSE; whether show the loading using arrow.
+		#' @param loading_taxa_num default 10; the number of taxa used for the loading. Only available when \code{loading_arrow = TRUE}.
+		#' @param loading_text_color default "black"; the color of taxa text. Only available when \code{loading_arrow = TRUE}.
+		#' @param loading_arrow_color default "grey30"; the color of taxa arrow. Only available when \code{loading_arrow = TRUE}.
+		#' @param loading_text_size default 3; the size of taxa text. Only available when \code{loading_arrow = TRUE}.
+		#' @param loading_text_italic default FALSE; whether using italic for the taxa text. Only available when \code{loading_arrow = TRUE}.
 		#' @return \code{ggplot}.
 		#' @examples
 		#' t1$plot_ordination(plot_type = "point")
@@ -205,7 +211,13 @@ trans_beta <- R6Class(classname = "trans_beta",
 			ellipse_level = 0.9,
 			ellipse_type = "t",
 			NMDS_stress_pos = c(1, 1),
-			NMDS_stress_text_prefix = ""
+			NMDS_stress_text_prefix = "",
+			loading_arrow = FALSE,
+			loading_taxa_num = 10, 
+			loading_text_color = "black",
+			loading_arrow_color = "grey30",
+			loading_text_size = 3,
+			loading_text_italic = FALSE
 			){
 			ordination <- self$ordination
 			if(is.null(ordination)){
@@ -297,6 +309,32 @@ trans_beta <- R6Class(classname = "trans_beta",
 			}
 			if(!is.null(plot_shape)){
 				p <- p + scale_shape_manual(values = shape_values)
+			}
+			if(loading_arrow & ordination %in% c("PCA", "DCA")){
+				df_arrows <- self$res_ordination$loading[1:loading_taxa_num, ]
+				colnames(df_arrows)[1:2] <- c("x", "y")
+				p <- p + geom_segment(
+					data = df_arrows, 
+					aes(x = 0, y = 0, xend = x, yend = y), 
+					arrow = arrow(length = unit(0.2, "cm")), 
+					color = loading_arrow_color, 
+					alpha = .6
+					)
+				df_arrows$label <- rownames(df_arrows)
+				if(loading_text_italic){
+					df_arrows$label %<>% paste0("italic('", .,"')")
+					loading_text_parse <- TRUE
+				}else{
+					loading_text_parse <- FALSE
+				}
+				p <- p + ggrepel::geom_text_repel(
+					data = df_arrows, 
+					aes_meco("x", "y", label = "label"), 
+					size = loading_text_size, 
+					color = loading_text_color, 
+					segment.alpha = .01, 
+					parse = loading_text_parse
+				)
 			}
 			p
 		},

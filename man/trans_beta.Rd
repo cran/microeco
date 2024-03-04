@@ -140,8 +140,9 @@ Unconstrained ordination.
 \if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_ordination(
   ordination = "PCoA",
   ncomp = 3,
-  trans_otu = FALSE,
+  trans = FALSE,
   scale_species = FALSE,
+  scale_species_ratio = 0.8,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -154,9 +155,12 @@ PCoA: principal coordinates analysis; NMDS: non-metric multidimensional scaling.
 
 \item{\code{ncomp}}{default 3; dimensions shown in the results.}
 
-\item{\code{trans_otu}}{default FALSE; whether species abundance will be square transformed; only available when \code{ordination} is "PCA" or "DCA".}
+\item{\code{trans}}{default FALSE; whether species abundance will be square transformed; only available when \code{ordination} is "PCA" or "DCA".}
 
 \item{\code{scale_species}}{default FALSE; whether species loading in PCA or DCA is scaled.}
+
+\item{\code{scale_species_ratio}}{default 0.8; the ratio to scale up the loading; multiply by the maximum distance between samples and origin. 
+Only available when \code{scale_species = TURE}.}
 
 \item{\code{...}}{parameters passed to \code{vegan::rda} function when \code{ordination = "PCA"}, 
 or \code{vegan::decorana} function when \code{ordination = "DCA"}, 
@@ -201,7 +205,13 @@ Plot the ordination result.
   ellipse_level = 0.9,
   ellipse_type = "t",
   NMDS_stress_pos = c(1, 1),
-  NMDS_stress_text_prefix = ""
+  NMDS_stress_text_prefix = "",
+  loading_arrow = FALSE,
+  loading_taxa_num = 10,
+  loading_text_color = "black",
+  loading_arrow_color = "grey30",
+  loading_text_size = 3,
+  loading_text_italic = FALSE
 )}\if{html}{\out{</div>}}
 }
 
@@ -254,6 +264,18 @@ and the y-axis position is equal to \code{max(points of y axis) * NMDS_stress_po
 \code{NMDS_stress_pos = NULL} denotes no stress text to show.}
 
 \item{\code{NMDS_stress_text_prefix}}{default ""; If NMDS_stress_pos is not NULL, this parameter can be used to add text in front of the stress value.}
+
+\item{\code{loading_arrow}}{default FALSE; whether show the loading using arrow.}
+
+\item{\code{loading_taxa_num}}{default 10; the number of taxa used for the loading. Only available when \code{loading_arrow = TRUE}.}
+
+\item{\code{loading_text_color}}{default "black"; the color of taxa text. Only available when \code{loading_arrow = TRUE}.}
+
+\item{\code{loading_arrow_color}}{default "grey30"; the color of taxa arrow. Only available when \code{loading_arrow = TRUE}.}
+
+\item{\code{loading_text_size}}{default 3; the size of taxa text. Only available when \code{loading_arrow = TRUE}.}
+
+\item{\code{loading_text_italic}}{default FALSE; whether using italic for the taxa text. Only available when \code{loading_arrow = TRUE}.}
 }
 \if{html}{\out{</div>}}
 }
