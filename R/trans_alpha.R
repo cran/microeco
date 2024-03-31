@@ -29,9 +29,18 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					message("The alpha_diversity in dataset not found! Calculate it automatically ...")
 					dataset$cal_alphadiv()
 				}
-				data_alpha <- dataset$alpha_diversity %>% 
-					cbind.data.frame(Sample = rownames(.), ., stringsAsFactors = FALSE) %>%
-					.[, !grepl("^se", colnames(.))] %>%
+				data_alpha <- dataset$alpha_diversity %>% .[, !grepl("^se", colnames(.)), drop = FALSE]
+				tmp_filter <- c()
+				for(i in colnames(data_alpha)){
+					if(any(is.nan(data_alpha[, i]))){
+						tmp_filter %<>% c(., i)
+					}
+				}
+				if(length(tmp_filter) > 0){
+					message("NaN is found for index ", paste(tmp_filter, collapse = " "), "! Filtering ...")
+					data_alpha %<>% .[, ! colnames(.) %in% tmp_filter, drop = FALSE]
+				}
+				data_alpha %<>% cbind.data.frame(Sample = rownames(.), ., stringsAsFactors = FALSE) %>%
 					reshape2::melt(id.vars = "Sample") %>%
 					`colnames<-`(c("Sample", "Measure", "Value")) %>%
 					dplyr::left_join(., rownames_to_column(dataset$sample_table), by = c("Sample" = "rowname"))
@@ -234,6 +243,9 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				for(k in measure){
 					if(is.null(by_group)){
 						div_table <- data_alpha[data_alpha$Measure == k, c(group, "Value")]
+						if(private$check_skip_comp(div_table, k, by_group)){
+							next
+						}
 						tmp_res <- private$kdunn_test(input_table = div_table, group = group, measure = k, KW_dunn_letter = KW_dunn_letter, 
 							p_adjust_method = p_adjust_method, alpha = alpha, ...)
 						compare_result %<>% rbind(., tmp_res)
@@ -242,6 +254,9 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 							div_table <- data_alpha[data_alpha$Measure == k & all_bygroups == each_group, c(by_group, group, "Value")]
 							if(length(unique(as.character(div_table[, group]))) < 3){
 								message("Skip the by_group: ", each_group, " as groups number < 3!")
+								next
+							}
+							if(private$check_skip_comp(div_table, k, by_group, each_group)){
 								next
 							}
 							tmp_res <- private$kdunn_test(input_table = div_table, group = group, measure = k, KW_dunn_letter = KW_dunn_letter, 
@@ -902,7 +917,12 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			use_method <- "Dunn's Kruskal-Wallis Multiple Comparisons"
 			raw_groups <- input_table[, group]
 			if(any(grepl("-", raw_groups))){
-				input_table[, group] %<>% gsub("-", "sub&&&sub", ., fixed = TRUE)
+				input_table[, group] %<>% gsub("-", "sub&hyphen&sub", ., fixed = TRUE)
+			}
+			if(KW_dunn_letter){
+				if(any(grepl("\\s", raw_groups))){
+					input_table[, group] %<>% gsub(" ", "&space&", ., fixed = TRUE)
+				}
 			}
 			orderd_groups <- tapply(input_table[, "Value"], input_table[, group], median) %>% sort(decreasing = TRUE) %>% names
 			input_table[, group] %<>% factor(., levels = orderd_groups)
@@ -925,12 +945,15 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			tmp <- combn(orderd_groups, 2) %>% t %>% as.data.frame %>% apply(., 1, function(x){paste0(x, collapse = " - ")})
 			dunnTest_table <- dunnTest_table[match(tmp, dunnTest_table$Comparison), ]
 			if(KW_dunn_letter){
-				dunnTest_final <- rcompanion::cldList(P.adj ~ Comparison, data = dunnTest_table, threshold = alpha,
-					remove.space = TRUE, remove.equal = FALSE, remove.zero = FALSE)
+				dunntest_final <- rcompanion::cldList(P.adj ~ Comparison, data = dunnTest_table, threshold = alpha,
+					remove.space = TRUE, remove.equal = FALSE, remove.zero = FALSE, swap.colon = FALSE, swap.vs = FALSE)
 				if(any(grepl("-", raw_groups))){
-					dunnTest_final$Group %<>% gsub("sub&&&sub", "-", ., fixed = TRUE)
+					dunntest_final$Group %<>% gsub("sub&hyphen&sub", "-", ., fixed = TRUE)
 				}
-				dunnTest_res <- data.frame(Measure = measure, Test_method = use_method, dunnTest_final)
+				if(any(grepl("\\s", raw_groups))){
+					dunntest_final$Group %<>% gsub("&space&", " ", .)
+				}
+				dunnTest_res <- data.frame(Measure = measure, Test_method = use_method, dunntest_final)
 			}else{
 				max_group <- lapply(dunnTest_table$Comparison, function(x){
 					group_select <- unlist(strsplit(x, split = " - "))
@@ -938,8 +961,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					private$group_value_compare(table_compare_select$Value, table_compare_select[, group], median)
 				}) %>% unlist
 				if(any(grepl("-", raw_groups))){
-					dunnTest_table$Comparison %<>% gsub("sub&&&sub", "-", ., fixed = TRUE)
-					max_group %<>% gsub("sub&&&sub", "-", ., fixed = TRUE)
+					dunnTest_table$Comparison %<>% gsub("sub&hyphen&sub", "-", ., fixed = TRUE)
+					max_group %<>% gsub("sub&hyphen&sub", "-", ., fixed = TRUE)
 				}
 				dunnTest_res <- data.frame(Measure = measure, Test_method = use_method, Group = max_group, dunnTest_table)
 			}
@@ -964,6 +987,18 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				"NA"
 			}else{
 				group_values %>% {.[which.max(.)]} %>% names
+			}
+		},
+		check_skip_comp = function(longdata, variable, by_group, by_group_var = NULL){
+			if(length(unique(longdata$Value)) == 1){
+				if(is.null(by_group)){
+					message("Only one value is found! Skip ", variable, " ...")
+				}else{
+					message("Only one value is found! Skip ", variable, " for ", by_group, ": ", by_group_var," ...")
+				}
+				TRUE
+			}else{
+				FALSE
 			}
 		}
 	),

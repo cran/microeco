@@ -641,7 +641,7 @@ microtable <- R6Class(classname = "microtable",
 		#'   The default NULL represents that all the measures are calculated. 'Shannon', 'Simpson' and 'InvSimpson' are calculated based on \code{vegan::diversity} function;
 		#'   'Chao1' and 'ACE' depend on the function \code{vegan::estimateR}.
 		#'   'Fisher' index relies on the function \code{vegan::fisher.alpha}.
-		#'   "Observed" means the observed species number in the community.
+		#'   "Observed" means the observed species number in a community, i.e. richness.
 		#'   "Coverage" represents good's coverage. It is defined:
 		#' 	   	     \deqn{Coverage = 1 - \frac{f1}{n}} 
 		#'    where \emph{n} is the total abundance of a sample, and \emph{f1} is the number of singleton (species with abundance 1) in the sample.
@@ -675,7 +675,12 @@ microtable <- R6Class(classname = "microtable",
 			outlist <- vector("list")
 			estimRmeas <- c("Chao1", "Observed", "ACE")
 			if(any(estimRmeas %in% use_measures)){
-				outlist <- c(outlist, list(t(data.frame(vegan::estimateR(OTU), check.names = FALSE))))
+				est <- tryCatch(vegan::estimateR(OTU), error = function(e){c("Skip 'Chao1', 'ACE' and 'Observed' ...")})
+				if(is.numeric(est)){
+					outlist <- c(outlist, list(t(data.frame(est, check.names = FALSE))))
+				}else{
+					message(est)
+				}
 			}
 			if("Shannon" %in% use_measures){
 				outlist <- c(outlist, list(shannon = vegan::diversity(OTU, index = "shannon")))
@@ -735,8 +740,8 @@ microtable <- R6Class(classname = "microtable",
 		#' Calculate beta diversity dissimilarity matrix, such as Bray-Curtis, Jaccard, and UniFrac.
 		#' See An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035> and Lozupone et al. (2005) <doi:10.1128/AEM.71.12.8228–8235.2005>.
 		#'
-		#' @param method default NULL; a character vector with one or more elements; "bray" and "jaccard" are used when \code{method = NULL}; 
-		#'   see the \code{method} parameter in \code{\link{vegdist}} function for more available options. 
+		#' @param method default NULL; a character vector with one or more elements; \code{c("bray", "jaccard")} is used when \code{method = NULL}; 
+		#'   See the \code{method} parameter in \code{\link{vegdist}} function for more available options, such as 'aitchison' and 'robust.aitchison'. 
 		#' @param unifrac default FALSE; whether UniFrac indexes (weighted and unweighted) are calculated. Phylogenetic tree is necessary when \code{unifrac = TRUE}.
 		#' @param binary default FALSE; Whether convert abundance to binary data (presence/absence) when \code{method} is not "jaccard". 
 		#'   TRUE is used for "jaccard" automatically.
@@ -754,16 +759,24 @@ microtable <- R6Class(classname = "microtable",
 			if(is.null(method)){
 				method <- c("bray", "jaccard")
 			}
+			vegdist_methods <- c("manhattan", "euclidean", "canberra", "bray", "kulczynski", "gower", "morisita", "horn", "mountford", 
+				"jaccard", "raup", "binomial", "chao", "altGower", "cao", "mahalanobis", "clark", "chisq", "chord", "hellinger", 
+				"aitchison", "robust.aitchison")
 			for(i in method){
+				i <- match.arg(i, vegdist_methods)
 				if(i == "jaccard"){
 					binary_use <- TRUE
 				}else{
 					binary_use <- binary
 				}
+				if(i == "aitchison"){
+					if(any(eco_table == 0)){
+						eco_table <- eco_table + 1
+					}
+				}
 				res[[i]] <- as.matrix(vegan::vegdist(eco_table, method = i, binary = binary_use, ...))
 			}
-			
-			if(unifrac == T){
+			if(unifrac){
 				if(is.null(self$phylo_tree)){
 					stop("No phylogenetic tree provided, please change the parameter unifrac to FALSE")
 				}
