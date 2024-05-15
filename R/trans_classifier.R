@@ -14,15 +14,15 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 		#' Create the trans_classifier object.
 		#' 
 		#' @param dataset the object of \code{\link{microtable}} Class.
-		#' @param x.predictors default "all"; character string or data.frame; a character string represents selecting the corresponding data from microtable$taxa_abund; 
+		#' @param x.predictors default "Genus"; character string or data.frame; a character string represents selecting the corresponding data from microtable$taxa_abund; 
 		#'   data.frame represents other customized input. See the following available options:
 		#'   \describe{
-		#'     \item{\strong{'all'}}{use all the taxa stored in microtable$taxa_abund}
 		#'     \item{\strong{'Genus'}}{use Genus level table in microtable$taxa_abund, or other specific taxonomic rank, e.g. 'Phylum'}
+		#'     \item{\strong{'all'}}{use all the taxa stored in microtable$taxa_abund}
 		#'     \item{\strong{other input}}{must be a data.frame; It should have the same format with the data.frame in microtable$taxa_abund, i.e. rows are features; 
 		#'       cols are samples with same names in sample_table}
 		#'   }
-		#' @param y.response default NULL; the response variable in sample_table.
+		#' @param y.response default NULL; the response variable in \code{sample_table} of input \code{microtable} object.
 		#' @param n.cores default 1; the CPU thread used.
 		#' @return data_feature and data_response in the object.
 		#' @examples
@@ -33,8 +33,8 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 		#' 		x.predictors = "Genus",
 		#' 		y.response = "Group")
 		#' }
-		initialize = function(dataset = NULL,
-				x.predictors = "all",
+		initialize = function(dataset,
+				x.predictors = "Genus",
 				y.response = NULL,
 				n.cores = 1
 			){
@@ -44,9 +44,9 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 				stop("No y.response provided!")
 			}
 			if(!y.response %in% colnames(sampleinfo)){
-				stop("Input y.response must be dataset$sample_table!")
+				stop("Input y.response must be a column name of dataset$sample_table!")
 			}
-			# parse y.response
+			
 			response_data <- sampleinfo[, y.response]
 			if(is.numeric(response_data)){
 				self$type <- "Regression"
@@ -73,12 +73,20 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 				self$data_MapNames <- MapNames
 				self$data_response <- ClassNames
 			}
-			
 			# x.predictors must be character or data.frame
 			if(is.character(x.predictors)){
+				if(is.null(dataset$taxa_abund)){
+					message("No taxa_abund found in the dataset. Calculate the relative abundance ...")
+					dataset$cal_abund()
+				}
 				if (grepl("all", x.predictors, ignore.case = TRUE)) {
 					abund_table <- do.call(rbind, unname(dataset$taxa_abund))
 				}else{
+					if(! x.predictors %in% names(dataset$taxa_abund)){
+						message("x.predictors is not found in the taxa_abund list. Use the features in otu_table ...")
+						dataset$add_rownames2taxonomy(use_name = x.predictors)
+						suppressMessages(dataset$cal_abund())
+					}
 					abund_table <- dataset$taxa_abund[[x.predictors]]
 				}
 			}else{
@@ -109,7 +117,7 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 		#' Pre-process (centering, scaling etc.) of the feature data based on the caret::preProcess function. 
 		#' 	 See \href{https://topepo.github.io/caret/pre-processing.html}{https://topepo.github.io/caret/pre-processing.html} for more details.
 		#' 
-		#' @param ... parameters pass to preProcess function of caret package.
+		#' @param ... parameters pass to \code{preProcess} function of caret package.
 		#' @return converted data_feature in the object.
 		#' @examples
 		#' \dontrun{
@@ -129,7 +137,7 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 		#' @param boruta.maxRuns default 300; maximal number of importance source runs; passed to the maxRuns parameter in Boruta function of Boruta package.
 		#' @param boruta.pValue default 0.01; p value passed to the pValue parameter in Boruta function of Boruta package.
 		#' @param boruta.repetitions default 4; repetition runs for the feature selection.
-		#' @param ... parameters pass to Boruta function of Boruta package.
+		#' @param ... parameters pass to \code{Boruta} function of Boruta package.
 		#' @return optimized data_feature in the object.
 		#' @examples
 		#' \dontrun{
@@ -173,16 +181,14 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 		#' @description
 		#' Split data for training and testing.
 		#' 
-		#' @param prop.train default 3/4; the ratio of the dataset used for the training.
+		#' @param prop.train default 3/4; the ratio of the data used for the training.
 		#' @return data_train and data_test in the object.
 		#' @examples
 		#' \dontrun{
 		#' t1$cal_split(prop.train = 3/4)
 		#' }
 		cal_split = function(prop.train = 3/4){
-			###################### ----------------
 			######################    DATA SPLIT: TRAIN and TEST
-			######################
 			message("Creating training set and testing set ...")
 			data_response <- self$data_response
 			if(self$type == "Classification"){
@@ -196,9 +202,7 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 			test_data <- rsample::testing(SplitData)
 			message("Stratified sampling with the proportion of ", prop.train*100 ,"% for the training set ...")
 
-			###################### 
 			######################    DATA SPLIT end
-			###################### ----------------
 			self$data_train <- train_data
 			self$data_test <- test_data
 			message("Training and testing data are stored in object$data_train and object$data_test respectively ...")
@@ -561,6 +565,31 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 				theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
 				theme(legend.title = element_blank())
 			p
+		},
+		#' @description
+		#' Use caretList function of caretEnsemble package to run multiple models. For the available models, please run \code{names(getModelInfo())}.
+		#' 
+		#' @param ... parameters pass to \code{caretList} function of caretEnsemble package.
+		#' @return res_caretList_models object.
+		#' @examples
+		#' \dontrun{
+		#' t1$cal_caretList(methodList = c('rf', 'svmRadial'))
+		#' }
+		cal_caretList = function(
+			...
+			){
+			if(!require(caretEnsemble)){
+				stop("Please first install caretEnsemble package from CRAN!")
+			}
+			if(is.null(self$trainControl)){
+				stop("Please first run set_trainControl function!")
+			}
+			use_trainControl <- self$trainControl
+			train_data <- self$data_train
+			
+			models <- caretList(Response ~ ., data = train_data, trControl = use_trainControl, ...)
+			self$res_caretList_models <- models
+			message('Models are stored in object$res_caretList_models ...')
 		}
 	),
 	lock_class = FALSE,

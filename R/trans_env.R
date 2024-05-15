@@ -102,7 +102,14 @@ trans_env <- R6Class(classname = "trans_env",
 		#'     	  For multi-factor anova, see \code{aov}}
 		#'     \item{\strong{'scheirerRayHare'}}{Scheirer Ray Hare test for nonparametric test used for a two-way factorial experiment; 
 		#'     	  see \code{scheirerRayHare} function of \code{rcompanion} package}
-		#'     \item{\strong{'lme'}}{lme: Linear Mixed Effect Model based on the \code{lmerTest} package}
+		#'     \item{\strong{'lm'}}{Linear model based on the \code{lm} function}
+		#'     \item{\strong{'lme'}}{lme: Linear Mixed Effect Model based on the \code{lmerTest} package. 
+		#'     	  The \code{formula} parameter should be provided.}
+		#'     \item{\strong{'glmm'}}{Generalized linear mixed model (GLMM) based on the glmmTMB package. 
+		#'     	  The \code{formula} and \code{family} parameters are needed. 
+		#'     	  Please refer to glmmTMB package to select the family function, e.g. \code{family = glmmTMB::lognormal(link = "log")}.
+		#'     	  The usage of formula is similar with that in 'lme' method.
+		#'     	  For the details of return table, please refer to the help document of trans_diff class.}
 		#'   }
 		#' @param ... parameters passed to \code{cal_diff} function of \code{\link{trans_alpha}} class.
 		#' @return \code{res_diff} stored in the object.
@@ -113,8 +120,8 @@ trans_env <- R6Class(classname = "trans_env",
 		#' t1$cal_diff(group = "Group", method = "KW")
 		#' t1$cal_diff(group = "Group", method = "anova")
 		#' }
-		cal_diff = function(group = NULL, by_group = NULL, method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lme")[1], ...){
-			if(is.null(group) & ! method %in% c("anova", "scheirerRayHare")){
+		cal_diff = function(group = NULL, by_group = NULL, method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lm", "lme", "glmm")[1], ...){
+			if(is.null(group) & ! method %in% c("anova", "scheirerRayHare", "lm", "lme", "glmm")){
 				stop("The group parameter is necessary for the method: ", method, "!")
 			}
 			if(!is.null(group)){
@@ -808,13 +815,10 @@ trans_env <- R6Class(classname = "trans_env",
 		#' 	  please see the example.
 		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options.
 		#' 	  \code{p_adjust_method = "none"} can disable the p value adjustment.
-		#' @param p_adjust_type default "All"; "All", "Type", "Taxa" or "Env"; P value adjustment type.
+		#' @param p_adjust_type default "All"; "All", "Taxa" or "Env"; P value adjustment type.
 		#' 	  "Env": adjustment for each environmental variable separately; 
 		#' 	  "Taxa": adjustment for each taxon separately; 
-		#' 	  "Type": adjustment according to the groups provided. If \code{by_group} is NULL, adjustment is performed for all the data together.
-		#' 	  If \code{by_group} is provided, for each group in it separately.
-		#' 	  These three options are the first three colnames of return table \code{res_cor}.
-		#' 	  "All": adjustment for all the data together no matter whether \code{by_group} is provided. If \code{by_group} is NULL, it is same with the "Type" option.
+		#' 	  "All": adjustment for all the data together no matter whether \code{by_group} is provided.
 		#' @param by_group default NULL; one column name or number in sample_table; calculate correlations for different groups separately.
 		#' @param group_use default NULL; numeric or character vector to select one column in sample_table for selecting samples; together with group_select.
 		#' @param group_select default NULL; the group name used; remain samples within the group.
@@ -828,7 +832,6 @@ trans_env <- R6Class(classname = "trans_env",
 		#' t2 <- trans_diff$new(dataset = dataset, method = "rf", group = "Group", rf_taxa_level = "Genus")
 		#' t1 <- trans_env$new(dataset = dataset, add_data = env_data_16S[, 4:11])
 		#' t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_diff$Taxa[1:40])
-		#' t1$cal_cor(use_data = "other", p_adjust_type = "Env", other_taxa = t2$res_diff$Taxa[1:40])
 		#' }
 		cal_cor = function(
 			use_data = c("Genus", "all", "other")[1],
@@ -838,7 +841,7 @@ trans_env <- R6Class(classname = "trans_env",
 			use_taxa_num = NULL,
 			other_taxa = NULL,
 			p_adjust_method = "fdr",
-			p_adjust_type = c("All", "Type", "Taxa", "Env")[1],
+			p_adjust_type = c("All", "Taxa", "Env")[1],
 			by_group = NULL,
 			group_use = NULL,
 			group_select = NULL,
@@ -922,7 +925,7 @@ trans_env <- R6Class(classname = "trans_env",
 				}
 				fit_data <- Maaslin2::Maaslin2(save_abund_table, save_env_data, output = tmp_output_maaslin2, ...)
 				res <- fit_data$results
-				res <- data.frame(Type = "All", res)
+				res <- data.frame(by_group = "All", res)
 				colnames(res)[colnames(res) == "feature"] <- "Taxa"
 				colnames(res)[colnames(res) == "metadata"] <- "Env"
 				colnames(res)[colnames(res) == "pval"] <- "Pvalue"
@@ -943,14 +946,14 @@ trans_env <- R6Class(classname = "trans_env",
 					}
 				)
 				res %<>% t %>% as.data.frame(stringsAsFactors = FALSE)
-				colnames(res) <- c("Type", "Taxa", "Env", "Correlation","Pvalue")
+				colnames(res) <- c("by_group", "Taxa", "Env", "Correlation","Pvalue")
 				res$Pvalue %<>% as.numeric
 				res$Correlation %<>% as.numeric
 				res$AdjPvalue <- rep(0, nrow(res))
 				if(p_adjust_type == "All"){
 					res$AdjPvalue <- p.adjust(res$Pvalue, method = p_adjust_method)
 				}else{
-					choose_col <- which(c("Type", "Taxa", "Env") %in% p_adjust_type)
+					choose_col <- which(c("Taxa", "Env") %in% p_adjust_type)
 					comb_names2 <- comb_names[choose_col, ] %>% t %>% as.data.frame %>% unique %>% t %>% as.data.frame(stringsAsFactors = FALSE)
 					# p value adjustment separately
 					for(i in seq_len(ncol(comb_names2))){
@@ -987,6 +990,10 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param text_x_order default NULL; character vector; provide customized text order for x axis.
 		#' @param xtext_angle default 30; number ranging from 0 to 90; used to adjust x axis text angle. 
 		#' @param xtext_size default 10; x axis text size.
+		#' @param xtext_color default "black"; x axis text color.
+		#' @param ytext_size default NULL; y axis text size. NULL means default ggplot2 value.
+		#' @param ytext_color default "black"; y axis text color.
+		#' @param sig_label_size default 4; the size of significance label shown in the cell.
 		#' @param font_family default NULL; font family used in \code{ggplot2}; only available when \code{pheatmap = FALSE}.
 		#' @param cluster_ggplot default "none"; add clustering dendrogram for \code{ggplot2} based heatmap. Available options: "none", "row", "col" or "both". 
 		#'   "none": no any clustering used; "row": add clustering for rows; "col": add clustering for columns; "both": add clustering for both rows and columns.
@@ -1017,6 +1024,10 @@ trans_env <- R6Class(classname = "trans_env",
 			text_x_order = NULL,
 			xtext_angle = 30,
 			xtext_size = 10,
+			xtext_color = "black",
+			ytext_size = NULL,
+			ytext_color = "black",			
+			sig_label_size = 4,
 			font_family = NULL,
 			cluster_ggplot = "none",
 			cluster_height_rows = 0.2,
@@ -1076,10 +1087,10 @@ trans_env <- R6Class(classname = "trans_env",
 			if(keep_prefix == F){
 				use_data$Taxa %<>% gsub(".*__", "", .)
 			}
-			if(pheatmap & length(unique(use_data$Type)) > 1){
-				use_data[, xvalue] <- paste0(use_data$Type, ": ", use_data[, xvalue])
+			if(pheatmap & length(unique(use_data$by_group)) > 1){
+				use_data[, xvalue] <- paste0(use_data$by_group, ": ", use_data[, xvalue])
 			}
-			if(length(unique(use_data$Type)) == 1 | pheatmap){
+			if(length(unique(use_data$by_group)) == 1 | pheatmap){
 				clu_data <- reshape2::dcast(use_data, formula = reformulate(xvalue, "Taxa"), value.var = cell_value) %>% 
 					`row.names<-`(.[,1]) %>% 
 					.[, -1, drop = FALSE]
@@ -1172,14 +1183,15 @@ trans_env <- R6Class(classname = "trans_env",
 				}
 				legend_fill <- ifelse(self$cor_method == "maaslin2", paste0("maaslin2\ncoef"), paste0(toupper(substring(self$cor_method, 1, 1)), substring(self$cor_method, 2)))
 				
-				p <- p + geom_text(aes(label = Significance), color = "black", size = 4) + 
+				p <- p + geom_text(aes(label = Significance), color = "black", size = sig_label_size) + 
 					labs(y = NULL, x = "Measure", fill = legend_fill) +
 					theme(strip.background = element_rect(fill = "grey85", colour = "white"), axis.title = element_blank()) +
 					theme(strip.text = element_text(size = 11), panel.border = element_blank(), panel.grid = element_blank())
-				p <- p + ggplot_xtext_anglesize(xtext_angle, xtext_size)
+				p <- p + ggplot_xtext_anglesize(xtext_angle, xtext_size, text_color = xtext_color) +
+					theme(axis.text.y = element_text(colour = ytext_color, size = ytext_size))
 				p <- p + scale_y_discrete(limits = lim_y, position = text_y_position) + scale_x_discrete(limits = lim_x)
 				
-				if(length(unique(use_data$Type)) == 1){
+				if(length(unique(use_data$by_group)) == 1){
 					if(cluster_ggplot != "none"){
 						if(cluster_ggplot %in% c("row", "both")){
 							row_plot <- ggtree::ggtree(row_cluster, hang = 0)
@@ -1191,7 +1203,7 @@ trans_env <- R6Class(classname = "trans_env",
 						}
 					}
 				}else{
-					p <- p + facet_grid(. ~ Type, drop = TRUE, scale = "free", space = "free_x")
+					p <- p + facet_grid(. ~ by_group, drop = TRUE, scale = "free", space = "free_x")
 				}
 				if(ylab_type_italic == T){
 					p <- p + theme(axis.text.y = element_text(face = 'italic'))

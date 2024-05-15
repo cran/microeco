@@ -51,7 +51,7 @@ d1$filter_taxa(rel_abund = 0.0001, freq = 0.2)
 ## ------------------------------------------------
 
 \donttest{
-m1$rarefy_samples(sample.size = min(m1$sample_sums()), replace = TRUE)
+m1$rarefy_samples(sample.size = min(m1$sample_sums()))
 }
 
 ## ------------------------------------------------
@@ -330,27 +330,21 @@ d1$filter_taxa(rel_abund = 0.0001, freq = 0.2)
 \if{html}{\out{<a id="method-microtable-rarefy_samples"></a>}}
 \if{latex}{\out{\hypertarget{method-microtable-rarefy_samples}{}}}
 \subsection{Method \code{rarefy_samples()}}{
-Rarefy communities to make all samples have same feature number.
+Rarefy communities to make all samples have same count number.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{microtable$rarefy_samples(
-  method = c("rarefying", "SRS")[1],
-  sample.size = NULL,
-  rngseed = 123,
-  replace = TRUE
-)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{microtable$rarefy_samples(method = c("rarefy", "SRS")[1], sample.size, ...)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{method}}{default c("rarefying", "SRS")[1]; "rarefying" represents the classical resampling like \code{\link{rrarefy}} function of \code{vegan} package.
+\item{\code{method}}{default c("rarefy", "SRS")[1]; "rarefy" represents the classical resampling like \code{\link{rrarefy}} function of \code{vegan} package.
 "SRS" is scaling with ranked subsampling method based on the SRS package provided by Lukas Beule and Petr Karlovsky (2020) <DOI:10.7717/peerj.9593>.}
 
-\item{\code{sample.size}}{default NULL; feature number, If not provided, use minimum number of all samples.}
+\item{\code{sample.size}}{default NULL; libray size. If not provided, use the minimum number across all samples. 
+For "SRS" method, this parameter is passed to \code{Cmin} parameter of \code{SRS} function of SRS package.}
 
-\item{\code{rngseed}}{default 123; random seed.}
-
-\item{\code{replace}}{default TRUE; see \code{\link{sample}} for the random sampling; Available when \code{method = "rarefying"}.}
+\item{\code{...}}{parameters pass to \code{norm} function of \code{\link{trans_norm}} class.}
 }
 \if{html}{\out{</div>}}
 }
@@ -360,7 +354,7 @@ None; rarefied dataset.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
-m1$rarefy_samples(sample.size = min(m1$sample_sums()), replace = TRUE)
+m1$rarefy_samples(sample.size = min(m1$sample_sums()))
 }
 }
 \if{html}{\out{</div>}}

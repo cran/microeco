@@ -113,6 +113,14 @@ t1$cal_ROC()
 \dontrun{
 t1$plot_ROC(size = 1, alpha = 0.7)
 }
+
+## ------------------------------------------------
+## Method `trans_classifier$cal_caretList`
+## ------------------------------------------------
+
+\dontrun{
+t1$cal_caretList(methodList = c('rf', 'svmRadial'))
+}
 }
 \section{Methods}{
 \subsection{Public methods}{
@@ -129,6 +137,7 @@ t1$plot_ROC(size = 1, alpha = 0.7)
 \item \href{#method-trans_classifier-plot_confusionMatrix}{\code{trans_classifier$plot_confusionMatrix()}}
 \item \href{#method-trans_classifier-cal_ROC}{\code{trans_classifier$cal_ROC()}}
 \item \href{#method-trans_classifier-plot_ROC}{\code{trans_classifier$plot_ROC()}}
+\item \href{#method-trans_classifier-cal_caretList}{\code{trans_classifier$cal_caretList()}}
 \item \href{#method-trans_classifier-clone}{\code{trans_classifier$clone()}}
 }
 }
@@ -139,8 +148,8 @@ t1$plot_ROC(size = 1, alpha = 0.7)
 Create the trans_classifier object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$new(
-  dataset = NULL,
-  x.predictors = "all",
+  dataset,
+  x.predictors = "Genus",
   y.response = NULL,
   n.cores = 1
 )}\if{html}{\out{</div>}}
@@ -151,16 +160,16 @@ Create the trans_classifier object.
 \describe{
 \item{\code{dataset}}{the object of \code{\link{microtable}} Class.}
 
-\item{\code{x.predictors}}{default "all"; character string or data.frame; a character string represents selecting the corresponding data from microtable$taxa_abund; 
+\item{\code{x.predictors}}{default "Genus"; character string or data.frame; a character string represents selecting the corresponding data from microtable$taxa_abund; 
 data.frame represents other customized input. See the following available options:
 \describe{
-  \item{\strong{'all'}}{use all the taxa stored in microtable$taxa_abund}
   \item{\strong{'Genus'}}{use Genus level table in microtable$taxa_abund, or other specific taxonomic rank, e.g. 'Phylum'}
+  \item{\strong{'all'}}{use all the taxa stored in microtable$taxa_abund}
   \item{\strong{other input}}{must be a data.frame; It should have the same format with the data.frame in microtable$taxa_abund, i.e. rows are features; 
     cols are samples with same names in sample_table}
 }}
 
-\item{\code{y.response}}{default NULL; the response variable in sample_table.}
+\item{\code{y.response}}{default NULL; the response variable in \code{sample_table} of input \code{microtable} object.}
 
 \item{\code{n.cores}}{default 1; the CPU thread used.}
 }
@@ -197,7 +206,7 @@ Pre-process (centering, scaling etc.) of the feature data based on the caret::pr
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{...}}{parameters pass to preProcess function of caret package.}
+\item{\code{...}}{parameters pass to \code{preProcess} function of caret package.}
 }
 \if{html}{\out{</div>}}
 }
@@ -239,7 +248,7 @@ Perform feature selection.
 
 \item{\code{boruta.repetitions}}{default 4; repetition runs for the feature selection.}
 
-\item{\code{...}}{parameters pass to Boruta function of Boruta package.}
+\item{\code{...}}{parameters pass to \code{Boruta} function of Boruta package.}
 }
 \if{html}{\out{</div>}}
 }
@@ -269,7 +278,7 @@ Split data for training and testing.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{prop.train}}{default 3/4; the ratio of the dataset used for the training.}
+\item{\code{prop.train}}{default 3/4; the ratio of the data used for the training.}
 }
 \if{html}{\out{</div>}}
 }
@@ -571,6 +580,36 @@ ggplot2 object.
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
 t1$plot_ROC(size = 1, alpha = 0.7)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_classifier-cal_caretList"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_classifier-cal_caretList}{}}}
+\subsection{Method \code{cal_caretList()}}{
+Use caretList function of caretEnsemble package to run multiple models. For the available models, please run \code{names(getModelInfo())}.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_caretList(...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{parameters pass to \code{caretList} function of caretEnsemble package.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+res_caretList_models object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$cal_caretList(methodList = c('rf', 'svmRadial'))
 }
 }
 \if{html}{\out{</div>}}

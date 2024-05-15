@@ -39,6 +39,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'     \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallace and generalized linear model (glm) test with \code{ALDEx2} package; 
 		#'     	  see also the \code{test} parameter in \code{ALDEx2::aldex} function.}
 		#'     \item{\strong{'DESeq2'}}{Differential expression analysis based on the Negative Binomial (a.k.a. Gamma-Poisson) distribution based on the \code{DESeq2} package.}
+		#'     \item{\strong{'edgeR'}}{The \code{exactTest} method of \code{edgeR} package is implemented.}
 		#'     \item{\strong{'ancombc2'}}{Analysis of Compositions of Microbiomes with Bias Correction (ANCOM-BC) 
 		#'        based on the \code{ancombc2} function from \code{ANCOMBC} package.
 		#'        If the \code{fix_formula} parameter is not provided, the function can automatically assign it by using group parameter.
@@ -60,6 +61,9 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'     	  In the return table, the significance of fixed factors are tested by function \code{anova}.
 		#'     	  The significance of 'Estimate' in each term of fixed factors comes from the model.}
 		#'     \item{\strong{'glmm'}}{Generalized linear mixed model (GLMM) based on the \code{glmmTMB} package.
+		#'     	  The \code{formula} and \code{family} parameters are needed. 
+		#'     	  Please refer to glmmTMB package to select the family function, e.g. \code{family = glmmTMB::lognormal(link = "log")}.
+		#'     	  The usage of formula is similar with that in 'lme' method.
 		#'     	  For more available parameters, please see \code{glmmTMB::glmmTMB} function and use parameter passing.
 		#'     	  In the return table, Conditional_R2 and Marginal_R2 represent total variance (explained by both fixed and random effects) and the variance explained by 
 		#'     	  fixed effects, respectively. The significance of fixed factors are tested by Chi-square test from function \code{car::Anova}.
@@ -142,7 +146,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		initialize = function(
 			dataset = NULL,
 			method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lm",
-				"ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "linda", "maaslin2", "betareg", "lme", "glmm", "glmm_beta")[1],
+				"ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "edgeR", "linda", "maaslin2", "betareg", "lme", "glmm", "glmm_beta")[1],
 			group = NULL,
 			taxa_level = "all",
 			filter_thres = 0,
@@ -173,7 +177,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				message("Input dataset is NULL. Please run the functions with customized data ...")
 			}else{
 				method <- match.arg(method, c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", 
-					"anova", "scheirerRayHare", "lm", "ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "linda", "maaslin2", "betareg", "lme", "glmm", "glmm_beta"))
+					"anova", "scheirerRayHare", "lm", "ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "edgeR", "linda", "maaslin2", "betareg", "lme", "glmm", "glmm_beta"))
 
 				tmp_dataset <- clone(dataset)
 				sampleinfo <- tmp_dataset$sample_table
@@ -196,8 +200,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 						}
 					}
 				}
-
 				check_taxa_abund(tmp_dataset)
+				
 				if(grepl("all", taxa_level, ignore.case = TRUE)){
 					abund_table <- do.call(rbind, unname(tmp_dataset$taxa_abund))
 				}else{
@@ -477,13 +481,15 @@ trans_diff <- R6Class(classname = "trans_diff",
 					output$Significance <- generate_p_siglabel(output$P.adj, nonsig = "ns")
 				}
 				
-				if(method %in% c("metastat", "metagenomeSeq", "ALDEx2_t")){
+				if(method %in% c("metastat", "metagenomeSeq", "ALDEx2_t", "edgeR")){
+					tmp_dataset$sample_table %<>% dropallfactors
 					private$check_taxa_level_all(taxa_level)
 					if(is.null(group_choose_paired)){
 						all_name <- combn(unique(as.character(sampleinfo[, group])), 2)
 					}else{
 						all_name <- combn(unique(group_choose_paired), 2)
 					}
+					message("Total ", ncol(all_name), " paired group for test ...")
 					output <- data.frame()
 				}
 				if(method == "metastat"){
@@ -503,7 +509,6 @@ trans_diff <- R6Class(classname = "trans_diff",
 						.[,-1, drop = FALSE]
 					new_abund <- new_abund[order(apply(new_abund, 1, mean), decreasing = TRUE), rownames(sampleinfo), drop = FALSE]
 
-					message("Total ", ncol(all_name), " paired group for calculation ...")
 					for(i in 1:ncol(all_name)) {
 						message(paste0("Run ", i, " : ", paste0(as.character(all_name[,i]), collapse = " - "), " ..."))
 						use_data <- new_abund[ , unlist(lapply(as.character(all_name[,i]), function(x) which(as.character(sampleinfo[, group]) %in% x)))]
@@ -528,11 +533,10 @@ trans_diff <- R6Class(classname = "trans_diff",
 					if(!require("metagenomeSeq")){
 						stop("metagenomeSeq package not installed !")
 					}
-					message("Total ", ncol(all_name), " paired group for calculation ...")
 					for(i in 1:ncol(all_name)) {
-						message(paste0("Run ", i, " : ", paste0(as.character(all_name[,i]), collapse = " - "), " ...\n"))
+						message(paste0("Run ", i, " : ", paste0(as.character(all_name[, i]), collapse = " - "), " ...\n"))
 						use_dataset <- clone(tmp_dataset)
-						use_dataset$sample_table %<>% .[.[, group] %in% as.character(all_name[,i]), ]
+						use_dataset$sample_table %<>% .[.[, group] %in% as.character(all_name[, i]), , drop = FALSE]
 						newdata <- private$generate_microtable_unrel(use_dataset, taxa_level, filter_thres, filter_features)
 						obj <- newMRexperiment(
 							newdata$otu_table, 
@@ -542,7 +546,12 @@ trans_diff <- R6Class(classname = "trans_diff",
 						## Normalization and Statistical testing
 						obj_1 <- cumNorm(obj)
 						pd <- pData(obj)
-						colnames(pd)[which(colnames(pd) == group)] <- "Group"
+						if(group != "Group"){
+							if("Group" %in% colnames(pd)){
+								pd <- pd[, colnames(pd) != "Group", drop = FALSE]
+							}
+							colnames(pd)[which(colnames(pd) == group)] <- "Group"
+						}
 						mod <- model.matrix(~1 + Group, data = pd)
 						objres1 <- fitFeatureModel(obj_1, mod)
 						tb <- data.frame(logFC = objres1@fitZeroLogNormal$logFC, se = objres1@fitZeroLogNormal$se)
@@ -572,7 +581,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				}
 				if(method == "DESeq2"){
 					if(!require("DESeq2")){
-						stop("DESeq2 package not installed !")
+						stop("DESeq2 package is not installed !")
 					}
 					use_dataset <- clone(tmp_dataset)
 					newdata <- private$generate_microtable_unrel(use_dataset, taxa_level, filter_thres, filter_features)
@@ -621,17 +630,40 @@ trans_diff <- R6Class(classname = "trans_diff",
 					colnames(output)[colnames(output) == "pvalue"] <- "P.unadj"					
 					output <- output[, c("Comparison", "Taxa", colnames(output)[1:(ncol(output) - 2)])]
 				}
+				if(method == "edgeR"){
+					if(!require("edgeR")){
+						stop("edgeR package is not installed!")
+					}
+					for(i in 1:ncol(all_name)) {
+						message(paste0("Run ", i, " : ", paste0(as.character(all_name[,i]), collapse = " - "), " ...\n"))
+						use_dataset <- clone(tmp_dataset)
+						use_dataset$sample_table %<>% .[.[, group] %in% as.character(all_name[,i]), , drop = FALSE]
+						newdata <- private$generate_microtable_unrel(use_dataset, taxa_level, filter_thres, filter_features)
+						y <- DGEList(counts = newdata$otu_table, group = newdata$sample_table[, group])
+						z <- calcNormFactors(y)
+						z <- estimateTagwiseDisp(estimateCommonDisp(z))
+						res_raw <- exactTest(z)
+						st <- topTags(res_raw, n = nrow(newdata$otu_table), adjust.method = p_adjust_method, sort.by = "PValue")
+						res <- st@.Data[[1]]
+						colnames(res)[colnames(res) == "PValue"] <- "P.unadj"
+						colnames(res)[colnames(res) == "FDR"] <- "P.adj"
+						res <- cbind.data.frame(feature = rownames(res), res)
+						rownames(res) <- NULL
+						add_name <- paste0(as.character(all_name[, i]), collapse = " - ") %>% rep(., nrow(res))
+						res <- cbind.data.frame(compare = add_name, res)
+						output <- rbind.data.frame(output, res)
+					}
+				}
 				if(method %in% c("ALDEx2_t", "ALDEx2_kw")){
 					if(!require("ALDEx2")){
 						stop("ALDEx2 package is not installed !")
 					}
 				}
 				if(method == "ALDEx2_t"){
-					message("Total ", ncol(all_name), " paired group for test ...")				
 					for(i in 1:ncol(all_name)) {
 						message(paste0("Run ", i, " : ", paste0(as.character(all_name[,i]), collapse = " - "), " ...\n"))
 						use_dataset <- clone(tmp_dataset)
-						use_dataset$sample_table %<>% .[.[, group] %in% as.character(all_name[,i]), ]
+						use_dataset$sample_table %<>% .[.[, group] %in% as.character(all_name[,i]), , drop = FALSE]
 						newdata <- private$generate_microtable_unrel(use_dataset, taxa_level, filter_thres, filter_features)
 						res_raw <- ALDEx2::aldex(newdata$otu_table, newdata$sample_table[, group], test = "t", ...)
 						res <- cbind.data.frame(feature = rownames(res_raw), res_raw)
@@ -647,6 +679,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 						stop("Please provide the taxa_level instead of 'all', such as 'Genus' !")
 					}
 					use_dataset <- clone(tmp_dataset)
+					use_dataset$sample_table %<>% dropallfactors
 					newdata <- private$generate_microtable_unrel(use_dataset, taxa_level, filter_thres, filter_features)
 					res_raw <- ALDEx2::aldex(newdata$otu_table, newdata$sample_table[, group], test = "kw", ...)
 					res <- cbind.data.frame(feature = rownames(res_raw), res_raw)
@@ -784,7 +817,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 						colnames(res_abund)[colnames(res_abund) == group] <- "Group"
 					}
 				}
-				if(method %in% c("metagenomeSeq", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "linda")){
+				if(method %in% c("metagenomeSeq", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "edgeR", "linda")){
 					output %<>% dropallfactors(unfac2num = TRUE)
 					colnames(output)[1:2] <- c("Comparison", "Taxa")
 					if(group %in% colnames(sampleinfo)){
@@ -1368,7 +1401,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			annotation_shape = 22,
 			annotation_shape_size = 5
 			){
-			# developed based on microbiomeMarker 
+			# developed based on microbiomeMarker
 			abund_table <- self$abund_table
 			marker_table <- self$res_diff %>% dropallfactors
 			method <- self$method
@@ -1661,7 +1694,11 @@ trans_diff <- R6Class(classname = "trans_diff",
 
 			edges <- cbind(parent = index[match(nodes_parent, nodes)], child = index)
 			edges <- edges[!is.na(edges[, 1]), ]
-			# not label the tips
+			if(! inherits(edges, "matrix")){
+				stop("The parent and child nodes are not correctly recognized! ",
+					"Please try to use tidy_taxonomy function to tidy taxonomic table in your microtable object! Then rerun cal_abund function and trans_diff class!")
+			}
+			# donot label tips
 			node_label <- nodes[!is_tip]
 			phylo <- structure(list(
 				edge = edges, 

@@ -1,5 +1,5 @@
 #' @title
-#' Create \code{trans_abund} object for plotting taxonomic abundance.
+#' Create \code{trans_abund} object for taxonomic abundance visualization.
 #'
 #' @description
 #' This class is a wrapper for the taxonomic abundance transformations and visualization.
@@ -21,17 +21,17 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' @param delete_taxonomy_lineage default TRUE; whether delete the taxonomy lineage in front of the target level.
 		#' @param delete_taxonomy_prefix default TRUE; whether delete the prefix of taxonomy, such as "g__".
 		#' @param prefix default NULL; character string; available when \code{delete_taxonomy_prefix = T}; 
-		#'   default NULL reprensents using the "letter+__", e.g. "k__" for Phylum level;
+		#'   default NULL represents using the "letter+__", e.g. "k__" for Phylum level;
 		#'   Please provide the customized prefix when it is not standard, otherwise the program can not correctly recognize it.
 		#' @param use_percentage default TRUE; show the abundance percentage.
-		#' @param input_taxaname default NULL; character vector; input taxa names for selecting some taxa.
+		#' @param input_taxaname default NULL; character vector; input taxa names to select some taxa.
 		#' @param high_level default NULL; a taxonomic rank, such as "Phylum", used to add the taxonomic information of higher level.
 		#'   It is necessary for the legend with nested taxonomic levels in the bar plot.
 		#' @param high_level_fix_nsub default NULL; an integer, used to fix the number of selected abundant taxa in each taxon from higher taxonomic level.
 		#'   If the total number under one taxon of higher level is less than the high_level_fix_nsub, the total number will be used.
 		#'   When \code{high_level_fix_nsub} is provided, the taxa number of higher level is calculated as: \code{ceiling(ntaxa/high_level_fix_nsub)}.
 		#'   Note that \code{ntaxa} means either the parameter \code{ntaxa} or the taxonomic number obtained by filtering according to the \code{show} parameter.
-		#' @return \code{data_abund} stored in the object. The column 'all_mean_abund' reprensents mean relative abundance across all the samples.
+		#' @return \code{data_abund} stored in the object. The column 'all_mean_abund' represents mean relative abundance across all the samples.
 		#'   So the values in one taxon are all same across all the samples.
 		#'   If the sum of column 'Abundance' in one sample is larger than 1, the 'Abundance', 'SD' and 'SE' has been multiplied by 100.
 		#' @examples
@@ -112,7 +112,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 				}else{
 					extract_tax_table <- dataset$tax_table[, c(high_level, taxrank)] %>% unique
 					if(!delete_taxonomy_lineage){
-						stop("The delete_taxonomy_lineage should be FALSE when high_level is provided!")
+						stop("The delete_taxonomy_lineage should be TRUE when high_level is provided!")
 					}
 					if(delete_taxonomy_prefix){
 						extract_tax_table[, taxrank] %<>% gsub(prefix, "", .)
@@ -182,8 +182,9 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' Bar plot.
 		#'
 		#' @param color_values default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the bars.
-		#' @param bar_type default "full"; "full" or "notfull"; if \code{"full"}, total abundance are summed to 1 or 100 percentage.
-		#' @param others_color default "grey90"; the color for "others" taxa.
+		#' @param bar_full default TRUE; Whether the bar shows all the features (including 'Others'). 
+		#'    Default \code{TRUE} means total abundance are summed to 1 or 100 (percentage). \code{FALSE} means 'Others' will not be shown.
+		#' @param others_color default "grey90"; the color for "Others" taxa.
 		#' @param facet default NULL; a character vector for the facet; group column name of \code{sample_table}, such as, \code{"Group"};
 		#'    If multiple facets are needed, please provide ordered names, such as \code{c("Group", "Type")}.
 		#'    The latter should have a finer scale than the former one;
@@ -211,6 +212,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#'   To make it available, please assign \code{high_level} parameter when creating the object.
 		#' @param high_level_add_other default FALSE; whether add 'Others' (all the unknown taxa) in each taxon of higher taxonomic level.
 		#'   Only available when \code{ggnested = TRUE}.
+		#' @param ... Capture unknown parameters.
 		#' @return ggplot2 object. 
 		#' @examples
 		#' \donttest{
@@ -218,7 +220,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' }
 		plot_bar = function(
 			color_values = RColorBrewer::brewer.pal(8, "Dark2"),
-			bar_type = "full",
+			bar_full = TRUE,
 			others_color = "grey90",
 			facet = NULL,
 			order_x = NULL,
@@ -238,8 +240,18 @@ trans_abund <- R6Class(classname = "trans_abund",
 			ytitle_size = 17,
 			coord_flip = FALSE,
 			ggnested = FALSE,
-			high_level_add_other = FALSE
+			high_level_add_other = FALSE,
+			...
 			){
+			all_parameters <- c(as.list(environment()), list(...))
+			if("bar_type" %in% names(all_parameters)){
+				warning("Parameter bar_type is deprecated! Please use bar_full instead of it!")
+				if(all_parameters["bar_type"] == "full"){
+					bar_full <- TRUE
+				}else{
+					bar_full <- FALSE
+				}
+			}
 			plot_data <- self$data_abund
 			# try to filter useless columns
 			plot_data %<>% .[, ! colnames(.) %in% c("N", "SD", "SE", "Median", "Min", "Max", "quantile25", "quantile75", "all_mean_abund")]
@@ -257,9 +269,9 @@ trans_abund <- R6Class(classname = "trans_abund",
 					plot_data_merge <- plot_data[, ! colnames(plot_data) %in% c(self$high_level, "Taxonomy", "Abundance"), drop = FALSE] %>% unique
 					plot_data <- dplyr::left_join(new_data, plot_data_merge, by = c("Sample" = "Sample"))
 				}
-				bar_type <- "notfull"
+				bar_full <- FALSE
 			}
-			if(bar_type == "full"){
+			if(bar_full){
 				# make sure that taxonomy info are all in selected use_taxanames in case of special data
 				if(!all(plot_data$Taxonomy %in% use_taxanames)){
 					plot_data$Taxonomy[!plot_data$Taxonomy %in% use_taxanames] <- "Others"
@@ -327,7 +339,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 				}else{
 					p <- ggplot(plot_data, aes_meco(x = "Sample", y = "Abundance", fill = "Taxonomy"))
 				}
-				if(bar_type == "full"){
+				if(bar_full){
 					if(self$use_percentage == T){
 						p <- p + geom_bar(stat = "identity", position = "stack", show.legend = T, width = barwidth)
 					}else{
@@ -355,7 +367,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 				p <- p + theme(strip.background = element_rect(fill = facet_color, color = facet_color), strip.text = element_text(size=strip_text))
 				p <- p + scale_y_continuous(expand = c(0, 0.01))
 			}else{
-				if(bar_type == "full" & self$use_percentage == FALSE){
+				if(bar_full & self$use_percentage == FALSE){
 					p <- p + scale_y_continuous(limits = c(0, 1), expand = c(0, 0))
 				}else{
 					p <- p + scale_y_continuous(expand = c(0, 0))
@@ -483,7 +495,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 				if (is.null(plot_breaks)){
 					p <- p + scale_fill_gradientn(colours = color_values, trans = plot_colorscale, na.value = "#00008B", limits = c(min_abundance, max_abundance))
 				}else{
-					p <- p + scale_fill_gradientn(colours = color_values, trans = plot_colorscale, breaks=plot_breaks, na.value = "#00008B",
+					p <- p + scale_fill_gradientn(colours = color_values, trans = plot_colorscale, breaks = plot_breaks, na.value = "#00008B",
 						limits = c(min_abundance, max_abundance))
 				}
 				if(!is.null(facet)){

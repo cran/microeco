@@ -24,6 +24,10 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			if(is.null(dataset)){
 				message("Parameter dataset not provided. Please run the functions with your other customized data!")
 				self$data_alpha <- NULL
+				self$data_stat <- NULL
+				if(! is.null(group)){
+					stop("Parameter dataset is not provided, but group is provided!")
+				}
 			}else{
 				if(is.null(dataset$alpha_diversity)){
 					message("The alpha_diversity in dataset not found! Calculate it automatically ...")
@@ -44,6 +48,23 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					reshape2::melt(id.vars = "Sample") %>%
 					`colnames<-`(c("Sample", "Measure", "Value")) %>%
 					dplyr::left_join(., rownames_to_column(dataset$sample_table), by = c("Sample" = "rowname"))
+				if(!is.null(by_group)){
+					check_table_variable(data_alpha, by_group, "by_group", "dataset$sample_table")
+					if(is.factor(dataset$sample_table[, by_group])){
+						data_alpha[, by_group] %<>% factor(., levels = levels(dataset$sample_table[, by_group]))
+					}
+				}
+				if(! is.null(group)){
+					check_table_variable(data_alpha, group, "group", "dataset$sample_table")
+					self$data_stat <- microeco:::summarySE_inter(data_alpha, measurevar = "Value", groupvars = c(group, by_group, "Measure"))
+					message('The group statistics are stored in object$data_stat ...')
+					if(is.factor(dataset$sample_table[, group])){
+						data_alpha[, group] %<>% factor(., levels = levels(dataset$sample_table[, group]))
+					}
+				}else{
+					self$data_stat <- NULL
+				}
+				check_table_variable(data_alpha, by_ID, "by_ID", "dataset$sample_table")
 				if(!is.null(order_x)){
 					if(length(order_x == 1)){
 						data_alpha$Sample %<>% factor(., levels = unique(dataset$sample_table[, order_x]))
@@ -54,19 +75,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				self$data_alpha <- data_alpha
 				message('The transformed diversity data is stored in object$data_alpha ...')
 			}
-			check_table_variable(data_alpha, by_group, "by_group", "dataset$sample_table")
-			check_table_variable(data_alpha, by_ID, "by_ID", "dataset$sample_table")
 			
-			if(! is.null(group)){
-				if(is.null(dataset)){
-					stop("Parameter dataset not provided, but group is provided!")
-				}
-				check_table_variable(data_alpha, group, "group", "dataset$sample_table")
-				self$data_stat <- microeco:::summarySE_inter(data_alpha, measurevar = "Value", groupvars = c(group, by_group, "Measure"))
-				message('The group statistics are stored in object$data_stat ...')
-			}else{
-				self$data_stat <- NULL
-			}
 			self$group <- group
 			self$by_group <- by_group
 			self$by_ID <- by_ID
@@ -83,7 +92,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#'     \item{\strong{'anova'}}{Variance analysis. For one-way anova, the post hoc test is Duncan's new multiple range test 
 		#'     	  based on \code{duncan.test} function of \code{agricolae} package. Please use \code{anova_post_test} parameter to select other post hoc method.
 		#'     	  For multi-way anova, Please use \code{formula} parameter to specify the model and see \code{\link{aov}} for more details}
-		#'     \item{\strong{'scheirerRayHare'}}{Scheirer Ray Hare test (nonparametric test) for a two-way factorial experiment; 
+		#'     \item{\strong{'scheirerRayHare'}}{Scheirer-Ray-Hare test (nonparametric test) for a two-way factorial experiment; 
 		#'     	  see \code{scheirerRayHare} function of \code{rcompanion} package}
 		#'     \item{\strong{'lm'}}{Linear Model based on the \code{lm} function}
 		#'     \item{\strong{'lme'}}{Linear Mixed Effect Model based on the \code{lmerTest} package}
@@ -155,7 +164,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			}
 			# 'by_group' for test inside each by_group instead of all groups in 'group'
 			by_group <- self$by_group
-			data_alpha <- self$data_alpha
+			data_alpha <- self$data_alpha %>% dropallfactors
 			by_ID <- self$by_ID
 
 			if(is.null(measure)){
@@ -302,39 +311,27 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				# to make multi-factor distinct from one-way anova
 				compare_result <- data.frame()
 				for(k in measure){
-					div_table <- data_alpha[data_alpha$Measure == k, ]
-					if(method == "anova"){
-						model <- aov(reformulate(formula, "Value"), div_table, ...)
-						tmp <- summary(model)[[1]]
-						tmp1 <- data.frame(method = paste0(method, " formula for ", formula), Measure = k, Factors = rownames(tmp), 
-							Df = tmp$Df, Fvalue = tmp$`F value`, P.unadj = tmp$`Pr(>F)`)
-					}
-					if(method == "scheirerRayHare"){
-						invisible(capture.output(tmp <- rcompanion::scheirerRayHare(reformulate(formula, "Value"), div_table, ...)))
-						tmp1 <- data.frame(method = paste0(method, " formula for ", formula), Measure = k, Factors = rownames(tmp), 
-							Df = tmp$Df, Fvalue = tmp$H, P.unadj = tmp$p.value)
-					}
-					if(method == "betareg"){
-						check_res <- tryCatch(tmp <- betareg::betareg(reformulate(formula, "Value"), data = div_table, ...), error = function(e) { skip_to_next <- TRUE})
-						if(rlang::is_true(check_res)) {
-							message("Model fitting failed for ", k, " ! Skip ...")
+					if(is.null(by_group)){
+						div_table <- data_alpha[data_alpha$Measure == k, ]
+						tmp_res <- private$formula_anova_sche_betareg_test(method = method, input_table = div_table, formula = formula, measure = k, ...)
+						if(is.null(tmp_res)){
 							next
 						}else{
-							tmp <- betareg::betareg(reformulate(formula, "Value"), data = div_table, ...)
-							# extract the first element: coefficients
-							tmp_coefficients <- summary(tmp)[[1]]
-							tmp_mean <- tmp_coefficients$mean %>% as.data.frame
-							tmp_precision <- tmp_coefficients$precision %>% as.data.frame
-							tmp1 <- data.frame(method = paste0(method, " formula for ", formula), Measure = k, 
-								Factors = c(rownames(tmp_mean), rownames(tmp_precision)), 
-								Estimate = c(tmp_mean$Estimate, tmp_precision$Estimate), 
-								Zvalue = c(tmp_mean$`z value`, tmp_precision$`z value`), 
-								P.unadj = c(tmp_mean$`Pr(>|z|)`, tmp_precision$`Pr(>|z|)`))
+							compare_result %<>% rbind(., tmp_res)
+						}
+					}else{
+						for(each_group in unique_bygroups){
+							div_table <- data_alpha[data_alpha$Measure == k & all_bygroups == each_group, ]
+							tmp_res <- private$formula_anova_sche_betareg_test(method = method, input_table = div_table, formula = formula, measure = k, ...)
+							if(is.null(tmp_res)){
+								next
+							}else{
+								tmp_res <- cbind.data.frame(by_group = each_group, tmp_res)
+								compare_result %<>% rbind(., tmp_res)
+							}
 						}
 					}
-					compare_result %<>% rbind(., tmp1)
 				}
-				compare_result$Significance <- generate_p_siglabel(compare_result$P.unadj, nonsig = "ns")
 				method <- paste0(method, "-formula")
 			}
 			if(method %in% c("lm", "lme", "glmm", "glmm_beta")){
@@ -344,7 +341,6 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				}
 				for(k in measure){
 					div_table <- data_alpha[data_alpha$Measure == k, ]
-					tmp_res <- data.frame()
 					if(method == "lm"){
 						tmp <- stats::lm(reformulate(formula, "Value"), data = div_table, ...)
 						if(return_model){
@@ -417,10 +413,11 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				}
 				method <- paste0(method, "-formula")
 			}
-			if(! method %in% c("anova", paste0(c("anova", "scheirerRayHare", "betareg"), "-formula"), "lme", "glmm", "glmm_beta")){
-				if("P.adj" %in% colnames(compare_result)){
-					compare_result$Significance <- generate_p_siglabel(compare_result$P.adj, nonsig = "ns")
-					compare_result$Significance %<>% as.character
+			if("P.adj" %in% colnames(compare_result)){
+				compare_result$Significance <- generate_p_siglabel(compare_result$P.adj, nonsig = "ns") %>% as.character
+			}else{
+				if("P.unadj" %in% colnames(compare_result)){
+					compare_result$Significance <- generate_p_siglabel(compare_result$P.unadj, nonsig = "ns") %>% as.character
 				}
 			}
 			self$res_diff <- compare_result
@@ -448,8 +445,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' 	  the default 0.1 means \code{max(values) + 0.1 * (max(values) - min(values))}.
 		#' @param y_increase default 0.05; the increasing y axia space to add the label (asterisk or letter); the default 0.05 means \code{0.05 * (max(values) - min(values))}; 
 		#' 	  this parameter is also used to label the letters of anova result with the fixed space.
-		#' @param xtext_angle default NULL; number (e.g. 30) used to make x axis text generate angle.
-		#' @param xtext_size default 15; x axis text size.
+		#' @param xtext_angle default 30; number (e.g. 30) used to make x axis text generate angle.
+		#' @param xtext_size default 13; x axis text size. NULL means the default size in ggplot2.
 		#' @param ytitle_size default 17; y axis title size.
 		#' @param barwidth default 0.9; the bar width in plot; applied when by_group is not NULL.
 		#' @param use_boxplot default TRUE; TRUE denotes boxplot by using the data_alpha table in the object. 
@@ -470,7 +467,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @param heatmap_y default "Taxa"; the column of \code{res_diff} for the y axis of heatmap.
 		#' @param heatmap_lab_fill default "P value"; legend title of heatmap.
 		#' @param ... parameters passing to \code{ggpubr::ggboxplot} function when box plot is used or 
-		#' 	  \code{plot_cor} function in \code{\link{trans_env}} class for the heatmap of multiple factors when formula is found in the res_diff of the object.
+		#' 	  \code{plot_cor} function in \code{\link{trans_env}} class for the heatmap of multiple factors when formula is found in the \code{res_diff} of the object.
 		#' @return ggplot.
 		#' @examples
 		#' \donttest{
@@ -493,8 +490,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			order_x_mean = FALSE,
 			y_start = 0.1,
 			y_increase = 0.05,
-			xtext_angle = NULL,
-			xtext_size = 15,
+			xtext_angle = 30,
+			xtext_size = 13,
 			ytitle_size = 17,
 			barwidth = 0.9,
 			use_boxplot = TRUE,
@@ -526,8 +523,17 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			}
 			if(use_heatmap){
 				tmp <- self$res_diff
+				if("by_group" %in% colnames(tmp)){
+					if(!is.factor(tmp[, "by_group"])){
+						if(is.factor(self$data_alpha[, self$by_group])){
+							tmp[, "by_group"] %<>% factor(., levels = levels(self$data_alpha[, self$by_group]))
+						}else{
+							tmp[, "by_group"] %<>% as.factor
+						}
+					}
+				}
 				tmp_trans_env <- convert_diff2transenv(tmp, heatmap_x, heatmap_y, heatmap_cell, heatmap_sig, heatmap_lab_fill)
-				p <- tmp_trans_env$plot_cor(keep_full_name = TRUE, keep_prefix = TRUE, ...)
+				p <- tmp_trans_env$plot_cor(keep_full_name = TRUE, keep_prefix = TRUE, xtext_angle = xtext_angle, xtext_size = xtext_size, ...)
 			}else{
 				
 				cal_diff_method <- self$cal_diff_method
@@ -676,6 +682,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 								all_by_groups <- levels(use_data[, by_group])
 								all_groups <- levels(use_data[, group])
 								tmp_use_data <- dropallfactors(use_data)
+								y_range_use <- max(tmp_use_data$Value) - min(tmp_use_data$Value)
+								
 								for(j in all_by_groups){
 									select_tmp_data <- tmp_use_data %>% .[.[, by_group] == j, ]
 									x_axis_order <- all_groups %>% .[. %in% select_tmp_data[, group]]
@@ -694,7 +702,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 										x_mid %<>% c(., mid_num + (start_bar_mid + (match(i, x_axis_order) - 1) * increase_bar_mid))
 									}
 									tmp_position <- tapply(select_tmp_data$Value, select_tmp_data[, group], function(x) {res <- max(x); ifelse(is.na(res), x, res)}) %>% 
-										{. + y_increase * (max(select_tmp_data$Value) - min(select_tmp_data$Value))} %>% 
+										{. + y_increase * y_range_use} %>% 
 										.[x_axis_order]
 									y_position %<>% c(., tmp_position)
 								}
@@ -742,10 +750,12 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 									tmp_use_data <- dropallfactors(use_data)
 									
 									diff_by_groups <- use_diff_data$by_group %>% unique
+									# same y_range_use for all elements in by_group instead of each one
+									y_range_use <- max(tmp_use_data$Value) - min(tmp_use_data$Value)
+
 									for(j in diff_by_groups){
 										select_tmp_data <- tmp_use_data %>% .[.[, by_group] == j, ]
 										# y axix starting position
-										y_range_use <- max(select_tmp_data$Value) - min(select_tmp_data$Value)
 										y_start_use <- max(select_tmp_data$Value) + y_start * y_range_use
 										x_axis_order <- all_groups %>% .[. %in% select_tmp_data[, group]]
 										# identify the start x position for each by_group
@@ -808,14 +818,11 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				}
 				p <- p + ylab(measure) + xlab("")
 				p <- p + theme(
-						axis.text.x = element_text(colour = "black", size = xtext_size),
 						axis.title.y = element_text(size = ytitle_size),
 						axis.text.y = element_text(size = rel(1.1)),
 						axis.title.x = element_blank()
 						)
-				if(!is.null(xtext_angle)){
-					p <- p + theme(axis.text.x = element_text(angle = xtext_angle, vjust = 1, hjust = 1))
-				}
+				p <- p + ggplot_xtext_anglesize(xtext_angle, xtext_size)
 				if(is.null(by_group)){
 					p <- p + theme(legend.position = "none")
 				}
@@ -1000,6 +1007,38 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			}else{
 				FALSE
 			}
+		},
+		formula_anova_sche_betareg_test = function(method, input_table, formula, measure, ...){
+			if(method == "anova"){
+				model <- aov(reformulate(formula, "Value"), input_table, ...)
+				tmp <- summary(model)[[1]]
+				tmp_res <- data.frame(method = paste0(method, " formula for ", formula), Measure = measure, Factors = rownames(tmp), 
+					Df = tmp$Df, Fvalue = tmp$`F value`, P.unadj = tmp$`Pr(>F)`)
+			}
+			if(method == "scheirerRayHare"){
+				invisible(capture.output(tmp <- rcompanion::scheirerRayHare(reformulate(formula, "Value"), input_table, ...)))
+				tmp_res <- data.frame(method = paste0(method, " formula for ", formula), Measure = measure, Factors = rownames(tmp), 
+					Df = tmp$Df, Fvalue = tmp$H, P.unadj = tmp$p.value)
+			}
+			if(method == "betareg"){
+				check_res <- tryCatch(tmp <- betareg::betareg(reformulate(formula, "Value"), data = input_table, ...), error = function(e) { skip_to_next <- TRUE})
+				if(rlang::is_true(check_res)) {
+					message("Model fitting failed for ", measure, " ! Skip ...")
+					tmp_res <- NULL
+				}else{
+					tmp <- betareg::betareg(reformulate(formula, "Value"), data = input_table, ...)
+					# extract the first element: coefficients
+					tmp_coefficients <- summary(tmp)[[1]]
+					tmp_mean <- tmp_coefficients$mean %>% as.data.frame
+					tmp_precision <- tmp_coefficients$precision %>% as.data.frame
+					tmp_res <- data.frame(method = paste0(method, " formula for ", formula), Measure = measure, 
+						Factors = c(rownames(tmp_mean), rownames(tmp_precision)), 
+						Estimate = c(tmp_mean$Estimate, tmp_precision$Estimate), 
+						Zvalue = c(tmp_mean$`z value`, tmp_precision$`z value`), 
+						P.unadj = c(tmp_mean$`Pr(>|z|)`, tmp_precision$`Pr(>|z|)`))
+				}
+			}
+			tmp_res
 		}
 	),
 	lock_objects = FALSE,

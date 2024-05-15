@@ -81,7 +81,7 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
   dataset = NULL,
   method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox",
     "t.test", "anova", "scheirerRayHare", "lm", "ancombc2", "ALDEx2_t", "ALDEx2_kw",
-    "DESeq2", "linda", "maaslin2", "betareg", "lme", "glmm", "glmm_beta")[1],
+    "DESeq2", "edgeR", "linda", "maaslin2", "betareg", "lme", "glmm", "glmm_beta")[1],
   group = NULL,
   taxa_level = "all",
   filter_thres = 0,
@@ -132,6 +132,7 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
   \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallace and generalized linear model (glm) test with \code{ALDEx2} package; 
         see also the \code{test} parameter in \code{ALDEx2::aldex} function.}
   \item{\strong{'DESeq2'}}{Differential expression analysis based on the Negative Binomial (a.k.a. Gamma-Poisson) distribution based on the \code{DESeq2} package.}
+  \item{\strong{'edgeR'}}{The \code{exactTest} method of \code{edgeR} package is implemented.}
   \item{\strong{'ancombc2'}}{Analysis of Compositions of Microbiomes with Bias Correction (ANCOM-BC) 
      based on the \code{ancombc2} function from \code{ANCOMBC} package.
      If the \code{fix_formula} parameter is not provided, the function can automatically assign it by using group parameter.
@@ -153,6 +154,9 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
         In the return table, the significance of fixed factors are tested by function \code{anova}.
         The significance of 'Estimate' in each term of fixed factors comes from the model.}
   \item{\strong{'glmm'}}{Generalized linear mixed model (GLMM) based on the \code{glmmTMB} package.
+        The \code{formula} and \code{family} parameters are needed. 
+        Please refer to glmmTMB package to select the family function, e.g. \code{family = glmmTMB::lognormal(link = "log")}.
+        The usage of formula is similar with that in 'lme' method.
         For more available parameters, please see \code{glmmTMB::glmmTMB} function and use parameter passing.
         In the return table, Conditional_R2 and Marginal_R2 represent total variance (explained by both fixed and random effects) and the variance explained by 
         fixed effects, respectively. The significance of fixed factors are tested by Chi-square test from function \code{car::Anova}.

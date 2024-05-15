@@ -130,7 +130,7 @@ Differential test on alpha diversity.
   \item{\strong{'anova'}}{Variance analysis. For one-way anova, the post hoc test is Duncan's new multiple range test 
         based on \code{duncan.test} function of \code{agricolae} package. Please use \code{anova_post_test} parameter to select other post hoc method.
         For multi-way anova, Please use \code{formula} parameter to specify the model and see \code{\link{aov}} for more details}
-  \item{\strong{'scheirerRayHare'}}{Scheirer Ray Hare test (nonparametric test) for a two-way factorial experiment; 
+  \item{\strong{'scheirerRayHare'}}{Scheirer-Ray-Hare test (nonparametric test) for a two-way factorial experiment; 
         see \code{scheirerRayHare} function of \code{rcompanion} package}
   \item{\strong{'lm'}}{Linear Model based on the \code{lm} function}
   \item{\strong{'lme'}}{Linear Mixed Effect Model based on the \code{lmerTest} package}
@@ -211,8 +211,8 @@ Heatmap is employed automatically to show the significances of differential test
   order_x_mean = FALSE,
   y_start = 0.1,
   y_increase = 0.05,
-  xtext_angle = NULL,
-  xtext_size = 15,
+  xtext_angle = 30,
+  xtext_size = 13,
   ytitle_size = 17,
   barwidth = 0.9,
   use_boxplot = TRUE,
@@ -264,9 +264,9 @@ the default 0.1 means \code{max(values) + 0.1 * (max(values) - min(values))}.}
 \item{\code{y_increase}}{default 0.05; the increasing y axia space to add the label (asterisk or letter); the default 0.05 means \code{0.05 * (max(values) - min(values))}; 
 this parameter is also used to label the letters of anova result with the fixed space.}
 
-\item{\code{xtext_angle}}{default NULL; number (e.g. 30) used to make x axis text generate angle.}
+\item{\code{xtext_angle}}{default 30; number (e.g. 30) used to make x axis text generate angle.}
 
-\item{\code{xtext_size}}{default 15; x axis text size.}
+\item{\code{xtext_size}}{default 13; x axis text size. NULL means the default size in ggplot2.}
 
 \item{\code{ytitle_size}}{default 17; y axis title size.}
 
@@ -306,7 +306,7 @@ FALSE represents mean-sd or mean-se plot by invoking the data_stat table in the 
 \item{\code{heatmap_lab_fill}}{default "P value"; legend title of heatmap.}
 
 \item{\code{...}}{parameters passing to \code{ggpubr::ggboxplot} function when box plot is used or 
-\code{plot_cor} function in \code{\link{trans_env}} class for the heatmap of multiple factors when formula is found in the res_diff of the object.}
+\code{plot_cor} function in \code{\link{trans_env}} class for the heatmap of multiple factors when formula is found in the \code{res_diff} of the object.}
 }
 \if{html}{\out{</div>}}
 }

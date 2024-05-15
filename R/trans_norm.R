@@ -20,6 +20,7 @@ trans_norm <- R6Class(classname = "trans_norm",
 		initialize = function(dataset = NULL)
 			{
 			if(inherits(dataset, "microtable")){
+				dataset$tidy_dataset()
 				abund_table <- dataset$otu_table
 				abund_table <- t(abund_table)
 			}else{
@@ -38,73 +39,100 @@ trans_norm <- R6Class(classname = "trans_norm",
 		},
 		#' @description
 		#' Normalization/transformation methods.
-		#' @param method default NULL; See the following details and available options. \cr 
+		#' @param method default "rarefy"; See the following available options. \cr 
 		#' \cr 
 		#' Methods for normalization:
 		#' \itemize{
-		#'   \item \code{GMPR}: Geometric mean of pairwise ratios <doi: 10.7717/peerj.4600>. 
-		#' 	   	 For a given sample \eqn{i}, the size factor \eqn{s_i} is defined:
-		#' 	   	     \deqn{s_i = \lgroup {\displaystyle\prod_{j=1}^{n} r_{ij}} \rgroup ^{1/n}}
-		#' 	   	 where \eqn{r_{ij} = Median_{k|c_{ki}c_{kj} \ne 0} \lbrace \dfrac{c_{ki}}{c_{kj}} \rbrace}. 
-		#' 	   	 \eqn{r_{ij}} is the median count ratio of nonzero counts between sample \eqn{i} and \eqn{j}.
-		#' 	   	 \eqn{k} denotes all the features. For sample \eqn{i}, \eqn{GMPR = \frac{x_{i}}{s_i}}, where \eqn{x_i} is the feature abundances of sample \eqn{i}.
-		#'   \item \code{clr}: Centered log-ratio normalization <ISBN:978-0-412-28060-3> <doi: 10.3389/fmicb.2017.02224>. 
+		#'   \item \code{"rarefy"}: classic rarefaction based on R sample function.
+		#'   \item \code{"SRS"}: scaling with ranked subsampling method based on the SRS package provided by Lukas Beule and Petr Karlovsky (2020) <doi:10.7717/peerj.9593>.
+		#'   \item \code{"clr"}: Centered log-ratio normalization <ISBN:978-0-412-28060-3> <doi: 10.3389/fmicb.2017.02224>. 
 		#' 	   	 It is defined:  \deqn{clr_{ki} = \log\frac{x_{ki}}{g(x_i)}}
 		#' 	   	 where \eqn{x_{ki}} is the abundance of \eqn{k}th feature in sample \eqn{i}, \eqn{g(x_i)} is the geometric mean of abundances for sample \eqn{i}.
 		#' 	   	 A pseudocount need to be added to deal with the zero. For more information, please see the 'clr' method in \code{decostand} function of vegan package.
-		#'   \item \code{rclr}: Robust centered log-ratio normalization <doi: doi:10.1128/msystems.00016-19>.
+		#'   \item \code{"rclr"}: Robust centered log-ratio normalization <doi: doi:10.1128/msystems.00016-19>.
 		#' 	   	 It is defined:  \deqn{rclr_{ki} = \log\frac{x_{ki}}{g(x_i > 0)}}
 		#' 	   	 where \eqn{x_{ki}} is the abundance of \eqn{k}th feature in sample \eqn{i}, \eqn{g(x_i > 0)} is the geometric mean of abundances (> 0) for sample \eqn{i}.
 		#' 	   	 In rclr, zero values are kept as zeroes, and not taken into account.
-		#'   \item \code{CCS}: Cumulative sum scaling normalization based on the \code{metagenomeSeq} package <doi:10.1038/nmeth.2658>.
+		#'   \item \code{"GMPR"}: Geometric mean of pairwise ratios <doi: 10.7717/peerj.4600>. 
+		#' 	   	 For a given sample \eqn{i}, the size factor \eqn{s_i} is defined:
+		#' 	   	     \deqn{s_i =  \biggl( {\displaystyle\prod_{j=1}^{n} Median_{k|c_{ki}c_{kj} \ne 0} \lbrace \dfrac{c_{ki}}{c_{kj}} \rbrace} \biggr) ^{1/n}}
+		#' 	   	 where \eqn{k} denotes all the features, and \eqn{n} denotes all the samples. 
+		#' 	   	 For sample \eqn{i}, \eqn{GMPR = \frac{x_{i}}{s_i}}, where \eqn{x_i} is the feature abundances of sample \eqn{i}.
+		#'   \item \code{"CSS"}: Cumulative sum scaling normalization based on the \code{metagenomeSeq} package <doi:10.1038/nmeth.2658>.
 		#' 	   	 For a given sample \eqn{j}, the scaling factor \eqn{s_{j}^{l}} is defined:
 		#' 	   	     \deqn{s_{j}^{l} = {\displaystyle\sum_{i|c_{ij} \leqslant q_{j}^{l}} c_{ij}}}
 		#' 	   	 where \eqn{q_{j}^{l}} is the \eqn{l}th quantile of sample \eqn{j}, that is, in sample \eqn{j} there are \eqn{l} features with counts smaller than \eqn{q_{j}^{l}}.
 		#' 	   	 \eqn{c_{ij}} denotes the count (abundance) of feature i in sample \eqn{j}.
 		#' 	   	 For \eqn{l} = 0.95\eqn{m} (feature number), \eqn{q_{j}^{l}} corresponds to the 95th percentile of the count distribution for sample \eqn{j}.
 		#' 	   	 Normalized counts \eqn{\tilde{c_{ij}} = (\frac{c_{ij}}{s_{j}^{l}})(N)}, where \eqn{N} is an appropriately chosen normalization constant.
-		#'   \item \code{TSS}: Total sum scaling, divided by the sequencing depth.
-		#'   \item \code{TMM}: Trimmed mean of M-values method based on the \code{normLibSizes} function of \code{edgeR} package <doi: 10.1186/gb-2010-11-3-r25>.
-		#'   \item \code{RLE}: Relative log expression. 
-		#'   \item \code{SRS}: scaling with ranked subsampling method based on the SRS package provided by Lukas Beule and Petr Karlovsky (2020) <DOI:10.7717/peerj.9593>.
+		#'   \item \code{"TSS"}: Total sum scaling. Abundance is divided by the sequencing depth.
+		#' 	   	 For a given sample \eqn{j}, normalized counts is defined:
+		#' 	   	     \deqn{\tilde{c_{ij}} = \frac{c_{ij}}{\sum_{i=1}^{N_{j}} c_{ij}}}
+		#' 	   	 where \eqn{c_{ij}} is the counts of feature \eqn{i} in sample \eqn{j}, and \eqn{N_{j}} is the feature number of sample \eqn{j}.
+		#'   \item \code{"eBay"}: Empirical Bayes approach to normalization <10.1186/s12859-020-03552-z>. 
+		#' 	   	 The implemented method is not tree-related. In the output, the sum of each sample is 1.
+		#'   \item \code{"TMM"}: Trimmed mean of M-values method based on the \code{normLibSizes} function of \code{edgeR} package <doi: 10.1186/gb-2010-11-3-r25>.
+		#'   \item \code{"DESeq2"}: Median ratio of gene counts relative to geometric mean per gene based on the DESeq function of \code{DESeq2} package <doi: 10.1186/s13059-014-0550-8>.
+		#' 	   	 This option can invoke the \code{trans_diff} class and extract the normalized data from the original result.
+		#' 	   	 Note that either \code{group} or \code{formula} should be provided.
+		#' 	   	 The scaling factor is defined:
+		#' 	   	     \deqn{s_{j} = Median_{i} \frac{c_{ij}}{\bigl( {\prod_{j=1}^{n} c_{ij}} \bigr) ^{1/n}}}
+		#' 	   	 where \eqn{c_{ij}} is the counts of feature \eqn{i} in sample \eqn{j}, and \eqn{n} is the total sample number.
+		#'   \item \code{"Wrench"}: Group-wise and sample-wise compositional bias factor <doi: 10.1186/s12864-018-5160-5>.
+		#' 	   	 Note that condition parameter is necesary to be passed to \code{condition} parameter in \code{wrench} function of Wrench package.
+		#' 	   	 As the input data must be microtable object, so the input condition parameter can be a column name of \code{sample_table}.
+		#' 	   	 The scaling factor is defined:
+		#' 	   	     \deqn{s_{j} = \frac{1}{p} \sum_{ij} W_{ij} \frac{X_{ij}}{\overline{X_{i}}}}
+		#' 	   	 where \eqn{X_{ij}} represents the relative abundance (proportion) for feature \eqn{i} in sample \eqn{j},
+		#' 	   	 \eqn{\overline{X_{i}}} is the average proportion of feature \eqn{i} across the dataset,
+		#' 	   	 \eqn{W_{ij}} represents a weight specific to each technique, and \eqn{p} is the feature number in sample.
+		#'   \item \code{"RLE"}: Relative log expression. 
 		#' }
 		#' Methods based on \code{\link{decostand}} function:
 		#' \itemize{
-		#'   \item \code{total}: divide by margin total (default MARGIN = 1, i.e. rows - samples).
-		#'   \item \code{max}: divide by margin maximum (default MARGIN = 2, i.e. columns - features).
-		#'   \item \code{normalize}:  make margin sum of squares equal to one (default MARGIN = 1).
-		#'   \item \code{range}: standardize values into range 0...1 (default MARGIN = 2). If all values are constant, they will be transformed to 0.
-		#'   \item \code{standardize}: scale x to zero mean and unit variance (default MARGIN = 2).
-		#'   \item \code{pa}: scale x to presence/absence scale (0/1).
-		#'   \item \code{log}: logarithmic transformation as suggested by Anderson et al. (2006): log_b (x) + 1 for x > 0, where b is the base of the logarithm; zeros are left as zeros. Higher bases give less weight to quantities and more to presences, and logbase = Inf gives the presence/absence scaling. Please note this is not log(x+1). Anderson et al. (2006) suggested this for their (strongly) modified Gower distance (implemented as method = "altGower" in vegdist), but the standardization can be used independently of distance indices.
+		#'   \item \code{"total"}: divide by margin total (default MARGIN = 1, i.e. rows - samples).
+		#'   \item \code{"max"}: divide by margin maximum (default MARGIN = 2, i.e. columns - features).
+		#'   \item \code{"normalize"}:  make margin sum of squares equal to one (default MARGIN = 1).
+		#'   \item \code{"range"}: standardize values into range 0...1 (default MARGIN = 2). If all values are constant, they will be transformed to 0.
+		#'   \item \code{"standardize"}: scale x to zero mean and unit variance (default MARGIN = 2).
+		#'   \item \code{"pa"}: scale x to presence/absence scale (0/1).
+		#'   \item \code{"log"}: logarithmic transformation.
 		#' }
 		#' Other methods for transformation:
 		#' \itemize{
-		#'   \item \code{AST}: Arc sine square root transformation.
+		#'   \item \code{"AST"}: Arc sine square root transformation.
 		#' }
-		#' @param MARGIN default NULL; 1 = samples, and 2 = features of abundance table; only available when method comes from \code{\link{decostand}} function.
-		#'    If MARGIN is NULL, use the default value in decostand function.
-		#' @param logbase default exp(1); The logarithm base.
-		#' @param Cmin default NULL; see Cmin parameter in \code{SRS::SRS} function; Only available when \code{method = "SRS"}.
-		#'    If not provided, use the minimum number across all the samples.
+		#' @param sample.size default NULL; libray size for rarefaction when method = "rarefy" or "SRS". If not provided, use the minimum number across all samples. 
+		#'    For "SRS" method, this parameter is passed to \code{Cmin} parameter of \code{SRS} function of SRS package.
+		#' @param rngseed default 123; random seed. Available when method = "rarefy" or "SRS".
+		#' @param replace default TRUE; see \code{\link{sample}} for the random sampling; Available when \code{method = "rarefy"}.
 		#' @param pseudocount default 1; add pseudocount for those features with 0 abundance when \code{method = "clr"}.
 		#' @param intersect.no default 10; the intersecting taxa number between paired sample for \code{method = "GMPR"}.
 		#' @param ct.min default 1; the minimum number of counts required to calculate ratios for \code{method = "GMPR"}.
-		#' @param ... parameters pass to \code{\link{decostand}}, or \code{metagenomeSeq::cumNorm} when method = "CCS", or 
-		#'    \code{edgeR::normLibSizes} when method = "TMM" or "RLE".
+		#' @param condition default NULL; Only available when \code{method = "Wrench"}. 
+		#'    This parameter is passed to the \code{condition} parameter of \code{wrench} function in Wrench package
+		#'    It must be a column name of \code{sample_table} or a vector with same length of samples.
+		#' @param MARGIN default NULL; 1 = samples, and 2 = features of abundance table; only available when method comes from \code{\link{decostand}} function.
+		#'    If MARGIN is NULL, use the default value in decostand function.
+		#' @param logbase default 2; The logarithm base.
+		#' @param ... parameters pass to \code{\link{decostand}}, or \code{metagenomeSeq::cumNorm} when method = "CSS", 
+		#'    or \code{edgeR::normLibSizes} when method = "TMM" or "RLE", 
+		#'    or \code{trans_diff} class when method = "DESeq2",
+		#'    or \code{wrench} function of Wrench package when method = "Wrench".
 		#' 
 		#' @return new microtable object or data.frame object.
 		#' @examples
-		#' newdataset <- t1$norm(method = "log")
 		#' newdataset <- t1$norm(method = "clr")
-		norm = function(method = NULL, MARGIN = NULL, logbase = 2, Cmin = NULL, pseudocount = 1, intersect.no = 10, ct.min = 1, ...)
+		#' newdataset <- t1$norm(method = "log")
+		norm = function(method = "rarefy", sample.size = NULL, rngseed = 123, replace = TRUE, pseudocount = 1, intersect.no = 10, 
+			ct.min = 1, condition = NULL, MARGIN = NULL, logbase = 2, ...)
 			{
 			abund_table <- self$data_table
 			if(is.null(method)){
 				stop("Please select a method!")
 			}
 			method <- tolower(method)
-			method <- match.arg(method, c("gmpr", "clr", "rclr", "ccs", "tss", "tmm", "rle", "srs", "ast", 
+			method <- match.arg(method, c("rarefy", "srs", "gmpr", "clr", "rclr", "css", "tss", "ebay", "tmm", "deseq2", "rle", "wrench", "ast", 
 				"total", "max", "frequency", "normalize", "range", "rank", "standardize", "pa", "chi.square", "hellinger", "log"))
 			
 			if(method %in% c("total", "max", "frequency", "normalize", "range", "rank", "standardize", "pa", "chi.square", "hellinger", "log")){
@@ -112,6 +140,61 @@ trans_norm <- R6Class(classname = "trans_norm",
 					MARGIN <- switch(method, total = 1, max = 2, frequency = 2, normalize = 1, range = 2, rank = 1, standardize = 2, chi.square = 1, NULL)
 				}
 				res_table <- vegan::decostand(x = abund_table, method = method, MARGIN = MARGIN, logbase = logbase, ...)
+			}
+			if(method %in% c("rarefy", "srs")){
+				newotu <- as.data.frame(t(abund_table))
+				suppressMessages(tmpobj <- microtable$new(newotu))
+				set.seed(rngseed)
+
+				if(is.null(sample.size)){
+					sample.size <- min(tmpobj$sample_sums())
+					message("Use the minimum number across samples: ", sample.size)
+				}
+				if(length(sample.size) > 1){
+					stop("Input sample.size had more than one value!")
+				}
+				if(sample.size <= 0){
+					stop("sample.size less than or equal to zero. Need positive sample size to work!")
+				}
+				if (max(tmpobj$sample_sums()) < sample.size){
+					stop("sample.size is larger than the maximum of sample sums, pleasure check input sample.size!")
+				}
+				if (min(tmpobj$sample_sums()) < sample.size) {
+					rmsamples <- tmpobj$sample_names()[tmpobj$sample_sums() < sample.size]
+					message(length(rmsamples), " samples are removed because of fewer reads than input sample.size ...")
+					feature_num_raw <- length(tmpobj$taxa_names())
+					tmpobj$sample_table <- base::subset(tmpobj$sample_table, ! tmpobj$sample_names() %in% rmsamples)
+					tmpobj$tidy_dataset()
+					feature_num_filter <- length(tmpobj$taxa_names())
+					if(feature_num_filter < feature_num_raw){
+						message((feature_num_raw - feature_num_filter), " features with 0 abundance are removed after filtering samples ...")
+					}
+				}
+				newotu <- tmpobj$otu_table
+				if(method == "rarefy"){
+					newotu <- as.data.frame(apply(newotu, 2, private$rarefaction_subsample, sample.size = sample.size, replace = replace))
+				}else{
+					newotu <- SRS::SRS(newotu, Cmin = sample.size, set_seed = TRUE, seed = rngseed)
+				}
+				rownames(newotu) <- rownames(tmpobj$otu_table)
+				tmpobj$otu_table <- newotu
+				rmtaxa <- apply(newotu, 1, sum) %>% .[. == 0]
+				if(length(rmtaxa) > 0){
+					message(length(rmtaxa), " features are removed because they are no longer present in any sample after random subsampling ...")
+					tmpobj$tidy_dataset()
+				}
+				res_table <- t(tmpobj$otu_table)
+			}
+			if(method == "deseq2"){
+				if(!inherits(self$dataset, "microtable")){
+					stop("For DESeq2 method, the input dataset must be microtable object when creating the object!")
+				}
+				use_dataset <- clone(self$dataset)
+				use_dataset$tax_table <- data.frame(OTU = rownames(use_dataset$otu_table))
+				rownames(use_dataset$tax_table) <- use_dataset$tax_table$OTU
+				res_obj <- suppressMessages(trans_diff$new(dataset = use_dataset, method = "DESeq2", taxa_level = "OTU", ...))
+				res_raw <- res_obj$res_diff_raw
+				res_table <- t(counts(res_raw, normalized = TRUE))
 			}
 			if(method == "gmpr"){
 				transposed_table <- t(abund_table)
@@ -131,7 +214,7 @@ trans_norm <- R6Class(classname = "trans_norm",
 				}
 				res_table <- vegan::decostand(x = abund_table, method = method, MARGIN = MARGIN, logbase = logbase, ...)
 			}
-			if(method == "ccs"){
+			if(method == "css"){
 				obj <- metagenomeSeq::newMRexperiment(t(abund_table))
 				obj_1 <- metagenomeSeq::cumNorm(obj, ...)
 				res_table <- t(metagenomeSeq::MRcounts(obj_1, norm = TRUE))
@@ -139,14 +222,33 @@ trans_norm <- R6Class(classname = "trans_norm",
 			if(method == "tss"){
 				res_table <- apply(abund_table, 1, function(x){x/sum(x)}) %>% t
 			}
-			if(method == "srs"){
-				newotu <- as.data.frame(t(abund_table))
-				if(is.null(Cmin)){
-					Cmin <- min(colSums(newotu))
+			if(method == "ebay"){
+				res_table <- private$ebay(abund_table)
+			}
+			if(method == "wrench"){
+				if(!require("Wrench")){
+					stop('Please first install Wrench package: BiocManager::install("Wrench")')
 				}
-				res_table <- SRS::SRS(newotu, Cmin = Cmin, set_seed = TRUE, seed = 123)
-				res_table <- t(res_table)
-				colnames(res_table) <- colnames(abund_table)
+				if(is.null(condition)){
+					stop("Please provide the condition parameter, which is necessary for Wrench method!")
+				}
+				if(length(condition) == 1){
+					if(!inherits(self$dataset, "microtable")){
+						stop("Please provide a microtable object when input condition parameter is a column name!")
+					}
+					use_dataset <- clone(self$dataset)
+					check_table_variable(use_dataset$sample_table, condition, "condition", "sample_table")
+					condition <- use_dataset$sample_table[, condition]
+				}else{
+					if(length(condition) != nrow(abund_table)){
+						stop("Provided condition must have a length same with samples!")
+					}
+				}				
+				transposed_table <- t(abund_table)
+				res_raw <- wrench(mat = transposed_table, condition = condition, ...)
+				self$res_wrench_raw <- res_raw
+				size_factor <- res_raw$nf
+				res_table <- t(transposed_table) / size_factor
 			}
 			if(method %in% c("tmm", "rle")){
 				abund_table %<>% t
@@ -163,6 +265,7 @@ trans_norm <- R6Class(classname = "trans_norm",
 			if(inherits(self$dataset, "microtable")){
 				res_dataset <- clone(self$dataset)
 				res_dataset$otu_table <- as.data.frame(t(res_table))
+				res_dataset$tidy_dataset()
 				res_dataset
 			}else{
 				res_table
@@ -170,10 +273,32 @@ trans_norm <- R6Class(classname = "trans_norm",
 		}
 	),
 	private = list(
+		rarefaction_subsample = function(x, sample.size, replace=FALSE){
+			# Adapted from the rarefy_even_depth in phyloseq package.
+			rarvec <- numeric(length(x))
+			if(sum(x) <= 0){
+				# Protect against, and quickly return an empty vector, 
+				return(rarvec)
+			}
+			if(replace){
+				suppressWarnings(subsample <- sample(1:length(x), sample.size, replace = TRUE, prob = x))
+			} else {
+				# resample without replacement
+				obsvec <- apply(data.frame(OTUi = 1:length(x), times = x), 1, function(x){
+					rep_len(x["OTUi"], x["times"])
+				})
+				obsvec <- unlist(obsvec, use.names=FALSE)
+				suppressWarnings(subsample <- sample(obsvec, sample.size, replace = FALSE))
+			}
+			sstab <- table(subsample)
+			# Assign the tabulated random subsample values to the species vector
+			rarvec[as(names(sstab), "integer")] <- sstab
+			return(rarvec)
+		},
 		AST = function(x){
 			sign(x) * asin(sqrt(abs(x)))
 		},
-		# modified based on https://github.com/jchen1981/GMPR
+		# modified from https://github.com/jchen1981/GMPR
 		GMPR = function(comm, intersect.no, ct.min) {
 			comm[comm < ct.min] <- 0	
 			comm.no <- numeric(ncol(comm))
@@ -210,6 +335,22 @@ trans_norm <- R6Class(classname = "trans_norm",
 			names(output) <- names(comm.no) <- colnames(comm)
 			attr(output, 'NSS') <- comm.no
 			output
+		},
+		# modified from https://github.com/liudoubletian/eBay
+		ebay = function(comm) {
+			sample_n <- nrow(comm)
+
+			B_e <- try(MGLM::MGLMreg(comm~1, dist="DM")@coefficients, silent=TRUE)
+
+			gr <- matrix(rep(1, sample_n))
+			alpha_e <- exp(gr%*%B_e)
+
+			exp_norm <- comm
+
+			for (n in 1:sample_n) {
+				exp_norm[n, ] <- unlist(comm[n, ] + alpha_e[n, ]) / (sum(comm[n, ]) + sum(alpha_e[n, ]))
+			}
+			exp_norm
 		}
 	),
 	lock_objects = FALSE,

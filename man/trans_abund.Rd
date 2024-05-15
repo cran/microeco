@@ -2,7 +2,7 @@
 % Please edit documentation in R/trans_abund.R
 \name{trans_abund}
 \alias{trans_abund}
-\title{Create \code{trans_abund} object for plotting taxonomic abundance.}
+\title{Create \code{trans_abund} object for taxonomic abundance visualization.}
 \description{
 This class is a wrapper for the taxonomic abundance transformations and visualization.
 The converted data style is the long-format for \code{ggplot2} plot.
@@ -152,12 +152,12 @@ Thereinto, quantile25 and quantile75 denote 25\% and 75\% quantiles, respectivel
 \item{\code{delete_taxonomy_prefix}}{default TRUE; whether delete the prefix of taxonomy, such as "g__".}
 
 \item{\code{prefix}}{default NULL; character string; available when \code{delete_taxonomy_prefix = T}; 
-default NULL reprensents using the "letter+__", e.g. "k__" for Phylum level;
+default NULL represents using the "letter+__", e.g. "k__" for Phylum level;
 Please provide the customized prefix when it is not standard, otherwise the program can not correctly recognize it.}
 
 \item{\code{use_percentage}}{default TRUE; show the abundance percentage.}
 
-\item{\code{input_taxaname}}{default NULL; character vector; input taxa names for selecting some taxa.}
+\item{\code{input_taxaname}}{default NULL; character vector; input taxa names to select some taxa.}
 
 \item{\code{high_level}}{default NULL; a taxonomic rank, such as "Phylum", used to add the taxonomic information of higher level.
 It is necessary for the legend with nested taxonomic levels in the bar plot.}
@@ -170,7 +170,7 @@ Note that \code{ntaxa} means either the parameter \code{ntaxa} or the taxonomic 
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-\code{data_abund} stored in the object. The column 'all_mean_abund' reprensents mean relative abundance across all the samples.
+\code{data_abund} stored in the object. The column 'all_mean_abund' represents mean relative abundance across all the samples.
   So the values in one taxon are all same across all the samples.
   If the sum of column 'Abundance' in one sample is larger than 1, the 'Abundance', 'SD' and 'SE' has been multiplied by 100.
 }
@@ -194,7 +194,7 @@ Bar plot.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_abund$plot_bar(
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),
-  bar_type = "full",
+  bar_full = TRUE,
   others_color = "grey90",
   facet = NULL,
   order_x = NULL,
@@ -214,7 +214,8 @@ Bar plot.
   ytitle_size = 17,
   coord_flip = FALSE,
   ggnested = FALSE,
-  high_level_add_other = FALSE
+  high_level_add_other = FALSE,
+  ...
 )}\if{html}{\out{</div>}}
 }
 
@@ -223,9 +224,10 @@ Bar plot.
 \describe{
 \item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the bars.}
 
-\item{\code{bar_type}}{default "full"; "full" or "notfull"; if \code{"full"}, total abundance are summed to 1 or 100 percentage.}
+\item{\code{bar_full}}{default TRUE; Whether the bar shows all the features (including 'Others'). 
+Default \code{TRUE} means total abundance are summed to 1 or 100 (percentage). \code{FALSE} means 'Others' will not be shown.}
 
-\item{\code{others_color}}{default "grey90"; the color for "others" taxa.}
+\item{\code{others_color}}{default "grey90"; the color for "Others" taxa.}
 
 \item{\code{facet}}{default NULL; a character vector for the facet; group column name of \code{sample_table}, such as, \code{"Group"};
 If multiple facets are needed, please provide ordered names, such as \code{c("Group", "Type")}.
@@ -272,6 +274,8 @@ To make it available, please assign \code{high_level} parameter when creating th
 
 \item{\code{high_level_add_other}}{default FALSE; whether add 'Others' (all the unknown taxa) in each taxon of higher taxonomic level.
 Only available when \code{ggnested = TRUE}.}
+
+\item{\code{...}}{Capture unknown parameters.}
 }
 \if{html}{\out{</div>}}
 }

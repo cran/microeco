@@ -10,14 +10,16 @@ convert_diff2transenv <- function(diff_table, heatmap_x, heatmap_y, heatmap_cell
 	if("ns" %in% diff_table[, heatmap_sig]){
 		diff_table[, heatmap_sig] <- gsub("ns", "", diff_table[, heatmap_sig])
 	}
+	if(! "by_group" %in% colnames(diff_table)){
+		diff_table$by_group <- "All"
+	}
 	# avoid duplicate column name
-	diff_table <- diff_table[, unique(c(heatmap_x, heatmap_y, heatmap_cell, heatmap_sig))]
+	diff_table <- diff_table[, unique(c("by_group", heatmap_x, heatmap_y, heatmap_cell, heatmap_sig))]
 	colnames(diff_table)[colnames(diff_table) == heatmap_x] <- "Env"
 	colnames(diff_table)[colnames(diff_table) == heatmap_y] <- "Taxa"
 	colnames(diff_table)[colnames(diff_table) == heatmap_cell] <- "Correlation"
 	colnames(diff_table)[colnames(diff_table) == heatmap_sig] <- "Significance"
 	
-	diff_table$Type <- "All"
 	suppressMessages(tmp_trans_env <- trans_env$new(dataset = NULL))
 	tmp_trans_env$cor_method <- heatmap_lab_fill
 	tmp_trans_env$res_cor <- diff_table
@@ -50,6 +52,7 @@ check_microtable <- function(obj){
 	if(! inherits(obj, "microtable")){
 		stop("The input dataset must be microtable object! Please check it!")
 	}
+	obj$tidy_dataset()
 }
 
 # check taxonomic level: obj either microtable object or taxonomic table
@@ -67,11 +70,11 @@ check_tax_level <- function(tax_level, obj){
 	}
 }
 
-ggplot_xtext_anglesize <- function(xtext_angle, xtext_size){
+ggplot_xtext_anglesize <- function(xtext_angle, xtext_size, text_color = "black"){
 	if(xtext_angle == 0){
-		theme(axis.text.x = element_text(colour = "black", size = xtext_size))
+		theme(axis.text.x = element_text(colour = text_color, size = xtext_size))
 	}else{
-		theme(axis.text.x = element_text(angle = xtext_angle, colour = "black", vjust = 1, hjust = 1, size = xtext_size))
+		theme(axis.text.x = element_text(angle = xtext_angle, colour = text_color, vjust = 1, hjust = 1, size = xtext_size))
 	}
 }
 
