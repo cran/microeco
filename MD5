@@ -1,11 +1,11 @@
-a6aa7c4faecb99fc25b6c8c4024e28a6 *DESCRIPTION
+4445ec365efe35dd9e47b158750d0a5c *DESCRIPTION
 c335c7b9a0088e98e0c2220eb1395403 *NAMESPACE
 a0112422157c37844ef95eb2cad49681 *R/data.R
 5cc673b8d878aa58bd4a8c5e80a17a5b *R/help.R
 6194e169da4b986151156dbfa7560f3a *R/import.R
-43e27e897de7da19cb7c2cfd57c04775 *R/microtable.R
+cd9d1c08a800617aed2bafa1fe2ddfd1 *R/microtable.R
 2600d8fdb5166ee339fa9400ff2e2c27 *R/trans_abund.R
-f54c81e32d88350165361dcb668924f2 *R/trans_alpha.R
+1e6b770786607bba6585ee10c29e4758 *R/trans_alpha.R
 9e537e4ca4c21588d19e29ff47d15929 *R/trans_beta.R
 085aa9f06affbee91bcf8316faedb193 *R/trans_classifier.R
 94eb204a1765853494cee0089db1b0ca *R/trans_diff.R
@@ -42,7 +42,7 @@ d34c358094357d4713b528f8bdcfddae *man/dataset.Rd
 5e86ec7c3cb4b073e0d17ac4cb133978 *man/fungi_func_FUNGuild.Rd
 c9f42a81836b40fa61a1d2991770c3e2 *man/fungi_func_FungalTraits.Rd
 83b6a7a4286e3287e361681c45bde19c *man/microeco.Rd
-3707fcc4d7e5af1e1c5e0479c6fe3dc6 *man/microtable.Rd
+d36b216c2f4c037d14321defb4b035f9 *man/microtable.Rd
 0faa0a48081f43bbed31cb2f8ef778e8 *man/otu_table_16S.Rd
 dc5fbfb83262fc36d65652061b4f66c0 *man/otu_table_ITS.Rd
 eef095946c4c181afc882676a16fff26 *man/phylo_tree_16S.Rd
