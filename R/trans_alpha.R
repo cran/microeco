@@ -1,4 +1,4 @@
-#' @title Create \code{trans_alpha} object for alpha diversity statistics and plot.
+#' @title Create \code{trans_alpha} object for alpha diversity statistics and visualization.
 #'
 #' @description
 #' This class is a wrapper for a series of alpha diversity analysis, including the statistics and visualization.
@@ -6,11 +6,11 @@
 #' @export
 trans_alpha <- R6Class(classname = "trans_alpha",
 	public = list(
-		#' @param dataset the object of \code{\link{microtable}} class.
-		#' @param group default NULL; a column of \code{sample_table} used for the statistics; If provided, can return \code{data_stat}.
-		#' @param by_group default NULL; a column of \code{sample_table} used to perform the differential test 
-		#'   among groups (\code{group} parameter) for each group (\code{by_group} parameter). So \code{by_group} has a higher level than \code{group} parameter.
-		#' @param by_ID default NULL; a column of \code{sample_table} used to perform paired t test or paired wilcox test for the paired data,
+		#' @param dataset an object of \code{\link{microtable}} class.
+		#' @param group default NULL; a column name of \code{sample_table} used for the statistics.
+		#' @param by_group default NULL; a column name of \code{sample_table} used to perform the differential test 
+		#'   among groups (from \code{group} parameter) for each group (from \code{by_group} parameter) separately.
+		#' @param by_ID default NULL; a column name of \code{sample_table} used to perform paired t test or paired wilcox test for the paired data,
 		#'   such as the data of plant compartments for different plant species (ID). 
 		#'   So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.
 		#' @param order_x default NULL; a \code{sample_table} column name or a vector with sample names; if provided, order samples by using \code{factor}.
@@ -22,7 +22,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' }
 		initialize = function(dataset = NULL, group = NULL, by_group = NULL, by_ID = NULL, order_x = NULL) {
 			if(is.null(dataset)){
-				message("Parameter dataset not provided. Please run the functions with your other customized data!")
+				message("Parameter dataset not provided. Please run the functions with your other customized data ...")
 				self$data_alpha <- NULL
 				self$data_stat <- NULL
 				if(! is.null(group)){
@@ -84,6 +84,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @description
 		#' Differential test on alpha diversity.
 		#'
+		#' @param measure default NULL; character vector; If NULL, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
+		#' 	 e.g. \code{c("Observed", "Chao1", "Shannon")}.
 		#' @param method default "KW"; see the following available options:
 		#'   \describe{
 		#'     \item{\strong{'KW'}}{Kruskal-Wallis Rank Sum Test for all groups (>= 2)}
@@ -91,22 +93,21 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#'     \item{\strong{'wilcox'}}{Wilcoxon Rank Sum Test for all paired groups}
 		#'     \item{\strong{'t.test'}}{Student's t-Test for all paired groups}
 		#'     \item{\strong{'anova'}}{Variance analysis. For one-way anova, the post hoc test is Duncan's new multiple range test 
-		#'     	  based on \code{duncan.test} function of \code{agricolae} package. Please use \code{anova_post_test} parameter to select other post hoc method.
+		#'     	  based on \code{duncan.test} function of \code{agricolae} package. Please use \code{anova_post_test} parameter to change post hoc method.
 		#'     	  For multi-way anova, Please use \code{formula} parameter to specify the model and see \code{\link{aov}} for more details}
 		#'     \item{\strong{'scheirerRayHare'}}{Scheirer-Ray-Hare test (nonparametric test) for a two-way factorial experiment; 
 		#'     	  see \code{scheirerRayHare} function of \code{rcompanion} package}
 		#'     \item{\strong{'lm'}}{Linear Model based on the \code{lm} function}
 		#'     \item{\strong{'lme'}}{Linear Mixed Effect Model based on the \code{lmerTest} package}
 		#'     \item{\strong{'betareg'}}{Beta Regression for Rates and Proportions based on the \code{betareg} package}
-		#'     \item{\strong{'glmm'}}{Generalized linear mixed model (GLMM) based on the \code{glmmTMB} package}
+		#'     \item{\strong{'glmm'}}{Generalized linear mixed model (GLMM) based on the \code{glmmTMB} package.
+		#'     	  A family function can be provided using parameter passing, such as: \code{family = glmmTMB::lognormal(link = "log")}}
 		#'     \item{\strong{'glmm_beta'}}{Generalized linear mixed model (GLMM) with a family function of beta distribution. 
 		#'     	  This is an extension of the GLMM model in \code{'glmm'} option. 
 		#'     	  The only difference is in \code{glmm_beta} the family function is fixed with the beta distribution function, 
 		#'     	  facilitating the fitting for proportional data (ranging from 0 to 1). The link function is fixed with \code{"logit"}.}
 		#'   }
-		#' @param measure default NULL; character vector; If NULL, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
-		#' 	 e.g. c("Observed", "Chao1", "Shannon").
-		#' @param p_adjust_method default "fdr" (for "KW", "wilcox", "t.test") or "holm" (for "KW_dunn"); P value adjustment method; 
+		#' @param p_adjust_method default "fdr" (for "KW", "wilcox", "t.test" methods) or "holm" (for "KW_dunn"); P value adjustment method; 
 		#' 	  For \code{method = 'KW', 'wilcox' or 't.test'}, please see method parameter of \code{p.adjust} function for available options;
 		#' 	  For \code{method = 'KW_dunn'}, please see \code{dunn.test::p.adjustment.methods} for available options.
 		#' @param formula default NULL; applied to two-way or multi-factor anova when 
@@ -126,7 +127,9 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#'   \code{lmerTest::lmer} (when \code{method = "lme"}) or 
 		#'   \code{betareg::betareg} (when \code{method = "betareg"}) or 
 		#'   \code{glmmTMB::glmmTMB} (when \code{method = "glmm"}).
-		#' @return \code{res_diff}, stored in object with the format \code{data.frame}.
+		#' @return \code{res_diff}, stored in object with the format \code{data.frame}.\cr
+		#'     When method is "betareg", "lm", "lme" or "glmm", 
+		#'     "Estimate" and "Std.Error" columns represent the fitted coefficient and its standard error, respectively.
 		#' @examples
 		#' \donttest{
 		#' t1$cal_diff(method = "KW")
@@ -135,10 +138,10 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' t1$cal_diff(method = "anova")
 		#' }
 		cal_diff = function(
+			measure = NULL,
 			method = c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lm", "lme", "betareg", "glmm", "glmm_beta")[1], 
-			measure = NULL, 
-			p_adjust_method = "fdr", 
 			formula = NULL,
+			p_adjust_method = "fdr", 
 			KW_dunn_letter = TRUE,
 			alpha = 0.05,
 			anova_post_test = "duncan.test",
@@ -150,17 +153,17 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			
 			if(method %in% c("scheirerRayHare", "lm", "lme", "betareg", "glmm", "glmm_beta") & is.null(formula)){
 				if(is.null(formula)){
-					stop("formula is necessary! Please provide formula parameter!")
+					stop("The formula parameter is NULL! It is necessary for the method: ", method, " !")
 				}
 			}
 			if(!method %in% c("anova", "scheirerRayHare", "lm", "lme", "betareg", "glmm", "glmm_beta")){
 				if(is.null(group)){
-					stop("For the method: ", method, " , group is necessary! Please recreate the object!")
+					stop("For the method: ", method, " , group is necessary! Please recreate the object and set the group parameter!")
 				}
 			}
 			if(method == "anova"){
 				if(is.null(group) & is.null(formula)){
-					stop("Both formula and group is NULL! Please provide either formula or group in the object creation!")
+					stop("Please provide either formula parameter or group parameter (in the object creation) for ANOVA method!")
 				}
 			}
 			# 'by_group' for test inside each by_group instead of all groups in 'group'
@@ -225,11 +228,11 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				}
 				if(is.null(by_group)){
 					compare_result <- data.frame(res_list$comnames, res_list$measure_use, res_list$test_method, res_list$max_group, res_list$p_value, p_value_adjust)
-					colnames(compare_result) <- c("Comparison", "Measure", "Test_method", "Group", "P.unadj", "P.adj")
+					colnames(compare_result) <- c("Comparison", "Measure", "Method", "Group", "P.unadj", "P.adj")
 				}else{
 					compare_result <- data.frame(res_list$comnames, res_list$group_by, res_list$measure_use, res_list$test_method, 
 						res_list$max_group, res_list$p_value, p_value_adjust)
-					colnames(compare_result) <- c("Comparison", "by_group", "Measure", "Test_method", "Group", "P.unadj", "P.adj")
+					colnames(compare_result) <- c("Comparison", "by_group", "Measure", "Method", "Group", "P.unadj", "P.adj")
 				}
 			}
 			if(method == "KW_dunn"){
@@ -354,12 +357,13 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 						tmp_coefficients <- as.data.frame(tmp_summary$coefficients, check.names = FALSE)
 						tmp_model_R2 <- performance::r2(tmp)
 						tmp_model_p <- anova(tmp)
-						tmp_res <- data.frame(method = paste0(method, " formula for ", formula), 
+						tmp_res <- data.frame(Method = paste0(method, " formula for ", formula), 
 							Measure = k, 
 							Factors = c("Model", rownames(tmp_model_p), rownames(tmp_coefficients)), 
 							R2 = c(tmp_model_R2$R2, rep(NA, nrow(tmp_model_p) + length(rownames(tmp_coefficients)))),
 							R2_adjusted = c(tmp_model_R2$R2_adjusted, rep(NA, nrow(tmp_model_p) + length(rownames(tmp_coefficients)))),
-							Estimate = c(NA, rep(NA, nrow(tmp_model_p)), tmp_coefficients$Estimate), 
+							Estimate  = c(NA, rep(NA, nrow(tmp_model_p)), tmp_coefficients$Estimate), 
+							Std.Error = c(NA, rep(NA, nrow(tmp_model_p)), tmp_coefficients$`Std. Error`), 
 							P.unadj = c(NA, tmp_model_p$`Pr(>F)`, tmp_coefficients$`Pr(>|t|)`)
 						)
 					}else{
@@ -373,13 +377,14 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 							tmp_model_R2 <- performance::r2(tmp)
 							tmp_model_p <- anova(tmp)
 							tmp_random_p <- lmerTest::ranova(tmp)
-							tmp_res <- data.frame(method = paste0(method, " formula for ", formula), 
+							tmp_res <- data.frame(Method = paste0(method, " formula for ", formula), 
 								Measure = k, 
 								Factors = c("Model", rownames(tmp_model_p), rownames(tmp_random_p), rownames(tmp_coefficients)), 
 								Conditional_R2 = c(tmp_model_R2$R2_conditional, rep(NA, nrow(tmp_model_p) + nrow(tmp_random_p) + length(rownames(tmp_coefficients)))),
 								Marginal_R2 = c(tmp_model_R2$R2_marginal, rep(NA, nrow(tmp_model_p) + nrow(tmp_random_p) + length(rownames(tmp_coefficients)))),
-								Estimate = c(NA, rep(NA, nrow(tmp_model_p) + nrow(tmp_random_p)), tmp_coefficients$Estimate), 
-								P.unadj = c(NA, tmp_model_p$`Pr(>F)`, tmp_random_p$`Pr(>Chisq)`, tmp_coefficients$`Pr(>|t|)`)
+								Estimate  = c(NA, rep(NA, nrow(tmp_model_p) + nrow(tmp_random_p)), tmp_coefficients$Estimate), 
+								Std.Error = c(NA, rep(NA, nrow(tmp_model_p) + nrow(tmp_random_p)), tmp_coefficients$`Std. Error`), 
+								P.unadj   = c(NA, tmp_model_p$`Pr(>F)`, tmp_random_p$`Pr(>Chisq)`, tmp_coefficients$`Pr(>|t|)`)
 							)
 						}else{
 							if(method == "glmm"){
@@ -393,18 +398,18 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 							tmp_summary <- summary(tmp)
 							tmp_coefficients <- as.data.frame(tmp_summary$coefficients$cond, check.names = FALSE)
 							tmp_model_p <- car::Anova(tmp)
-							tmp_model_R2 <- performance::r2(tmp)
-							test <- try(tmp_model_R2$R2_conditional, silent = TRUE)
-							if(inherits(test, "try-error")) {
+							tmp_model_R2 <- try(performance::r2(tmp), silent = TRUE)
+							if(inherits(tmp_model_R2, "try-error")) {
 								message("R2 unavailable for ", k, " !")
 								tmp_model_R2 <- list(R2_conditional = NA, R2_marginal = NA)
 							}
-							tmp_res <- data.frame(method = paste0(method, " formula for ", formula), 
+							tmp_res <- data.frame(Method = paste0(method, " formula for ", formula), 
 								Measure = k, 
 								Factors = c("Model", rownames(tmp_model_p), rownames(tmp_coefficients)), 
 								Conditional_R2 = c(tmp_model_R2$R2_conditional, rep(NA, nrow(tmp_model_p) + length(rownames(tmp_coefficients)))),
 								Marginal_R2 = c(tmp_model_R2$R2_marginal, rep(NA, nrow(tmp_model_p) + length(rownames(tmp_coefficients)))),
 								Estimate = c(NA, rep(NA, nrow(tmp_model_p)), tmp_coefficients$Estimate), 
+								Std.Error = c(NA, rep(NA, nrow(tmp_model_p)), tmp_coefficients$`Std. Error`), 
 								P.unadj = c(NA, tmp_model_p$`Pr(>Chisq)`, tmp_coefficients$`Pr(>|z|)`)
 							)
 						}
@@ -431,8 +436,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		},
 		#' @description
 		#' Plot the alpha diversity. Box plot is used for the visualization of alpha diversity when the \code{group} is found in the object.
-		#' Heatmap is employed automatically to show the significances of differential test 
-		#' 		when the formula is found in the \code{res_diff} table of the object.
+		#'   Heatmap is employed automatically to show the significances of differential test 
+		#' 	 when the formula is found in the \code{res_diff} table in the object.
 		#'
 		#' @param color_values default \code{RColorBrewer::brewer.pal}(8, "Dark2"); color pallete for groups.
 		#' @param measure default "Shannon"; one alpha diversity index in the object.
@@ -462,7 +467,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @param point_alpha default 0.8; point transparency. Available when \code{use_boxplot = FALSE}.
 		#' @param add_line default FALSE; whether add line. Available when \code{use_boxplot = FALSE}.
 		#' @param line_size default 0.8; line size when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.
-		#' @param line_type default 1; an integer; line type when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.
+		#' @param line_type default 2; an integer; line type when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.
 		#' @param line_color default "grey50"; line color when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE} and \code{by_group} is NULL.
 		#' @param line_alpha default 0.5; line transparency when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.
 		#' @param heatmap_cell default "P.unadj"; the column of \code{res_diff} table for the cell of heatmap when formula with multiple factors is found in the method.
@@ -470,6 +475,16 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @param heatmap_x default "Factors"; the column of \code{res_diff} for the x axis of heatmap.
 		#' @param heatmap_y default "Taxa"; the column of \code{res_diff} for the y axis of heatmap.
 		#' @param heatmap_lab_fill default "P value"; legend title of heatmap.
+		#' @param coefplot_sig_pos default 2; Significance label position in the coefficient point and errorbar plot. 
+		#' 	  The formula is \code{Estimate + coefplot_sig_pos * Std.Error}.
+		#' 	  This plot is used when there is only one measure found in the table, 
+		#' 	  and 'Estimate' and 'Std.Error' are both in the column names (such as for \code{lm} and \code{lme methods}).
+		#' 	  The x axis is 'Estimate', and y axis denotes 'Factors'.
+		#' 	  When coefplot_sig_pos is a negative value, the label is in the left of the errorbar.
+		#' 	  Errorbar size and width in the coefficient point plot can be adjusted with the parameters \code{errorbar_size} and \code{errorbar_width}. 
+		#' 	  Point size and alpha can be adjusted with parameters \code{point_size} and \code{point_alpha}. 
+		#' 	  The significance label size can be adjusted with parameter \code{add_sig_text_size}.
+		#' 	  Furthermore, the vertical line around 0 can be adjusted with parameters \code{line_size}, \code{line_type}, \code{line_color} and \code{line_alpha}. 
 		#' @param ... parameters passing to \code{ggpubr::ggboxplot} function when box plot is used or 
 		#' 	  \code{plot_cor} function in \code{\link{trans_env}} class for the heatmap of multiple factors when formula is found in the \code{res_diff} of the object.
 		#' @return ggplot.
@@ -506,7 +521,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			point_alpha = 0.8,
 			add_line = FALSE,
 			line_size = 0.8, 
-			line_type = 1,
+			line_type = 2,
 			line_color = "grey50",
 			line_alpha = 0.5, 
 			heatmap_cell = "P.unadj",
@@ -514,30 +529,63 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			heatmap_x = "Factors",
 			heatmap_y = "Measure",
 			heatmap_lab_fill = "P value",
+			coefplot_sig_pos = 2,
 			...
 			){
+			# first determine visualization way
 			if(is.null(self$res_diff)){
 				use_heatmap <- FALSE
 			}else{
-				if(any(grepl("formula", self$res_diff$method))){
+				if(any(grepl("formula", self$res_diff[, "Method"]))){
 					use_heatmap <- TRUE
 				}else{
 					use_heatmap <- FALSE
 				}
 			}
 			if(use_heatmap){
-				tmp <- self$res_diff
-				if("by_group" %in% colnames(tmp)){
-					if(!is.factor(tmp[, "by_group"])){
-						if(is.factor(self$data_alpha[, self$by_group])){
-							tmp[, "by_group"] %<>% factor(., levels = levels(self$data_alpha[, self$by_group]))
-						}else{
-							tmp[, "by_group"] %<>% as.factor
+				# For only one measure case, use errorplot
+				if(all(c("Estimate", "Std.Error") %in% colnames(self$res_diff))){
+					if(length(unique(self$res_diff$Measure)) == 1){
+						message("For one measure, employ coefficient point and errorbar instead of heatmap ...")
+						use_errorplot <- TRUE
+					}else{
+						use_errorplot <- FALSE
+					}
+				}else{
+					use_errorplot <- FALSE
+				}
+				if(use_errorplot){
+					tmp_data <- self$res_diff
+					tmp_data %<>% .[!is.na(.$Estimate), ]
+					
+					tmp_data$sig_pos <- tmp_data$Estimate + coefplot_sig_pos * tmp_data$Std.Error
+					use_color_values <- expand_colors(color_values, length(unique(tmp_data$Factors)))
+					
+					p <- ggplot(tmp_data, aes(x = Estimate, y = Factors, color = Factors)) +
+						theme_bw() +
+						geom_point(size = point_size, alpha = point_alpha) + 
+						geom_errorbar(aes(xmin = Estimate - Std.Error, xmax = Estimate + Std.Error), width = errorbar_width, size = errorbar_size) +
+						scale_color_manual(values = use_color_values) + 
+						geom_text(aes(x = sig_pos, y = Factors, label = Significance), data = tmp_data, inherit.aes = FALSE, size = add_sig_text_size) +
+						geom_vline(xintercept = 0, linetype = line_type, size = line_size, color = line_color, alpha = line_alpha) + 
+						theme(panel.grid = element_blank(), legend.position = "none") +
+						ylab("") +
+						xlab("Coefficient")
+					
+				}else{
+					tmp <- self$res_diff
+					if("by_group" %in% colnames(tmp)){
+						if(!is.factor(tmp[, "by_group"])){
+							if(is.factor(self$data_alpha[, self$by_group])){
+								tmp[, "by_group"] %<>% factor(., levels = levels(self$data_alpha[, self$by_group]))
+							}else{
+								tmp[, "by_group"] %<>% as.factor
+							}
 						}
 					}
+					tmp_trans_env <- convert_diff2transenv(tmp, heatmap_x, heatmap_y, heatmap_cell, heatmap_sig, heatmap_lab_fill)
+					p <- tmp_trans_env$plot_cor(keep_full_name = TRUE, keep_prefix = TRUE, xtext_angle = xtext_angle, xtext_size = xtext_size, ...)
 				}
-				tmp_trans_env <- convert_diff2transenv(tmp, heatmap_x, heatmap_y, heatmap_cell, heatmap_sig, heatmap_lab_fill)
-				p <- tmp_trans_env$plot_cor(keep_full_name = TRUE, keep_prefix = TRUE, xtext_angle = xtext_angle, xtext_size = xtext_size, ...)
 			}else{
 				
 				cal_diff_method <- self$cal_diff_method
@@ -964,7 +1012,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				if(any(grepl("\\s", raw_groups))){
 					dunntest_final$Group %<>% gsub("&space&", " ", .)
 				}
-				dunnTest_res <- data.frame(Measure = measure, Test_method = use_method, dunntest_final)
+				dunnTest_res <- data.frame(Measure = measure, Method = use_method, dunntest_final)
 			}else{
 				max_group <- lapply(dunnTest_table$Comparison, function(x){
 					group_select <- unlist(strsplit(x, split = " - "))
@@ -975,7 +1023,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					dunnTest_table$Comparison %<>% gsub("sub&hyphen&sub", "-", ., fixed = TRUE)
 					max_group %<>% gsub("sub&hyphen&sub", "-", ., fixed = TRUE)
 				}
-				dunnTest_res <- data.frame(Measure = measure, Test_method = use_method, Group = max_group, dunnTest_table)
+				dunnTest_res <- data.frame(Measure = measure, Method = use_method, Group = max_group, dunnTest_table)
 			}
 			dunnTest_res
 		},
@@ -988,7 +1036,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			res1 <- data.frame(rownames(res1), res1, stringsAsFactors = FALSE, check.names = FALSE)
 			colnames(res1) <- c("Group", "Letter")
 			rownames(res1) <- NULL
-			res <- data.frame(Measure = measure, Test_method = "anova", res1)
+			res <- data.frame(Measure = measure, Method = "anova", res1)
 			res
 		},
 		group_value_compare = function(value, group, ...){
@@ -1016,12 +1064,12 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			if(method == "anova"){
 				model <- aov(reformulate(formula, "Value"), input_table, ...)
 				tmp <- summary(model)[[1]]
-				tmp_res <- data.frame(method = paste0(method, " formula for ", formula), Measure = measure, Factors = rownames(tmp), 
+				tmp_res <- data.frame(Method = paste0(method, " formula for ", formula), Measure = measure, Factors = gsub("\\s+$", "", rownames(tmp)), 
 					Df = tmp$Df, Fvalue = tmp$`F value`, P.unadj = tmp$`Pr(>F)`)
 			}
 			if(method == "scheirerRayHare"){
 				invisible(capture.output(tmp <- rcompanion::scheirerRayHare(reformulate(formula, "Value"), input_table, ...)))
-				tmp_res <- data.frame(method = paste0(method, " formula for ", formula), Measure = measure, Factors = rownames(tmp), 
+				tmp_res <- data.frame(Method = paste0(method, " formula for ", formula), Measure = measure, Factors = rownames(tmp), 
 					Df = tmp$Df, Fvalue = tmp$H, P.unadj = tmp$p.value)
 			}
 			if(method == "betareg"){
@@ -1035,9 +1083,10 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					tmp_coefficients <- summary(tmp)[[1]]
 					tmp_mean <- tmp_coefficients$mean %>% as.data.frame
 					tmp_precision <- tmp_coefficients$precision %>% as.data.frame
-					tmp_res <- data.frame(method = paste0(method, " formula for ", formula), Measure = measure, 
+					tmp_res <- data.frame(Method = paste0(method, " formula for ", formula), Measure = measure, 
 						Factors = c(rownames(tmp_mean), rownames(tmp_precision)), 
 						Estimate = c(tmp_mean$Estimate, tmp_precision$Estimate), 
+						Std.Error = c(tmp_mean$`Std. Error`, tmp_precision$`Std. Error`), 
 						Zvalue = c(tmp_mean$`z value`, tmp_precision$`z value`), 
 						P.unadj = c(tmp_mean$`Pr(>|z|)`, tmp_precision$`Pr(>|z|)`))
 				}

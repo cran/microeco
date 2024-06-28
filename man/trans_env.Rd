@@ -571,7 +571,7 @@ one or more elements of "point", "ellipse", "chull", "centroid" and "none"; "non
 
 \item{\code{ellipse_level}}{default .9; confidence level of ellipse when "ellipse" is in \code{plot_type}.}
 
-\item{\code{ellipse_type}}{default "t"; ellipse type when "ellipse" is in \code{plot_type}; see type in \code{\link{stat_ellipse}}.}
+\item{\code{ellipse_type}}{default "t"; ellipse type when "ellipse" is in \code{plot_type}; see type parameter in \code{stat_ellipse} function of ggplot2 package.}
 
 \item{\code{add_sample_label}}{default NULL; the column name in sample table, if provided, show the point name in plot.}
 
@@ -650,7 +650,7 @@ Mantel test between beta diversity matrix and environmental data.
 
 \item{\code{by_group}}{default NULL; one column name or number in sample_table; used to perform mantel test for different groups separately.}
 
-\item{\code{...}}{paremeters passed to \code{\link{mantel}} of vegan package.}
+\item{\code{...}}{paremeters passed to \code{mantel} of vegan package.}
 }
 \if{html}{\out{</div>}}
 }
@@ -705,7 +705,7 @@ Actually, it can also be applied to other correlation between any two variables 
 "pearson", "spearman" or "kendall" all refer to the correlation analysis based on the \code{cor.test} function in R.
 "maaslin2" is the method in \code{Maaslin2} package for finding associations between metadata and potentially high-dimensional microbial multi-omics data.}
 
-\item{\code{add_abund_table}}{default NULL; additional data table to be used. Samples must be rows.}
+\item{\code{add_abund_table}}{default NULL; additional data table to be used. Row names must be sample names.}
 
 \item{\code{filter_thres}}{default 0; the abundance threshold, such as 0.0005 when the input is relative abundance.
 The features with abundances lower than filter_thres will be filtered. This parameter cannot be applied when add_abund_table parameter is provided.}

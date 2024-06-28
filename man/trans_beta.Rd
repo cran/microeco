@@ -7,7 +7,7 @@
 This class is a wrapper for a series of beta-diversity related analysis, 
 including ordination analysis based on An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035>, group distance comparision, 
 clustering, perMANOVA based on Anderson al. (2008) <doi:10.1111/j.1442-9993.2001.01070.pp.x>, ANOSIM and PERMDISP.
-Note that the beta diversity analysis methods related with environmental variables are encapsulated within trans_env class.
+Note that the beta diversity analysis methods related with environmental variables are encapsulated within the \code{trans_env} class.
 }
 \examples{
 
@@ -22,7 +22,7 @@ t1 <- trans_beta$new(dataset = dataset, measure = "bray", group = "Group")
 ## Method `trans_beta$cal_ordination`
 ## ------------------------------------------------
 
-t1$cal_ordination(ordination = "PCoA")
+t1$cal_ordination(method = "PCoA")
 
 ## ------------------------------------------------
 ## Method `trans_beta$plot_ordination`
@@ -111,8 +111,8 @@ t1$plot_clustering(group = "Group", replace_name = c("Saline", "Type"))
 \describe{
 \item{\code{dataset}}{the object of \code{\link{microtable}} class.}
 
-\item{\code{measure}}{default NULL; bray, jaccard, wei_unifrac or unwei_unifrac, or other name of matrix stored in \code{microtable$beta_diversity}; 
-used for ordination, manova, group distance comparision, etc. The measure must be one of names in \code{microtable$beta_diversity} list. 
+\item{\code{measure}}{default NULL; a matrix name stored in \code{microtable$beta_diversity} list, such as "bray" or "jaccard", or a customized matrix; 
+used for ordination, manova, group distance comparision, etc.;
 Please see \code{cal_betadiv} function of \code{\link{microtable}} class for more details.}
 
 \item{\code{group}}{default NULL; sample group used for manova, betadisper or group distance comparision.}
@@ -120,7 +120,7 @@ Please see \code{cal_betadiv} function of \code{\link{microtable}} class for mor
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-parameters stored in the object.
+measure, group and dataset stored in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -139,7 +139,7 @@ t1 <- trans_beta$new(dataset = dataset, measure = "bray", group = "Group")
 Unconstrained ordination.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_ordination(
-  ordination = "PCoA",
+  method = "PCoA",
   ncomp = 3,
   trans = FALSE,
   scale_species = FALSE,
@@ -151,22 +151,23 @@ Unconstrained ordination.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{ordination}}{default "PCoA"; "PCA", "DCA", "PCoA" or "NMDS". PCA: principal component analysis; DCA: detrended correspondence analysis; 
-PCoA: principal coordinates analysis; NMDS: non-metric multidimensional scaling.}
+\item{\code{method}}{default "PCoA"; "PCA", "DCA", "PCoA" or "NMDS". PCA: principal component analysis; DCA: detrended correspondence analysis; 
+PCoA: principal coordinates analysis; NMDS: non-metric multidimensional scaling. 
+Please refer to the paper <doi:10.1111/j.1574-6941.2007.00375.x> for the details of the methods.}
 
-\item{\code{ncomp}}{default 3; dimensions shown in the results.}
+\item{\code{ncomp}}{default 3; dimensions shown in the results (except method "NMDS").}
 
-\item{\code{trans}}{default FALSE; whether species abundance will be square transformed; only available when \code{ordination} is "PCA" or "DCA".}
+\item{\code{trans}}{default FALSE; whether species abundance will be square transformed; only available when \code{method} is "PCA" or "DCA".}
 
 \item{\code{scale_species}}{default FALSE; whether species loading in PCA or DCA is scaled.}
 
 \item{\code{scale_species_ratio}}{default 0.8; the ratio to scale up the loading; multiply by the maximum distance between samples and origin. 
 Only available when \code{scale_species = TURE}.}
 
-\item{\code{...}}{parameters passed to \code{vegan::rda} function when \code{ordination = "PCA"}, 
-or \code{vegan::decorana} function when \code{ordination = "DCA"}, 
-or \code{ape::pcoa} function when \code{ordination = "PCoA"}, 
-or \code{vegan::metaMDS} function when when \code{ordination = "NMDS"}.}
+\item{\code{...}}{parameters passed to \code{vegan::rda} function when \code{method = "PCA"}, 
+or \code{vegan::decorana} function when \code{method = "DCA"}, 
+or \code{ape::pcoa} function when \code{method = "PCoA"}, 
+or \code{vegan::metaMDS} function when when \code{method = "NMDS"}.}
 }
 \if{html}{\out{</div>}}
 }
@@ -175,7 +176,7 @@ or \code{vegan::metaMDS} function when when \code{ordination = "NMDS"}.}
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{t1$cal_ordination(ordination = "PCoA")
+\preformatted{t1$cal_ordination(method = "PCoA")
 }
 \if{html}{\out{</div>}}
 
@@ -221,7 +222,7 @@ Plot the ordination result.
 \describe{
 \item{\code{plot_type}}{default "point"; one or more elements of "point", "ellipse", "chull" and "centroid".
 \describe{
-  \item{\strong{'point'}}{add point}
+  \item{\strong{'point'}}{add sample points}
   \item{\strong{'ellipse'}}{add confidence ellipse for points of each group}
   \item{\strong{'chull'}}{add convex hull for points of each group}
   \item{\strong{'centroid'}}{add centroid line of each group}
@@ -255,7 +256,7 @@ Plot the ordination result.
 
 \item{\code{ellipse_level}}{default .9; confidence level of ellipse when "ellipse" is in \code{plot_type} parameter.}
 
-\item{\code{ellipse_type}}{default "t"; ellipse type when "ellipse" is in \code{plot_type} parameter; see type in \code{\link{stat_ellipse}}.}
+\item{\code{ellipse_type}}{default "t"; ellipse type when "ellipse" is in \code{plot_type} parameter; see type in \code{stat_ellipse}.}
 
 \item{\code{NMDS_stress_pos}}{default c(1, 1); a numerical vector with two values used to represent the insertion position of the stress text. 
 The first one denotes the x-axis, while the second one corresponds to the y-axis. 
@@ -300,7 +301,7 @@ t1$plot_ordination(plot_color = "Group", plot_type = c("point", "centroid"),
 \if{html}{\out{<a id="method-trans_beta-cal_manova"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_beta-cal_manova}{}}}
 \subsection{Method \code{cal_manova()}}{
-Calculate perMANOVA (Permutational Multivariate Analysis of Variance) based on <doi:10.1111/j.1442-9993.2001.01070.pp.x> and R vegan \code{adonis2} function.
+Calculate perMANOVA (Permutational Multivariate Analysis of Variance) based on the \code{adonis2} function of vegan package <doi:10.1111/j.1442-9993.2001.01070.pp.x>.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_manova(
   manova_all = TRUE,
@@ -318,8 +319,9 @@ Calculate perMANOVA (Permutational Multivariate Analysis of Variance) based on <
 \item{\code{manova_all}}{default TRUE; TRUE represents test for all the groups, i.e. the overall test;
 FALSE represents test for all the paired groups.}
 
-\item{\code{manova_set}}{default NULL; other specified group set for manova, such as \code{"Group + Type"} and \code{"Group*Type"}; see also \code{\link{adonis2}}.
-manova_set has higher priority than manova_all parameter. If manova_set is provided; manova_all is disabled.}
+\item{\code{manova_set}}{default NULL; other specified group set for manova, such as \code{"Group + Type"} and \code{"Group*Type"}.
+Please also see the \code{formula} parameter (only right-hand side) in \code{adonis2} function of vegan package.
+The parameter manova_set has higher priority than manova_all parameter. If manova_set is provided; manova_all is disabled.}
 
 \item{\code{group}}{default NULL; a column name of \code{sample_table} used for manova. If NULL, search \code{group} variable stored in the object.
 Available when \code{manova_set} is not provided.}
@@ -327,14 +329,15 @@ Available when \code{manova_set} is not provided.}
 \item{\code{by_group}}{default NULL; one column name in \code{sample_table}; used to perform paired comparisions within each group. 
 Only available when \code{manova_all = FALSE} and \code{manova_set} is not provided.}
 
-\item{\code{p_adjust_method}}{default "fdr"; p.adjust method; available when \code{manova_all = FALSE}; see method parameter of \code{p.adjust} function for available options.}
+\item{\code{p_adjust_method}}{default "fdr"; p.adjust method; available when \code{manova_all = FALSE}; 
+see \code{method} parameter of \code{p.adjust} function for available options.}
 
-\item{\code{...}}{parameters passed to \code{\link{adonis2}} function of \code{vegan} package.}
+\item{\code{...}}{parameters passed to \code{adonis2} function of \code{vegan} package.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-\code{res_manova} stored in object.
+\code{res_manova} stored in object with \code{data.frame} class.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -349,7 +352,7 @@ Only available when \code{manova_all = FALSE} and \code{manova_set} is not provi
 \if{html}{\out{<a id="method-trans_beta-cal_anosim"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_beta-cal_anosim}{}}}
 \subsection{Method \code{cal_anosim()}}{
-Analysis of similarities (ANOSIM) based on R vegan \code{anosim} function.
+Analysis of similarities (ANOSIM) based on the \code{anosim} function of vegan package.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_anosim(
   paired = FALSE,
@@ -372,12 +375,12 @@ Only available when \code{paired = TRUE}.}
 
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; available when \code{paired = TRUE}; see method parameter of \code{p.adjust} function for available options.}
 
-\item{\code{...}}{parameters passed to \code{\link{anosim}} function of \code{vegan} package.}
+\item{\code{...}}{parameters passed to \code{anosim} function of \code{vegan} package.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-\code{res_anosim} stored in object.
+\code{res_anosim} stored in object with \code{data.frame} class.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -392,7 +395,7 @@ Only available when \code{paired = TRUE}.}
 \if{html}{\out{<a id="method-trans_beta-cal_betadisper"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_beta-cal_betadisper}{}}}
 \subsection{Method \code{cal_betadisper()}}{
-A wrapper for \code{betadisper} function in vegan package for multivariate homogeneity test of groups dispersions (PERMDISP).
+Multivariate homogeneity test of groups dispersions (PERMDISP) based on \code{betadisper} function in vegan package.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_betadisper(...)}\if{html}{\out{</div>}}
 }
@@ -400,7 +403,7 @@ A wrapper for \code{betadisper} function in vegan package for multivariate homog
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{...}}{parameters passed to \code{\link{betadisper}} function.}
+\item{\code{...}}{parameters passed to \code{betadisper} function.}
 }
 \if{html}{\out{</div>}}
 }
@@ -420,7 +423,7 @@ A wrapper for \code{betadisper} function in vegan package for multivariate homog
 \if{html}{\out{<a id="method-trans_beta-cal_group_distance"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_beta-cal_group_distance}{}}}
 \subsection{Method \code{cal_group_distance()}}{
-Convert sample distances within groups or between groups.
+Convert symmetric distance matrix to distance table of paired samples that are within groups or between groups.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_group_distance(
   within_group = TRUE,
@@ -433,10 +436,10 @@ Convert sample distances within groups or between groups.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{within_group}}{default TRUE; whether transform sample distance within groups, if FALSE, transform sample distance between any two groups.}
+\item{\code{within_group}}{default TRUE; whether obtain distance table of paired samples within groups; if FALSE, obtain distances of paired samples between any two groups.}
 
-\item{\code{by_group}}{default NULL; one colname name of sample_table in \code{microtable} object.
-If provided, transform distances by the provided by_group parameter. This is especially useful for ordering and filtering values further.
+\item{\code{by_group}}{default NULL; one colname name of \code{sample_table} in \code{microtable} object.
+If provided, transform distances by the provided \code{by_group} parameter. This is especially useful for ordering and filtering values further.
 When \code{within_group = TRUE}, the result of by_group parameter is the format of paired groups.
 When \code{within_group = FALSE}, the result of by_group parameter is the format same with the group information in \code{sample_table}.}
 
@@ -464,7 +467,7 @@ t1$cal_group_distance(within_group = TRUE)
 \if{html}{\out{<a id="method-trans_beta-cal_group_distance_diff"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_beta-cal_group_distance_diff}{}}}
 \subsection{Method \code{cal_group_distance_diff()}}{
-Differential test of distances among groups.
+Differential test of converted distances across groups.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_group_distance_diff(
   group = NULL,
@@ -509,7 +512,7 @@ t1$cal_group_distance_diff()
 \if{html}{\out{<a id="method-trans_beta-plot_group_distance"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_beta-plot_group_distance}{}}}
 \subsection{Method \code{plot_group_distance()}}{
-Plotting the distance between samples within or between groups.
+Plot the distances of paired groups within or between groups.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_beta$plot_group_distance(plot_group_order = NULL, ...)}\if{html}{\out{</div>}}
 }
@@ -541,7 +544,7 @@ t1$plot_group_distance()
 \if{html}{\out{<a id="method-trans_beta-plot_clustering"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_beta-plot_clustering}{}}}
 \subsection{Method \code{plot_clustering()}}{
-Plotting clustering result based on the \code{ggdendro} package.
+Plot clustering result based on the \code{ggdendro} package.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_beta$plot_clustering(
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),

@@ -242,7 +242,7 @@ passed to \code{trans_env$cal_cor} function when method = "maaslin2".}
 \subsection{Returns}{
 res_diff and res_abund.\cr
   \strong{res_abund} includes mean abundance of each taxa (Mean), standard deviation (SD), standard error (SE) and sample number (N) in the group (Group).\cr
-  \strong{res_diff} is the detailed differential test result, may containing:\cr
+  \strong{res_diff} is the detailed differential test result depending on the method choice, may containing:\cr
     \strong{"Comparison"}: The groups for the comparision, maybe all groups or paired groups. If this column is not found, all groups are used;\cr
     \strong{"Group"}: Which group has the maximum median or mean value across the test groups; 
        For non-parametric methods, median value; For t.test, mean value;\cr
@@ -251,6 +251,8 @@ res_diff and res_abund.\cr
     \strong{"LDA" or "MeanDecreaseGini"}: LDA: linear discriminant score in LEfSe; MeanDecreaseGini: mean decreasing gini index in random forest;\cr
     \strong{"P.unadj"}: original p value;\cr
     \strong{"P.adj"}: adjusted p value;\cr
+    \strong{"Estimate" and "Std.Error"}: When method is "betareg", "lm", "lme" or "glmm", 
+       "Estimate" and "Std.Error" represent fitted coefficient and its standard error, respectively;\cr
     \strong{Others}: qvalue: qvalue in metastat analysis.
 }
 \subsection{Examples}{
@@ -387,10 +389,15 @@ Bar plot for indicator index, such as LDA score and P value.
   keep_full_name = FALSE,
   keep_prefix = TRUE,
   group_order = NULL,
-  axis_text_y = 12,
+  group_aggre = TRUE,
+  group_two_sep = TRUE,
   coord_flip = TRUE,
+  add_sig = FALSE,
+  add_sig_increase = 0.1,
+  add_sig_text_size = 5,
   xtext_angle = 45,
   xtext_size = 10,
+  axis_text_y = 12,
   heatmap_cell = "P.unadj",
   heatmap_sig = "Significance",
   heatmap_x = "Factors",
@@ -423,14 +430,25 @@ The input select_group must be one of \code{object$res_diff$Comparison}.}
 If NULL, the function can first determine whether the group column of \code{microtable$sample_table} is factor. If yes, use the levels in it.
 If provided, this parameter can overwrite the levels in the group of \code{microtable$sample_table}.}
 
-\item{\code{axis_text_y}}{default 12; the size for the y axis text.}
+\item{\code{group_aggre}}{default TRUE; whether aggregate the features for each group.}
+
+\item{\code{group_two_sep}}{default TRUE; whether display the features of two groups on opposite sides of the coordinate axes when there are only two groups in total.}
 
 \item{\code{coord_flip}}{default TRUE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical becomes horizontal.}
+
+\item{\code{add_sig}}{default FALSE; whether add significance label (asterisk) above the bar.}
+
+\item{\code{add_sig_increase}}{default 0.1; the axis position (\code{Value + add_sig_increase * max(Value)}) from which to add the significance label; 
+only available when \code{add_sig = TRUE}.}
+
+\item{\code{add_sig_text_size}}{default 5; the size of added significance label; only available when \code{add_sig = TRUE}.}
 
 \item{\code{xtext_angle}}{default 45; number ranging from 0 to 90; used to make x axis text generate angle to reduce text overlap; 
 only available when coord_flip = FALSE.}
 
 \item{\code{xtext_size}}{default 10; the text size of x axis.}
+
+\item{\code{axis_text_y}}{default 12; the size for the y axis text.}
 
 \item{\code{heatmap_cell}}{default "P.unadj"; the column of data for the cell of heatmap when formula with multiple factors is found in the method.}
 
@@ -442,7 +460,7 @@ only available when coord_flip = FALSE.}
 
 \item{\code{heatmap_lab_fill}}{default "P value"; legend title of heatmap.}
 
-\item{\code{...}}{parameters passing to \code{\link{geom_bar}} for the bar plot or 
+\item{\code{...}}{parameters passing to \code{geom_bar} for the bar plot or 
 \code{plot_cor} function in \code{\link{trans_env}} class for the heatmap of multiple factors when formula is found in the method.}
 }
 \if{html}{\out{</div>}}

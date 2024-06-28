@@ -125,7 +125,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' 	 passed to \code{trans_env$cal_cor} function when method = "maaslin2".
 		#' @return res_diff and res_abund.\cr
 		#'   \strong{res_abund} includes mean abundance of each taxa (Mean), standard deviation (SD), standard error (SE) and sample number (N) in the group (Group).\cr
-		#'   \strong{res_diff} is the detailed differential test result, may containing:\cr
+		#'   \strong{res_diff} is the detailed differential test result depending on the method choice, may containing:\cr
 		#'     \strong{"Comparison"}: The groups for the comparision, maybe all groups or paired groups. If this column is not found, all groups are used;\cr
 		#'     \strong{"Group"}: Which group has the maximum median or mean value across the test groups; 
 		#'        For non-parametric methods, median value; For t.test, mean value;\cr
@@ -134,6 +134,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'     \strong{"LDA" or "MeanDecreaseGini"}: LDA: linear discriminant score in LEfSe; MeanDecreaseGini: mean decreasing gini index in random forest;\cr
 		#'     \strong{"P.unadj"}: original p value;\cr
 		#'     \strong{"P.adj"}: adjusted p value;\cr
+		#'     \strong{"Estimate" and "Std.Error"}: When method is "betareg", "lm", "lme" or "glmm", 
+		#'        "Estimate" and "Std.Error" represent fitted coefficient and its standard error, respectively;\cr
 		#'     \strong{Others}: qvalue: qvalue in metastat analysis.
 		#' @examples
 		#' \donttest{
@@ -243,7 +245,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 							abund_foralpha %<>% .[apply(., 1, function(x){length(unique(x)) != 1}), ]
 						}
 						if(method %in% c("betareg", "glmm_beta")){
-							if(any(abund_foralpha) > 1){
+							if(any(abund_foralpha > 1)){
 								abund_foralpha %<>% {./(max(.) + beta_pseudo)}
 							}
 							if(any(abund_foralpha == 0)){
@@ -1154,17 +1156,23 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' @param group_order default NULL; a vector to order the legend and colors in plot; 
 		#' 	  If NULL, the function can first determine whether the group column of \code{microtable$sample_table} is factor. If yes, use the levels in it.
 		#' 	  If provided, this parameter can overwrite the levels in the group of \code{microtable$sample_table}.
-		#' @param axis_text_y default 12; the size for the y axis text.
+		#' @param group_aggre default TRUE; whether aggregate the features for each group.
+		#' @param group_two_sep default TRUE; whether display the features of two groups on opposite sides of the coordinate axes when there are only two groups in total.
 		#' @param coord_flip default TRUE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical becomes horizontal.
+		#' @param add_sig default FALSE; whether add significance label (asterisk) above the bar.
+		#' @param add_sig_increase default 0.1; the axis position (\code{Value + add_sig_increase * max(Value)}) from which to add the significance label; 
+		#' 	  only available when \code{add_sig = TRUE}.
+		#' @param add_sig_text_size default 5; the size of added significance label; only available when \code{add_sig = TRUE}.
 		#' @param xtext_angle default 45; number ranging from 0 to 90; used to make x axis text generate angle to reduce text overlap; 
 		#' 	  only available when coord_flip = FALSE.
 		#' @param xtext_size default 10; the text size of x axis.
+		#' @param axis_text_y default 12; the size for the y axis text.
 		#' @param heatmap_cell default "P.unadj"; the column of data for the cell of heatmap when formula with multiple factors is found in the method.
 		#' @param heatmap_sig default "Significance"; the column of data for the significance label of heatmap.
 		#' @param heatmap_x default "Factors"; the column of data for the x axis of heatmap.
 		#' @param heatmap_y default "Taxa"; the column of data for the y axis of heatmap.
 		#' @param heatmap_lab_fill default "P value"; legend title of heatmap.
-		#' @param ... parameters passing to \code{\link{geom_bar}} for the bar plot or 
+		#' @param ... parameters passing to \code{geom_bar} for the bar plot or 
 		#' 	  \code{plot_cor} function in \code{\link{trans_env}} class for the heatmap of multiple factors when formula is found in the method.
 		#' @return ggplot.
 		#' @examples
@@ -1180,10 +1188,15 @@ trans_diff <- R6Class(classname = "trans_diff",
 			keep_full_name = FALSE,
 			keep_prefix = TRUE,
 			group_order = NULL,
-			axis_text_y = 12,
+			group_aggre = TRUE,
+			group_two_sep = TRUE,
 			coord_flip = TRUE,
+			add_sig = FALSE,
+			add_sig_increase = 0.1,
+			add_sig_text_size = 5,
 			xtext_angle = 45,
 			xtext_size = 10,
+			axis_text_y = 12,
 			heatmap_cell = "P.unadj",
 			heatmap_sig = "Significance",
 			heatmap_x = "Factors",
@@ -1273,10 +1286,12 @@ trans_diff <- R6Class(classname = "trans_diff",
 				use_data %<>% .[sel_num, ]
 				if("Group" %in% colnames(use_data)){
 					if(is.null(group_order)){
-						if((!is.null(self$group_order)) & (length(unique(use_data$Group)) == length(self$group_order))){
-							use_data$Group %<>% factor(., levels = self$group_order)
-						}else{
-							use_data$Group %<>% as.character %>% as.factor
+						if(!is.factor(use_data$Group)){
+							if((!is.null(self$group_order)) & (length(unique(use_data$Group)) == length(self$group_order))){
+								use_data$Group %<>% factor(., levels = self$group_order)
+							}else{
+								use_data$Group %<>% as.character %>% as.factor
+							}
 						}
 					}else{
 						use_data$Group %<>% factor(., levels = group_order)
@@ -1291,31 +1306,41 @@ trans_diff <- R6Class(classname = "trans_diff",
 					}else{
 						color_values <- expand_colors(color_values, length(levels(use_data$Group)))
 					}
+				}
+				
+				if(group_aggre & "Group" %in% colnames(use_data)){
 					# rearrange orders
-					if(length(levels(use_data$Group)) == 2){
-						use_data$Taxa %<>% as.character %>% factor(., levels = rev(unique(unlist(lapply(levels(use_data$Group), function(x){
+					use_data$Taxa %<>% as.character
+					if(length(levels(use_data$Group)) == 2 & group_two_sep){
+						feature_orders <- lapply(levels(use_data$Group), function(x){
 							if(x == levels(use_data$Group)[1]){
 								use_data[as.character(use_data$Group) %in% x, ] %>% .[order(.$Value, decreasing = TRUE), "Taxa"]
 							}else{
 								use_data[as.character(use_data$Group) %in% x, ] %>% .[order(.$Value, decreasing = FALSE), "Taxa"]
 							}
-						})))))
+						}) %>% unlist %>% unique
 						use_data[use_data$Group == levels(use_data$Group)[2], "Value"] %<>% {. * -1}
 					}else{
-						use_data$Taxa %<>% as.character %>% factor(., levels = rev(unique(unlist(lapply(levels(use_data$Group), function(x){
+						feature_orders <- lapply(levels(use_data$Group), function(x){
 							use_data[as.character(use_data$Group) %in% x, ] %>% .[order(.$Value, decreasing = TRUE), "Taxa"]
-						})))))
+						}) %>% unlist %>% unique
 					}
 				}else{
 					use_data %<>% .[order(.$Value, decreasing = TRUE), ]
-					if(coord_flip){
-						use_data$Taxa %<>% factor(., levels = rev(.))
-					}else{
-						use_data$Taxa %<>% factor(., levels = .)
-					}
-					ylab_title <- "Value"
+					feature_orders <- use_data$Taxa
 				}
+
+				if(coord_flip){
+					use_data$Taxa %<>% factor(., levels = rev(feature_orders))
+				}else{
+					use_data$Taxa %<>% factor(., levels = feature_orders)
+				}
+
 				self$plot_diff_bar_taxa <- levels(use_data$Taxa) %>% rev
+				if(add_sig){
+					added_value <- add_sig_increase * max(abs(use_data$Value))
+					use_data$add_sig_position <- ifelse(use_data$Value > 0, use_data$Value + added_value, use_data$Value - added_value)
+				}
 				
 				if("Group" %in% colnames(use_data)){
 					p <- ggplot(use_data, aes(x = Taxa, y = Value, color = Group, fill = Group, group = Group)) +
@@ -1333,6 +1358,10 @@ trans_diff <- R6Class(classname = "trans_diff",
 					theme(panel.grid.minor.y = element_blank(), panel.grid.major.y = element_blank(), panel.grid.minor.x = element_blank()) +
 					theme(panel.border = element_blank()) +
 					theme(axis.line.x = element_line(color = "grey60", linetype = "solid", lineend = "square"))
+				
+				if(add_sig){
+					p <- p + geom_text(aes(x = Taxa, y = add_sig_position, label = Significance), data = use_data, size = add_sig_text_size)
+				}
 				
 				if(coord_flip){
 					p <- p + coord_flip()

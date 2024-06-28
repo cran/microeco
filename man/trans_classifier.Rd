@@ -2,7 +2,7 @@
 % Please edit documentation in R/trans_classifier.R
 \name{trans_classifier}
 \alias{trans_classifier}
-\title{Create trans_classifier object for machine-learning-based model prediction.}
+\title{Create \code{trans_classifier} object for machine-learning-based model prediction.}
 \description{
 This class is a wrapper for methods of machine-learning-based classification or regression models, including data pre-processing, feature selection, 
 data split, model training, prediction, confusionMatrix and ROC (Receiver Operator Characteristic) or PR (Precision-Recall) curve.
@@ -28,6 +28,7 @@ t1 <- trans_classifier$new(
 ## ------------------------------------------------
 
 \dontrun{
+# "nzv" removes near zero variance predictors
 t1$cal_preProcess(method = c("center", "scale", "nzv"))
 }
 
@@ -121,6 +122,22 @@ t1$plot_ROC(size = 1, alpha = 0.7)
 \dontrun{
 t1$cal_caretList(methodList = c('rf', 'svmRadial'))
 }
+
+## ------------------------------------------------
+## Method `trans_classifier$cal_caretList_resamples`
+## ------------------------------------------------
+
+\dontrun{
+t1$cal_caretList_resamples()
+}
+
+## ------------------------------------------------
+## Method `trans_classifier$plot_caretList_resamples`
+## ------------------------------------------------
+
+\dontrun{
+t1$plot_caretList_resamples()
+}
 }
 \section{Methods}{
 \subsection{Public methods}{
@@ -138,6 +155,8 @@ t1$cal_caretList(methodList = c('rf', 'svmRadial'))
 \item \href{#method-trans_classifier-cal_ROC}{\code{trans_classifier$cal_ROC()}}
 \item \href{#method-trans_classifier-plot_ROC}{\code{trans_classifier$plot_ROC()}}
 \item \href{#method-trans_classifier-cal_caretList}{\code{trans_classifier$cal_caretList()}}
+\item \href{#method-trans_classifier-cal_caretList_resamples}{\code{trans_classifier$cal_caretList_resamples()}}
+\item \href{#method-trans_classifier-plot_caretList_resamples}{\code{trans_classifier$plot_caretList_resamples()}}
 \item \href{#method-trans_classifier-clone}{\code{trans_classifier$clone()}}
 }
 }
@@ -145,7 +164,7 @@ t1$cal_caretList(methodList = c('rf', 'svmRadial'))
 \if{html}{\out{<a id="method-trans_classifier-new"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_classifier-new}{}}}
 \subsection{Method \code{new()}}{
-Create the trans_classifier object.
+Create a trans_classifier object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$new(
   dataset,
@@ -158,15 +177,16 @@ Create the trans_classifier object.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{dataset}}{the object of \code{\link{microtable}} Class.}
+\item{\code{dataset}}{an object of \code{\link{microtable}} class.}
 
-\item{\code{x.predictors}}{default "Genus"; character string or data.frame; a character string represents selecting the corresponding data from microtable$taxa_abund; 
-data.frame represents other customized input. See the following available options:
+\item{\code{x.predictors}}{default "Genus"; character string or data.frame; a character string represents selecting the corresponding data from \code{microtable$taxa_abund}; 
+data.frame denotes other customized input. See the following available options:
 \describe{
-  \item{\strong{'Genus'}}{use Genus level table in microtable$taxa_abund, or other specific taxonomic rank, e.g. 'Phylum'}
-  \item{\strong{'all'}}{use all the taxa stored in microtable$taxa_abund}
-  \item{\strong{other input}}{must be a data.frame; It should have the same format with the data.frame in microtable$taxa_abund, i.e. rows are features; 
-    cols are samples with same names in sample_table}
+  \item{\strong{'Genus'}}{use Genus level table in \code{microtable$taxa_abund}, or other specific taxonomic rank, e.g., 'Phylum'.
+     If an input level (e.g., ASV) is not found in the names of taxa_abund list, the function will use \code{otu_table} to calculate relative abundance of features.}
+  \item{\strong{'all'}}{use all the levels stored in \code{microtable$taxa_abund}.}
+  \item{\strong{other input}}{must be a data.frame object. It should have the same format with the tables in microtable$taxa_abund, i.e. rows are features; 
+    columns are samples with same names in sample_table.}
 }}
 
 \item{\code{y.response}}{default NULL; the response variable in \code{sample_table} of input \code{microtable} object.}
@@ -176,7 +196,7 @@ data.frame represents other customized input. See the following available option
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-data_feature and data_response in the object.
+\code{data_feature} and \code{data_response} stored in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -211,11 +231,12 @@ Pre-process (centering, scaling etc.) of the feature data based on the caret::pr
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-converted data_feature in the object.
+preprocessed \code{data_feature} in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
+# "nzv" removes near zero variance predictors
 t1$cal_preProcess(method = c("center", "scale", "nzv"))
 }
 }
@@ -242,9 +263,9 @@ Perform feature selection.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{boruta.maxRuns}}{default 300; maximal number of importance source runs; passed to the maxRuns parameter in Boruta function of Boruta package.}
+\item{\code{boruta.maxRuns}}{default 300; maximal number of importance source runs; passed to the \code{maxRuns} parameter in \code{Boruta} function of Boruta package.}
 
-\item{\code{boruta.pValue}}{default 0.01; p value passed to the pValue parameter in Boruta function of Boruta package.}
+\item{\code{boruta.pValue}}{default 0.01; p value passed to the pValue parameter in \code{Boruta} function of Boruta package.}
 
 \item{\code{boruta.repetitions}}{default 4; repetition runs for the feature selection.}
 
@@ -253,7 +274,7 @@ Perform feature selection.
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-optimized data_feature in the object.
+optimized \code{data_feature} in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -283,7 +304,7 @@ Split data for training and testing.
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-data_train and data_test in the object.
+\code{data_train} and \code{data_test} in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -300,7 +321,7 @@ t1$cal_split(prop.train = 3/4)
 \if{html}{\out{<a id="method-trans_classifier-set_trainControl"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_classifier-set_trainControl}{}}}
 \subsection{Method \code{set_trainControl()}}{
-Control parameters for the following training. See trainControl function of caret package for details.
+Control parameters for the following training. Please see \code{trainControl} function of caret package for details.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$set_trainControl(
   method = "repeatedcv",
@@ -321,12 +342,12 @@ see classProbs parameter in \code{caret::trainControl} function.}
 
 \item{\code{savePredictions}}{default TRUE; see \code{savePredictions} parameter in \code{caret::trainControl} function.}
 
-\item{\code{...}}{parameters pass to trainControl function of caret package.}
+\item{\code{...}}{parameters pass to \code{trainControl} function of caret package.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-trainControl in the object.
+\code{trainControl} in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -343,26 +364,29 @@ t1$set_trainControl(method = 'repeatedcv')
 \if{html}{\out{<a id="method-trans_classifier-cal_train"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_classifier-cal_train}{}}}
 \subsection{Method \code{cal_train()}}{
-Run the model training.
+Run the model training. Please see \href{https://topepo.github.io/caret/available-models.html}{https://topepo.github.io/caret/available-models.html} for available models.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_train(method = "rf", max.mtry = 2, max.ntree = 200, ...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_train(method = "rf", max.mtry = 2, ntree = 500, ...)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{method}}{default "rf"; "rf": random forest; see method in caret::train function for other options.}
+\item{\code{method}}{default "rf"; "rf": random forest; see method in \code{train} function of caret package for other options.
+For method = "rf", the \code{tuneGrid} is set: \code{expand.grid(mtry = seq(from = 1, to = max.mtry))}}
 
-\item{\code{max.mtry}}{default 2; for method = "rf"; maximum mtry used for the tunegrid to do hyperparameter tuning to optimize the model.}
+\item{\code{max.mtry}}{default 2; for method = "rf"; maximum mtry used in the \code{tuneGrid} to do hyperparameter tuning to optimize the model.}
 
-\item{\code{max.ntree}}{default 200; for method = "rf"; maximum number of trees used to optimize the model.}
+\item{\code{ntree}}{default 500; for method = "rf"; Number of trees to grow. 
+The default 500 is same with the \code{ntree} parameter in \code{randomForest} function in randomForest package.
+When it is a vector with more than one element, the function will try to optimize the model to select a best one, such as \code{c(100, 500, 1000)}.}
 
 \item{\code{...}}{parameters pass to \code{caret::train} function.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-res_train in the object.
+\code{res_train} in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -384,19 +408,23 @@ t1$cal_train(method = "svmRadial", tuneLength = 15)
 \subsection{Method \code{cal_feature_imp()}}{
 Get feature importance from the training model.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_feature_imp(...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_feature_imp(rf_feature_sig = FALSE, ...)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{...}}{parameters pass to varImp function of caret package.}
+\item{\code{rf_feature_sig}}{default FALSE; whether calculate feature significance in 'rf' model using \code{rfPermute} package; 
+only available for \code{method = "rf"} in \code{cal_train} function;}
+
+\item{\code{...}}{parameters pass to \code{varImp} function of caret package. 
+If \code{rf_feature_sig} is TURE and \code{train_method} is "rf", the parameters will be passed to \code{rfPermute} function of rfPermute package.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-res_feature_imp in the object. One row for each predictor variable. The column(s) are different importance measures.
-  For the method 'rf', it is MeanDecreaseGini (classification) or IncNodePurity (regression).
+\code{res_feature_imp} in the object. One row for each predictor variable. The column(s) are different importance measures.
+  For the method 'rf', it is MeanDecreaseGini (classification) or IncNodePurity (regression) when \code{rf_feature_sig = FALSE}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -415,18 +443,31 @@ t1$cal_feature_imp()
 \subsection{Method \code{plot_feature_imp()}}{
 Bar plot for feature importance.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$plot_feature_imp(...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$plot_feature_imp(
+  rf_sig_show = NULL,
+  show_sig_group = FALSE,
+  ...
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
+\item{\code{rf_sig_show}}{default NULL; "MeanDecreaseAccuracy" (Default) or "MeanDecreaseGini" for random forest classification;
+"\%IncMSE" (Default) or "IncNodePurity" for random forest regression;
+Only available when \code{rf_feature_sig = TRUE} in function \code{cal_feature_imp}, 
+which generate "MeanDecreaseGini" (and "MeanDecreaseAccuracy") or "\%IncMSE" (and "IncNodePurity") in the column names of \code{res_feature_imp};
+Function can also generate "Significance" according to the p value.}
+
+\item{\code{show_sig_group}}{default FALSE; whether show the features with different significant groups;
+Only available when "Significance" is found in the data.}
+
 \item{\code{...}}{parameters pass to \code{plot_diff_bar} function of \code{trans_diff} package.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-ggplot2 object.
+\code{ggplot2} object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -451,13 +492,31 @@ Run the prediction.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{positive_class}}{default NULL; see positive parameter in confusionMatrix function of caret package;
+\item{\code{positive_class}}{default NULL; see positive parameter in \code{confusionMatrix} function of caret package;
 If positive_class is NULL, use the first group in data as the positive class automatically.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-res_predict, res_confusion_fit and res_confusion_stats stored in the object.
+\code{res_predict}, \code{res_confusion_fit} and \code{res_confusion_stats} stored in the object.
+	  The \code{res_predict} is the predicted result for \code{data_test}.
+	  Several evaluation metrics in \code{res_confusion_fit} are defined as follows:
+	 \deqn{Accuracy = \frac{TP + TN}{TP + TN + FP + FN}}
+  \deqn{Sensitivity = Recall = TPR = \frac{TP}{TP + FN}}
+  \deqn{Specificity = TNR = 1 - FPR = \frac{TN}{TN + FP}}
+  \deqn{Precision = \frac{TP}{TP + FP}}
+	 \deqn{Prevalence = \frac{TP + FN}{TP + TN + FP + FN}}
+	 \deqn{F1-Score = \frac{2 * Precision * Recall}{Precision + Recall}}
+	 \deqn{Kappa = \frac{Accuracy - Pe}{1 - Pe}}
+  where TP is true positive; TN is ture negative; FP is false positive; and FN is false negative;
+  FPR is False Positive Rate; TPR is True Positive Rate; TNR is True Negative Rate;
+  Pe is the hypothetical probability of chance agreement on the classes for reference and prediction in the confusion matrix.
+  Accuracy represents the ratio of correct predictions.
+  Precision identifies how the model accurately predicted the positive classes.
+  Recall (sensitivity) measures the ratio of actual positives that are correctly identified by the model.
+  F1-score is the weighted average score of recall and precision. The value at 1 is the best performance and at 0 is the worst.
+  Prevalence represents how often positive events occurred.
+  Kappa identifies how well the model is predicting.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -474,7 +533,7 @@ t1$cal_predict()
 \if{html}{\out{<a id="method-trans_classifier-plot_confusionMatrix"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_classifier-plot_confusionMatrix}{}}}
 \subsection{Method \code{plot_confusionMatrix()}}{
-Plot the cross-tabulation of observed and predicted classes with associated statistics.
+Plot the cross-tabulation of observed and predicted classes with associated statistics based on the results of function \code{cal_predict}.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$plot_confusionMatrix(
   plot_confusion = TRUE,
@@ -492,7 +551,7 @@ Plot the cross-tabulation of observed and predicted classes with associated stat
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-ggplot object.
+\code{ggplot} object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -523,7 +582,8 @@ Get ROC (Receiver Operator Characteristic) curve data and the performance data.
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-a list res_ROC stored in the object.
+a list \code{res_ROC} stored in the object. It has two tables: \code{res_roc} and \code{res_pr}. AUC: Area Under the ROC Curve.
+  For the definition of metrics, please refer to the return part of function \code{cal_predict}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -569,12 +629,12 @@ other options should be one or more class names, same with the names in Group co
 
 \item{\code{plot_method}}{default FALSE; If TRUE, show the method in the legend though only one method is found.}
 
-\item{\code{...}}{parameters pass to geom_path function of ggplot2 package.}
+\item{\code{...}}{parameters pass to \code{geom_path} function of ggplot2 package.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-ggplot2 object.
+\code{ggplot2} object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -591,7 +651,7 @@ t1$plot_ROC(size = 1, alpha = 0.7)
 \if{html}{\out{<a id="method-trans_classifier-cal_caretList"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_classifier-cal_caretList}{}}}
 \subsection{Method \code{cal_caretList()}}{
-Use caretList function of caretEnsemble package to run multiple models. For the available models, please run \code{names(getModelInfo())}.
+Use \code{caretList} function of caretEnsemble package to run multiple models. For the available models, please run \code{names(getModelInfo())}.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_caretList(...)}\if{html}{\out{</div>}}
 }
@@ -599,17 +659,82 @@ Use caretList function of caretEnsemble package to run multiple models. For the 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{...}}{parameters pass to \code{caretList} function of caretEnsemble package.}
+\item{\code{...}}{parameters pass to \code{caretList} function of \code{caretEnsemble} package.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-res_caretList_models object.
+\code{res_caretList_models} in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
 t1$cal_caretList(methodList = c('rf', 'svmRadial'))
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_classifier-cal_caretList_resamples"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_classifier-cal_caretList_resamples}{}}}
+\subsection{Method \code{cal_caretList_resamples()}}{
+Use \code{resamples} function of caret package to collect the metric values based on the \code{res_caretList_models} data.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_caretList_resamples(...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{parameters pass to \code{resamples} function of \code{caret} package.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+\code{res_caretList_resamples} list and \code{res_caretList_resamples_reshaped} table in the object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$cal_caretList_resamples()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_classifier-plot_caretList_resamples"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_classifier-plot_caretList_resamples}{}}}
+\subsection{Method \code{plot_caretList_resamples()}}{
+Visualize the metric values based on the \code{res_caretList_resamples_reshaped} data.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$plot_caretList_resamples(
+  color_values = RColorBrewer::brewer.pal(8, "Dark2"),
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for the box.}
+
+\item{\code{...}}{parameters pass to \code{geom_boxplot} function of \code{ggplot2} package.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+ggplot object.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$plot_caretList_resamples()
 }
 }
 \if{html}{\out{</div>}}

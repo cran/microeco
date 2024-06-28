@@ -494,7 +494,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param ellipse_chull_fill default TRUE; whether fill colors to the area of ellipse or chull.
 		#' @param ellipse_chull_alpha default 0.1; color transparency in the ellipse or convex hull depending on whether "ellipse" or "centroid" is in \code{plot_type}.
 		#' @param ellipse_level default .9; confidence level of ellipse when "ellipse" is in \code{plot_type}.
-		#' @param ellipse_type default "t"; ellipse type when "ellipse" is in \code{plot_type}; see type in \code{\link{stat_ellipse}}.
+		#' @param ellipse_type default "t"; ellipse type when "ellipse" is in \code{plot_type}; see type parameter in \code{stat_ellipse} function of ggplot2 package.
 		#' @param add_sample_label default NULL; the column name in sample table, if provided, show the point name in plot.
 		#' @param env_nudge_x default NULL; numeric vector to adjust the env text x axis position; passed to nudge_x parameter of \code{ggrepel::geom_text_repel} function;
 		#'   default NULL represents automatic adjustment; the length must be same with the row number of \code{object$res_ordination_trans$df_arrows}. For example, 
@@ -738,7 +738,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param method default "pearson"; one of "pearson", "spearman" and "kendall"; correlation method; see method parameter in \code{vegan::mantel} function.
 		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options.
 		#' @param by_group default NULL; one column name or number in sample_table; used to perform mantel test for different groups separately.
-		#' @param ... paremeters passed to \code{\link{mantel}} of vegan package.
+		#' @param ... paremeters passed to \code{mantel} of vegan package.
 		#' @return \code{res_mantel} in object.
 		#' @examples
 		#' \donttest{
@@ -806,7 +806,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param cor_method default "pearson"; "pearson", "spearman", "kendall" or "maaslin2"; correlation method.
 		#' 	  "pearson", "spearman" or "kendall" all refer to the correlation analysis based on the \code{cor.test} function in R.
 		#' 	  "maaslin2" is the method in \code{Maaslin2} package for finding associations between metadata and potentially high-dimensional microbial multi-omics data.
-		#' @param add_abund_table default NULL; additional data table to be used. Samples must be rows.
+		#' @param add_abund_table default NULL; additional data table to be used. Row names must be sample names.
 		#' @param filter_thres default 0; the abundance threshold, such as 0.0005 when the input is relative abundance.
 		#' 	  The features with abundances lower than filter_thres will be filtered. This parameter cannot be applied when add_abund_table parameter is provided.
 		#' @param use_taxa_num default NULL; integer; a number used to select high abundant taxa; only useful when \code{use_data} parameter is a taxonomic level, e.g., "Genus".
@@ -860,6 +860,9 @@ trans_env <- R6Class(classname = "trans_env",
 				env_data <- private$check_numeric(env_data)
 			}
 			if(!is.null(add_abund_table)){
+				if(!any(rownames(add_abund_table) %in% rownames(env_data))){
+					stop("Please check provided add_abund_table! Row names of add_abund_table must be sample names!")
+				}
 				abund_table <- add_abund_table
 			}else{
 				check_taxa_abund(self$dataset)
@@ -1106,20 +1109,30 @@ trans_env <- R6Class(classname = "trans_env",
 					lim_x <- col_cluster %>% {.$labels[.$order]}
 				}
 			}else{
-				lim_y <- NULL
-				lim_x <- NULL
+				if(is.factor(use_data[, xvalue])){
+					lim_x <- levels(use_data[, xvalue])
+				}else{
+					lim_x <- NULL
+				}
+				if(is.factor(use_data[, "Taxa"])){
+					lim_y <- levels(use_data[, "Taxa"])
+				}else{
+					lim_y <- NULL
+				}				
 			}
 			# the input text_y_order or text_x_order has priority
-			if(!is.null(text_y_order) | !is.null(text_x_order)){
-				if(cluster_ggplot != "none"){
-					cluster_ggplot <- "none"
-					message("Change cluster_ggplot to none, as text_y_order and/or text_x_order provided!")
-				}
-				if(!is.null(text_y_order)){
-					lim_y <- rev(text_y_order)
-				}
-				if(!is.null(text_x_order)){
-					lim_x <- text_x_order
+			if(! pheatmap){
+				if(!is.null(text_y_order) | !is.null(text_x_order)){
+					if(cluster_ggplot != "none"){
+						cluster_ggplot <- "none"
+						message("Change cluster_ggplot to none, as text_y_order and/or text_x_order provided!")
+					}
+					if(!is.null(text_y_order)){
+						lim_y <- rev(text_y_order)
+					}
+					if(!is.null(text_x_order)){
+						lim_x <- text_x_order
+					}
 				}
 			}
 			if(pheatmap == T){
@@ -1327,10 +1340,12 @@ trans_env <- R6Class(classname = "trans_env",
 					}
 					# the sample_table names have been same with data_env when creading the object
 					group_vector <- self$dataset$sample_table[, group] %>% as.character
+				}else{
+					group_vector <- group
 				}
 			}
 			if(length(group_vector) != x_raw_length){
-				stop("The group length is not same with x length! Please check the input!")
+				stop("The group length is not same with x length! Please check the input data!")
 			}
 			if(is.vector(x) & is.vector(y)){
 				if(length(x) != length(y)){

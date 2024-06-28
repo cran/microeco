@@ -4,17 +4,17 @@
 #' This class is a wrapper for a series of beta-diversity related analysis, 
 #' including ordination analysis based on An et al. (2019) <doi:10.1016/j.geoderma.2018.09.035>, group distance comparision, 
 #' clustering, perMANOVA based on Anderson al. (2008) <doi:10.1111/j.1442-9993.2001.01070.pp.x>, ANOSIM and PERMDISP.
-#' Note that the beta diversity analysis methods related with environmental variables are encapsulated within trans_env class.
+#' Note that the beta diversity analysis methods related with environmental variables are encapsulated within the \code{trans_env} class.
 #'
 #' @export
 trans_beta <- R6Class(classname = "trans_beta",
 	public = list(
 		#' @param dataset the object of \code{\link{microtable}} class.
-		#' @param measure default NULL; bray, jaccard, wei_unifrac or unwei_unifrac, or other name of matrix stored in \code{microtable$beta_diversity}; 
-		#' 	 used for ordination, manova, group distance comparision, etc. The measure must be one of names in \code{microtable$beta_diversity} list. 
+		#' @param measure default NULL; a matrix name stored in \code{microtable$beta_diversity} list, such as "bray" or "jaccard", or a customized matrix; 
+		#' 	 used for ordination, manova, group distance comparision, etc.;
 		#' 	 Please see \code{cal_betadiv} function of \code{\link{microtable}} class for more details.
 		#' @param group default NULL; sample group used for manova, betadisper or group distance comparision.
-		#' @return parameters stored in the object.
+		#' @return measure, group and dataset stored in the object.
 		#' @examples
 		#' data(dataset)
 		#' t1 <- trans_beta$new(dataset = dataset, measure = "bray", group = "Group")
@@ -25,11 +25,12 @@ trans_beta <- R6Class(classname = "trans_beta",
 			){
 			check_microtable(dataset)
 			if(!is.null(measure)){
-				if(is.null(dataset$beta_diversity)){
-					stop("No beta_diversity list found in the input dataset! Please first use cal_betadiv function in microtable class to calculate it!")
-				}else{
+				if(is.vector(measure)){
 					if(length(measure) > 1){
 						stop("The input measure should only have one element! Please check it!")
+					}
+					if(is.null(dataset$beta_diversity)){
+						stop("No beta_diversity list found in the input dataset! Please first use cal_betadiv function in microtable class to calculate it!")
 					}
 					if(is.character(measure)){
 						if(!measure %in% names(dataset$beta_diversity)){
@@ -41,12 +42,29 @@ trans_beta <- R6Class(classname = "trans_beta",
 							if(measure > length(dataset$beta_diversity)){
 								stop("Input measure: ", measure, " is larger than total beta_diversity distance matrixes number! Please check it")
 							}
+							measure %<>% round
 						}else{
 							stop("Unknown format of input measure parameter!")
 						}
 					}
-					self$use_matrix <- dataset$beta_diversity[[measure]]
+					use_matrix <- dataset$beta_diversity[[measure]]
+				}else{
+					if(is.matrix(measure)){
+						if(! any(rownames(measure) %in% rownames(dataset$sample_table))){
+							stop("Provided measure is a matrix. The row names should be sample names!")
+						}
+						if(! any(colnames(measure) %in% rownames(dataset$sample_table))){
+							stop("Provided measure is a matrix. The column names should be sample names!")
+						}
+						if(! all(dataset$sample_names() %in% rownames(measure))){
+							stop("Some sample names are not found in the matrix of provided measure!")
+						}
+						use_matrix <- measure[dataset$sample_names(), dataset$sample_names()]
+					}else{
+						stop("Input measure parameter should be either a vector or a matrix!")
+					}
 				}
+				self$use_matrix <- use_matrix
 			}
 			if(!is.null(group)){
 				if(! group %in% colnames(dataset$sample_table)){
@@ -66,45 +84,50 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @description
 		#' Unconstrained ordination.
 		#'
-		#' @param ordination default "PCoA"; "PCA", "DCA", "PCoA" or "NMDS". PCA: principal component analysis; DCA: detrended correspondence analysis; 
-		#' 	  PCoA: principal coordinates analysis; NMDS: non-metric multidimensional scaling.
-		#' @param ncomp default 3; dimensions shown in the results.
-		#' @param trans default FALSE; whether species abundance will be square transformed; only available when \code{ordination} is "PCA" or "DCA".
+		#' @param method default "PCoA"; "PCA", "DCA", "PCoA" or "NMDS". PCA: principal component analysis; DCA: detrended correspondence analysis; 
+		#' 	  PCoA: principal coordinates analysis; NMDS: non-metric multidimensional scaling. 
+		#' 	  Please refer to the paper <doi:10.1111/j.1574-6941.2007.00375.x> for the details of the methods.
+		#' @param ncomp default 3; dimensions shown in the results (except method "NMDS").
+		#' @param trans default FALSE; whether species abundance will be square transformed; only available when \code{method} is "PCA" or "DCA".
 		#' @param scale_species default FALSE; whether species loading in PCA or DCA is scaled.
 		#' @param scale_species_ratio default 0.8; the ratio to scale up the loading; multiply by the maximum distance between samples and origin. 
 		#' 	  Only available when \code{scale_species = TURE}.
-		#' @param ... parameters passed to \code{vegan::rda} function when \code{ordination = "PCA"}, 
-		#' 	  or \code{vegan::decorana} function when \code{ordination = "DCA"}, 
-		#' 	  or \code{ape::pcoa} function when \code{ordination = "PCoA"}, 
-		#' 	  or \code{vegan::metaMDS} function when when \code{ordination = "NMDS"}.
+		#' @param ... parameters passed to \code{vegan::rda} function when \code{method = "PCA"}, 
+		#' 	  or \code{vegan::decorana} function when \code{method = "DCA"}, 
+		#' 	  or \code{ape::pcoa} function when \code{method = "PCoA"}, 
+		#' 	  or \code{vegan::metaMDS} function when when \code{method = "NMDS"}.
 		#' @return \code{res_ordination} stored in the object.
 		#' @examples
-		#' t1$cal_ordination(ordination = "PCoA")
+		#' t1$cal_ordination(method = "PCoA")
 		cal_ordination = function(
-			ordination = "PCoA",
+			method = "PCoA",
 			ncomp = 3,
 			trans = FALSE, 
 			scale_species = FALSE,
 			scale_species_ratio = 0.8,
 			...
 			){
-			if(is.null(ordination)){
-				stop("Input ordination should not be NULL !")
+			all_parameters <- c(as.list(environment()), list(...))
+			if("ordination" %in% names(all_parameters)){
+				stop("Parameter ordination is deprecated! Please use method instead of it!")
 			}
-			if(!ordination %in% c("PCA", "PCoA", "NMDS", "DCA")){
-				stop("Input ordination should be one of 'PCA', 'PCoA', 'NMDS' and 'DCA'!")
+			if(is.null(method)){
+				stop("Input method should not be NULL !")
+			}
+			if(!method %in% c("PCA", "PCoA", "NMDS", "DCA")){
+				stop("Input method should be one of 'PCA', 'PCoA', 'NMDS' and 'DCA'!")
 			}
 			dataset <- self$dataset
-			if(ordination %in% c("PCA", "DCA")){
-				plot.x <- switch(ordination, PCA = "PC1", DCA = "DCA1")
-				plot.y <- switch(ordination, PCA = "PC2", DCA = "DCA2")
+			if(method %in% c("PCA", "DCA")){
+				plot.x <- switch(method, PCA = "PC1", DCA = "DCA1")
+				plot.y <- switch(method, PCA = "PC2", DCA = "DCA2")
 				if(trans == T){
 					abund <- sqrt(dataset$otu_table)
 				}else{
 					abund <- dataset$otu_table
 				}
 				abund %<>% t
-				if(ordination == "PCA"){
+				if(method == "PCA"){
 					model <- rda(abund, ...)
 					expla <- round(model$CA$eig/model$CA$tot.chi*100, 1)
 				}else{
@@ -125,12 +148,12 @@ trans_beta <- R6Class(classname = "trans_beta",
 				}
 				outlist <- list(model = model, scores = combined, loading = loading, eig = expla)
 			}
-			if(ordination %in% c("PCoA", "NMDS")){
+			if(method %in% c("PCoA", "NMDS")){
 				if(is.null(self$use_matrix)){
 					stop("Please recreate the object and set the parameter measure !")
 				}
 			}
-			if(ordination == "PCoA"){
+			if(method == "PCoA"){
 				model <- ape::pcoa(as.dist(self$use_matrix), ...)
 				combined <- cbind.data.frame(model$vectors[,1:ncomp], dataset$sample_table)
 				colnames(combined)[1:ncomp] <- paste0("PCo", 1:ncomp)
@@ -138,21 +161,21 @@ trans_beta <- R6Class(classname = "trans_beta",
 				names(expla) <- paste0("PCo", 1:length(expla))
 				outlist <- list(model = model, scores = combined, eig = expla)
 			}
-			if(ordination == "NMDS"){
+			if(method == "NMDS"){
 				model <- vegan::metaMDS(as.dist(self$use_matrix), ...)
 				combined <- cbind.data.frame(model$points, dataset$sample_table)
 				outlist <- list(model = model, scores = combined)
 			}
 			self$res_ordination <- outlist
-			message('The ordination result is stored in object$res_ordination ...')
-			self$ordination <- ordination
+			message('The result is stored in object$res_ordination ...')
+			self$ordination_method <- method
 		},
 		#' @description
 		#' Plot the ordination result.
 		#'
 		#' @param plot_type default "point"; one or more elements of "point", "ellipse", "chull" and "centroid".
 		#'   \describe{
-		#'     \item{\strong{'point'}}{add point}
+		#'     \item{\strong{'point'}}{add sample points}
 		#'     \item{\strong{'ellipse'}}{add confidence ellipse for points of each group}
 		#'     \item{\strong{'chull'}}{add convex hull for points of each group}
 		#'     \item{\strong{'centroid'}}{add centroid line of each group}
@@ -171,7 +194,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @param ellipse_chull_fill default TRUE; whether fill colors to the area of ellipse or chull.
 		#' @param ellipse_chull_alpha default 0.1; color transparency in the ellipse or convex hull depending on whether "ellipse" or "centroid" is in \code{plot_type} parameter.
 		#' @param ellipse_level default .9; confidence level of ellipse when "ellipse" is in \code{plot_type} parameter.
-		#' @param ellipse_type default "t"; ellipse type when "ellipse" is in \code{plot_type} parameter; see type in \code{\link{stat_ellipse}}.
+		#' @param ellipse_type default "t"; ellipse type when "ellipse" is in \code{plot_type} parameter; see type in \code{stat_ellipse}.
 		#' @param NMDS_stress_pos default c(1, 1); a numerical vector with two values used to represent the insertion position of the stress text. 
 		#'   The first one denotes the x-axis, while the second one corresponds to the y-axis. 
 		#'   The assigned position is determined by multiplying the respective value with the maximum point on the corresponding coordinate axis. 
@@ -218,8 +241,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 			loading_text_size = 3,
 			loading_text_italic = FALSE
 			){
-			ordination <- self$ordination
-			if(is.null(ordination)){
+			ordination_method <- self$ordination_method
+			if(is.null(ordination_method)){
 				stop("Please first run cal_ordination function !")
 			}
 			if(is.null(plot_color)){
@@ -246,12 +269,12 @@ trans_beta <- R6Class(classname = "trans_beta",
 			if("point" %in% plot_type){
 				p <- p + geom_point(alpha = point_alpha, size = point_size)
 			}
-			if(ordination %in% c("PCA", "PCoA")){
+			if(ordination_method %in% c("PCA", "PCoA")){
 				p <- p + xlab(paste(plot_x, " [", eig[plot_x],"%]", sep = "")) + 
 					ylab(paste(plot_y, " [", eig[plot_y],"%]", sep = ""))
 			}
 			if(!is.null(NMDS_stress_pos)){
-				if(ordination == "NMDS"){
+				if(ordination_method == "NMDS"){
 					p <- p + annotate("text", x = max(combined[, 1]) * NMDS_stress_pos[1], y = max(combined[, 2]) * NMDS_stress_pos[2], 
 						label = paste0(NMDS_stress_text_prefix, round(model$stress, 2)), parse = TRUE)
 				}
@@ -309,7 +332,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			if(!is.null(plot_shape)){
 				p <- p + scale_shape_manual(values = shape_values)
 			}
-			if(loading_arrow & ordination %in% c("PCA", "DCA")){
+			if(loading_arrow & ordination_method %in% c("PCA", "DCA")){
 				df_arrows <- self$res_ordination$loading[1:loading_taxa_num, ]
 				colnames(df_arrows)[1:2] <- c("x", "y")
 				p <- p + geom_segment(
@@ -317,7 +340,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 					aes(x = 0, y = 0, xend = x, yend = y), 
 					arrow = arrow(length = unit(0.2, "cm")), 
 					color = loading_arrow_color, 
-					alpha = .6
+					alpha = .6,
+					inherit.aes = FALSE
 					)
 				df_arrows$label <- rownames(df_arrows)
 				if(loading_text_italic){
@@ -332,25 +356,28 @@ trans_beta <- R6Class(classname = "trans_beta",
 					size = loading_text_size, 
 					color = loading_text_color, 
 					segment.alpha = .01, 
-					parse = loading_text_parse
+					parse = loading_text_parse,
+					inherit.aes = FALSE
 				)
 			}
 			p
 		},
 		#' @description
-		#' Calculate perMANOVA (Permutational Multivariate Analysis of Variance) based on <doi:10.1111/j.1442-9993.2001.01070.pp.x> and R vegan \code{adonis2} function.
+		#' Calculate perMANOVA (Permutational Multivariate Analysis of Variance) based on the \code{adonis2} function of vegan package <doi:10.1111/j.1442-9993.2001.01070.pp.x>.
 		#'
 		#' @param manova_all default TRUE; TRUE represents test for all the groups, i.e. the overall test;
 		#'    FALSE represents test for all the paired groups.
-		#' @param manova_set default NULL; other specified group set for manova, such as \code{"Group + Type"} and \code{"Group*Type"}; see also \code{\link{adonis2}}.
-		#'    manova_set has higher priority than manova_all parameter. If manova_set is provided; manova_all is disabled.
+		#' @param manova_set default NULL; other specified group set for manova, such as \code{"Group + Type"} and \code{"Group*Type"}.
+		#'    Please also see the \code{formula} parameter (only right-hand side) in \code{adonis2} function of vegan package.
+		#'    The parameter manova_set has higher priority than manova_all parameter. If manova_set is provided; manova_all is disabled.
 		#' @param group default NULL; a column name of \code{sample_table} used for manova. If NULL, search \code{group} variable stored in the object.
 		#'    Available when \code{manova_set} is not provided.
 		#' @param by_group default NULL; one column name in \code{sample_table}; used to perform paired comparisions within each group. 
 		#'    Only available when \code{manova_all = FALSE} and \code{manova_set} is not provided.
-		#' @param p_adjust_method default "fdr"; p.adjust method; available when \code{manova_all = FALSE}; see method parameter of \code{p.adjust} function for available options.
-		#' @param ... parameters passed to \code{\link{adonis2}} function of \code{vegan} package.
-		#' @return \code{res_manova} stored in object.
+		#' @param p_adjust_method default "fdr"; p.adjust method; available when \code{manova_all = FALSE}; 
+		#'    see \code{method} parameter of \code{p.adjust} function for available options.
+		#' @param ... parameters passed to \code{adonis2} function of \code{vegan} package.
+		#' @return \code{res_manova} stored in object with \code{data.frame} class.
 		#' @examples
 		#' t1$cal_manova(manova_all = TRUE)
 		cal_manova = function(
@@ -395,19 +422,23 @@ trans_beta <- R6Class(classname = "trans_beta",
 					)
 				}
 			}
+			if(inherits(res, "anova")){
+				res %<>% as.data.frame
+				res$Significance <- generate_p_siglabel(res$`Pr(>F)`)
+			}
 			self$res_manova <- res
 			message('The result is stored in object$res_manova ...')
 		},
 		#' @description
-		#' Analysis of similarities (ANOSIM) based on R vegan \code{anosim} function.
+		#' Analysis of similarities (ANOSIM) based on the \code{anosim} function of vegan package.
 		#'
 		#' @param paired default FALSE; whether perform paired test between any two combined groups from all the input groups.
 		#' @param group default NULL; a column name of \code{sample_table}. If NULL, search \code{group} variable stored in the object.
 		#' @param by_group default NULL; one column name in \code{sample_table}; used to perform paired comparisions within each group. 
 		#'    Only available when \code{paired = TRUE}.
 		#' @param p_adjust_method default "fdr"; p.adjust method; available when \code{paired = TRUE}; see method parameter of \code{p.adjust} function for available options.
-		#' @param ... parameters passed to \code{\link{anosim}} function of \code{vegan} package.
-		#' @return \code{res_anosim} stored in object.
+		#' @param ... parameters passed to \code{anosim} function of \code{vegan} package.
+		#' @return \code{res_anosim} stored in object with \code{data.frame} class.
 		#' @examples
 		#' t1$cal_anosim()
 		cal_anosim = function(
@@ -444,19 +475,21 @@ trans_beta <- R6Class(classname = "trans_beta",
 					...
 				)
 			}else{
-				res <- anosim(
+				tmp <- anosim(
 					x = use_matrix, 
 					grouping = metadata[, group], 
 					...
 				)
+				res <- data.frame(Test = "ANOSIM for all groups", permutations = tmp$permutations, statistic.R = tmp$statistic, p.value = tmp$signif)
+				res$Significance <- generate_p_siglabel(res$p.value)
 			}
 			self$res_anosim <- res
 			message('The original result is stored in object$res_anosim ...')
 		},
 		#' @description
-		#' A wrapper for \code{betadisper} function in vegan package for multivariate homogeneity test of groups dispersions (PERMDISP).
+		#' Multivariate homogeneity test of groups dispersions (PERMDISP) based on \code{betadisper} function in vegan package.
 		#'
-		#' @param ... parameters passed to \code{\link{betadisper}} function.
+		#' @param ... parameters passed to \code{betadisper} function.
 		#' @return \code{res_betadisper} stored in object.
 		#' @examples
 		#' t1$cal_betadisper()
@@ -471,11 +504,11 @@ trans_beta <- R6Class(classname = "trans_beta",
 			message('The result is stored in object$res_betadisper ...')
 		},
 		#' @description
-		#' Convert sample distances within groups or between groups.
-		#'
-		#' @param within_group default TRUE; whether transform sample distance within groups, if FALSE, transform sample distance between any two groups.
-		#' @param by_group default NULL; one colname name of sample_table in \code{microtable} object.
-		#'   If provided, transform distances by the provided by_group parameter. This is especially useful for ordering and filtering values further.
+		#' Convert symmetric distance matrix to distance table of paired samples that are within groups or between groups.
+		#' 
+		#' @param within_group default TRUE; whether obtain distance table of paired samples within groups; if FALSE, obtain distances of paired samples between any two groups.
+		#' @param by_group default NULL; one colname name of \code{sample_table} in \code{microtable} object.
+		#'   If provided, transform distances by the provided \code{by_group} parameter. This is especially useful for ordering and filtering values further.
 		#'   When \code{within_group = TRUE}, the result of by_group parameter is the format of paired groups.
 		#'   When \code{within_group = FALSE}, the result of by_group parameter is the format same with the group information in \code{sample_table}.
 		#' @param ordered_group default NULL; a vector representing the ordered elements of \code{group} parameter; only useful when within_group = FALSE.
@@ -506,7 +539,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			message('The result is stored in object$res_group_distance ...')
 		},
 		#' @description
-		#' Differential test of distances among groups.
+		#' Differential test of converted distances across groups.
 		#'
 		#' @param group default NULL; a column name of \code{object$res_group_distance} used for the statistics; If NULL, use the \code{group} inside the object.
 		#' @param by_group default NULL; a column of \code{object$res_group_distance} used to perform the differential test 
@@ -523,6 +556,9 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' }
 		cal_group_distance_diff = function(group = NULL, by_group = NULL, by_ID = NULL, ...){
 			res_group_distance <- self$res_group_distance
+			if(is.null(res_group_distance)){
+				stop("Please first run cal_group_distance function!")
+			}
 			# use method in trans_alpha
 			temp1 <- suppressMessages(trans_alpha$new(dataset = NULL))
 			res_group_distance$Measure <- "group_distance"
@@ -553,7 +589,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			message('The result is stored in object$res_group_distance_diff ...')
 		},
 		#' @description
-		#' Plotting the distance between samples within or between groups.
+		#' Plot the distances of paired groups within or between groups.
 		#'
 		#' @param plot_group_order default NULL; a vector used to order the groups in the plot.
 		#' @param ... parameters (except measure) passed to \code{plot_alpha} function of \code{\link{trans_alpha}} class.
@@ -564,6 +600,9 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' }
 		plot_group_distance = function(plot_group_order = NULL, ...){
 			if(is.null(self$res_group_distance_diff)){
+				if(is.null(self$res_group_distance)){
+					stop("Please first run cal_group_distance function!")
+				}
 				group_distance <- self$res_group_distance
 				group <- self$group
 			}else{
@@ -605,7 +644,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			p
 		},
 		#' @description
-		#' Plotting clustering result based on the \code{ggdendro} package.
+		#' Plot clustering result based on the \code{ggdendro} package.
 		#'
 		#' @param color_values default RColorBrewer::brewer.pal(8, "Dark2"); color palette for the text.
 		#' @param measure default NULL; beta diversity index; If NULL, using the measure when creating object
