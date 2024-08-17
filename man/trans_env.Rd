@@ -679,6 +679,8 @@ Actually, it can also be applied to other correlation between any two variables 
 \if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_cor(
   use_data = c("Genus", "all", "other")[1],
   cor_method = c("pearson", "spearman", "kendall", "maaslin2")[1],
+  partial = FALSE,
+  partial_fix = NULL,
   add_abund_table = NULL,
   filter_thres = 0,
   use_taxa_num = NULL,
@@ -698,12 +700,20 @@ Actually, it can also be applied to other correlation between any two variables 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{use_data}}{default "Genus"; "Genus", "all" or "other"; "Genus" or other taxonomic name: use genus or other taxonomic abundance table in \code{taxa_abund}; 
-"all": use all merged taxonomic abundance table; "other": provide additional taxa name with \code{other_taxa} parameter which is necessary.}
+\item{\code{use_data}}{default "Genus"; "Genus", "all" or "other"; 
+"Genus" or other taxonomic names (e.g., "Phylum", "ASV"): invoke taxonomic abundance table in \code{taxa_abund} list of the \code{microtable} object; 
+"all": merge all the taxonomic abundance tables in \code{taxa_abund} list into one; "other": provide additional taxa names by assigning \code{other_taxa} parameter.}
 
 \item{\code{cor_method}}{default "pearson"; "pearson", "spearman", "kendall" or "maaslin2"; correlation method.
 "pearson", "spearman" or "kendall" all refer to the correlation analysis based on the \code{cor.test} function in R.
 "maaslin2" is the method in \code{Maaslin2} package for finding associations between metadata and potentially high-dimensional microbial multi-omics data.}
+
+\item{\code{partial}}{default FALSE; whether perform partial correlation based on the \code{ppcor} package.}
+
+\item{\code{partial_fix}}{default NULL; selected environmental variable names used as third group of variables in all the partial correlations. 
+If NULL; all the variables (except the one for correlation) in the environmental data will be used as the third group of variables.
+Otherwise, the function will control for the provided variables (one or more) in all the partial correlations, 
+and the variables in \code{partial_fix} will not be employed anymore in the correlation analysis.}
 
 \item{\code{add_abund_table}}{default NULL; additional data table to be used. Row names must be sample names.}
 
@@ -712,9 +722,9 @@ The features with abundances lower than filter_thres will be filtered. This para
 
 \item{\code{use_taxa_num}}{default NULL; integer; a number used to select high abundant taxa; only useful when \code{use_data} parameter is a taxonomic level, e.g., "Genus".}
 
-\item{\code{other_taxa}}{default NULL; character vector containing a series of feature names; used when use_data = "other"; 
-provided names should be standard full names used to select taxa from all the tables in taxa_abund list of the microtable object;
-please see the example.}
+\item{\code{other_taxa}}{default NULL; character vector containing a series of feature names; available when \code{use_data = "other"}; 
+provided names should be standard full names used to select taxa from all the tables in \code{taxa_abund} list of the \code{microtable} object;
+please refer to the example.}
 
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options.
 \code{p_adjust_method = "none"} can disable the p value adjustment.}
@@ -894,10 +904,10 @@ Scatter plot with fitted line based on the correlation or regression.\cr
   point_size = 5,
   point_alpha = 0.6,
   line_size = 0.8,
-  line_alpha = 1,
   line_color = "black",
   line_se = TRUE,
   line_se_color = "grey70",
+  line_alpha = 0.5,
   pvalue_trim = 4,
   cor_coef_trim = 3,
   lm_equation = TRUE,
@@ -959,13 +969,13 @@ If group_order is provided, disable the group orders or factor levels in the \co
 
 \item{\code{line_size}}{default 0.8; line size value.}
 
-\item{\code{line_alpha}}{default 1; alpha value for the line color transparency.}
-
 \item{\code{line_color}}{default "black"; fitted line color; only available when \code{group = NULL}.}
 
 \item{\code{line_se}}{default TRUE; Whether show the confidence interval for the fitting.}
 
 \item{\code{line_se_color}}{default "grey70"; the color to fill the confidence interval when \code{line_se = TRUE}.}
+
+\item{\code{line_alpha}}{default 0.5; alpha value for the color transparency of line confidence interval.}
 
 \item{\code{pvalue_trim}}{default 4; trim the decimal places of p value.}
 

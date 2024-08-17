@@ -1,7 +1,7 @@
 Package: microeco
 Type: Package
 Title: Microbial Community Ecology Data Analysis
-Version: 1.8.0
+Version: 1.9.0
 Authors@R: c(person("Chi", "Liu", role = c("aut", "cre"), email = "liuchi0426@126.com"),
               person("Felipe", "R. P. Mansoldo", role = "ctb", email = "mansoldo@micro.ufrj.br"),
               person("Minjie", "Yao", role = "ctb", email = "yaomj@fafu.edu.cn"),
@@ -17,14 +17,14 @@ URL: https://github.com/ChiLiubio/microeco
 Depends: R (>= 3.5.0)
 Imports: R6, stats, ape, vegan, rlang, data.table, magrittr, dplyr,
         tibble, scales, grid, ggplot2 (>= 3.5.0), RColorBrewer,
-        reshape2, igraph
+        reshape2, igraph (>= 2.0.0)
 Suggests: GUniFrac, MASS, ggpubr, randomForest, ggdendro, ggrepel,
         agricolae, gridExtra, picante, pheatmap, rgexf, mice, GGally
 License: GPL-3
 LazyData: true
 Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2024-06-28 02:03:21 UTC; Chi
+Packaged: 2024-08-16 14:33:37 UTC; Chi
 Repository: CRAN
-Date/Publication: 2024-06-28 04:40:06 UTC
-RoxygenNote: 7.3.1
+Date/Publication: 2024-08-17 23:30:02 UTC
+RoxygenNote: 7.3.2

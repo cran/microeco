@@ -60,7 +60,10 @@ microtable <- R6Class(classname = "microtable",
 					`row.names<-`(.$SampleID)
 			}else{
 				if(!inherits(sample_table, "data.frame")){
-					stop("The input sample_table must be data.frame format!")
+					stop("Input sample_table must be data.frame format!")
+				}
+				if(inherits(sample_table, "tbl_df")){
+					stop("Input sample_table is of tbl_df class! It may be created using tibble package! Please convert it to traditional data.frame class!")
 				}
 				self$sample_table <- sample_table
 			}
@@ -199,11 +202,12 @@ microtable <- R6Class(classname = "microtable",
 			suppressMessages(self$tidy_dataset())
 		},
 		#' @description
-		#' Trim all the data in the \code{microtable} object to make taxa and samples consistent. So the results are intersections.
+		#' Trim all the data in the \code{microtable} object to make taxa and samples consistent. The results are intersections across data.
 		#'
 		#' @param main_data default FALSE; if TRUE, only basic data in \code{microtable} object is trimmed. Otherwise, all data, 
 		#' 	  including \code{taxa_abund}, \code{alpha_diversity} and \code{beta_diversity}, are all trimed.
-		#' @return None, object of \code{microtable} itself cleaned up. 
+		#' @return None. The data in the object are tidied up. 
+		#' 	  If \code{tax_table} is in object, its row names are totally same with the row names of \code{otu_table}.
 		#' @examples
 		#' m1$tidy_dataset(main_data = TRUE)
 		tidy_dataset = function(main_data = FALSE){
@@ -351,13 +355,13 @@ microtable <- R6Class(classname = "microtable",
 		#' @description
 		#' Merge samples according to specific group to generate a new \code{microtable}.
 		#'
-		#' @param use_group the group column in \code{sample_table}.
+		#' @param group a column name in \code{sample_table} of \code{microtable} object.
 		#' @return a new merged microtable object.
 		#' @examples
 		#' \donttest{
-		#' m1$merge_samples(use_group = "Group")
+		#' m1$merge_samples("Group")
 		#' }
-		merge_samples = function(use_group){
+		merge_samples = function(group){
 			otu_table <- self$otu_table
 			sample_table <- self$sample_table
 			if(!is.null(self$tax_table)){
@@ -375,8 +379,11 @@ microtable <- R6Class(classname = "microtable",
 			}else{
 				rep_fasta <- NULL
 			}
-			otu_table_new <- rowsum(t(otu_table), as.factor(as.character(sample_table[, use_group]))) %>% t %>% as.data.frame
-			sample_table_new <- data.frame(SampleID = unique(as.character(sample_table[, use_group]))) %>% `row.names<-`(.[,1])
+			if(! group %in% colnames(sample_table)){
+				stop("Provided parameter group must be a column name of sample_table !")
+			}
+			otu_table_new <- rowsum(t(otu_table), as.factor(as.character(sample_table[, group]))) %>% t %>% as.data.frame
+			sample_table_new <- data.frame(SampleID = unique(as.character(sample_table[, group]))) %>% `row.names<-`(.[,1])
 			microtable$new(
 				sample_table = sample_table_new, 
 				otu_table = otu_table_new, 

@@ -6,14 +6,14 @@
 #' @export
 trans_alpha <- R6Class(classname = "trans_alpha",
 	public = list(
-		#' @param dataset an object of \code{\link{microtable}} class.
-		#' @param group default NULL; a column name of \code{sample_table} used for the statistics.
+		#' @param dataset \code{\link{microtable}} object.
+		#' @param group default NULL; a column name of \code{sample_table} in the input microtable object used for the statistics across groups.
 		#' @param by_group default NULL; a column name of \code{sample_table} used to perform the differential test 
 		#'   among groups (from \code{group} parameter) for each group (from \code{by_group} parameter) separately.
 		#' @param by_ID default NULL; a column name of \code{sample_table} used to perform paired t test or paired wilcox test for the paired data,
 		#'   such as the data of plant compartments for different plant species (ID). 
 		#'   So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.
-		#' @param order_x default NULL; a \code{sample_table} column name or a vector with sample names; if provided, order samples by using \code{factor}.
+		#' @param order_x default NULL; a column name of \code{sample_table} or a vector with sample names. If provided, sort samples using \code{factor}.
 		#' @return \code{data_alpha} and \code{data_stat} stored in the object.
 		#' @examples
 		#' \donttest{
@@ -84,7 +84,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @description
 		#' Differential test on alpha diversity.
 		#'
-		#' @param measure default NULL; character vector; If NULL, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
+		#' @param measure default NULL; character vector; If NULL, all indexes will be used; see names of \code{microtable$alpha_diversity}, 
 		#' 	 e.g. \code{c("Observed", "Chao1", "Shannon")}.
 		#' @param method default "KW"; see the following available options:
 		#'   \describe{
@@ -92,8 +92,8 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#'     \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons <10.1080/00401706.1964.10490181> based on \code{dunnTest} function in \code{FSA} package}
 		#'     \item{\strong{'wilcox'}}{Wilcoxon Rank Sum Test for all paired groups}
 		#'     \item{\strong{'t.test'}}{Student's t-Test for all paired groups}
-		#'     \item{\strong{'anova'}}{Variance analysis. For one-way anova, the post hoc test is Duncan's new multiple range test 
-		#'     	  based on \code{duncan.test} function of \code{agricolae} package. Please use \code{anova_post_test} parameter to change post hoc method.
+		#'     \item{\strong{'anova'}}{Variance analysis. For one-way anova, the default post hoc test is Duncan's new multiple range test.
+		#'     	  Please use \code{anova_post_test} parameter to change the post hoc method.
 		#'     	  For multi-way anova, Please use \code{formula} parameter to specify the model and see \code{\link{aov}} for more details}
 		#'     \item{\strong{'scheirerRayHare'}}{Scheirer-Ray-Hare test (nonparametric test) for a two-way factorial experiment; 
 		#'     	  see \code{scheirerRayHare} function of \code{rcompanion} package}
@@ -108,22 +108,23 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#'     	  facilitating the fitting for proportional data (ranging from 0 to 1). The link function is fixed with \code{"logit"}.}
 		#'   }
 		#' @param p_adjust_method default "fdr" (for "KW", "wilcox", "t.test" methods) or "holm" (for "KW_dunn"); P value adjustment method; 
-		#' 	  For \code{method = 'KW', 'wilcox' or 't.test'}, please see method parameter of \code{p.adjust} function for available options;
+		#' 	  For \code{method = 'KW', 'wilcox' or 't.test'}, please see \code{method} parameter of \code{p.adjust} function for available options;
 		#' 	  For \code{method = 'KW_dunn'}, please see \code{dunn.test::p.adjustment.methods} for available options.
-		#' @param formula default NULL; applied to two-way or multi-factor anova when 
-		#'   method = \code{"anova"} or \code{"scheirerRayHare"} or \code{"lme"} or \code{"betareg"} or \code{"glmm"}; 
+		#' @param formula default NULL; applied to two-way or multi-factor analysis when 
+		#'   method is \code{"anova"}, \code{"scheirerRayHare"}, \code{"lm"}, \code{"lme"}, \code{"betareg"} or \code{"glmm"}; 
 		#'   specified set for independent variables, i.e. the latter part of a general formula, 
 		#'   such as \code{'block + N*P*K'}.
-		#' @param KW_dunn_letter default TRUE; For \code{method = 'KW_dunn'}, \code{TRUE} denotes paired significances are presented by letters;
+		#' @param KW_dunn_letter default TRUE; For \code{method = 'KW_dunn'}, \code{TRUE} denotes significances are presented by letters;
 		#'   \code{FALSE} means significances are shown by asterisk for paired comparison.
 		#' @param alpha default 0.05; Significant level; used for generating significance letters when method is 'anova' or 'KW_dunn'.
 		#' @param anova_post_test default "duncan.test". The post hoc test method for one-way anova. Other available options include "LSD.test" and "HSD.test". 
 		#'   All those are the function names in \code{agricolae} package.
-		#' @param return_model default FALSE; whether return the original lmer or glmm model list in the object.
+		#' @param return_model default FALSE; whether return the original "lm", "lmer" or "glmm" model list in the object.
 		#' @param ... parameters passed to \code{kruskal.test} (when \code{method = "KW"}) or \code{wilcox.test} function (when \code{method = "wilcox"}) or 
 		#'   \code{dunnTest} function of \code{FSA} package (when \code{method = "KW_dunn"}) or 
 		#'   \code{agricolae::duncan.test}/\code{agricolae::LSD.test}/\code{agricolae::HSD.test} (when \code{method = "anova"}, one-way anova) or 
 		#'   \code{rcompanion::scheirerRayHare} (when \code{method = "scheirerRayHare"}) or 
+		#'   \code{stats::lm} (when \code{method = "lm"}) or 
 		#'   \code{lmerTest::lmer} (when \code{method = "lme"}) or 
 		#'   \code{betareg::betareg} (when \code{method = "betareg"}) or 
 		#'   \code{glmmTMB::glmmTMB} (when \code{method = "glmm"}).
@@ -355,13 +356,13 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 						}
 						tmp_summary <- summary(tmp)
 						tmp_coefficients <- as.data.frame(tmp_summary$coefficients, check.names = FALSE)
-						tmp_model_R2 <- performance::r2(tmp)
 						tmp_model_p <- anova(tmp)
+						R2data <- private$R2_extract(tmp, nrow(tmp_model_p) + nrow(tmp_coefficients))
+
 						tmp_res <- data.frame(Method = paste0(method, " formula for ", formula), 
 							Measure = k, 
 							Factors = c("Model", rownames(tmp_model_p), rownames(tmp_coefficients)), 
-							R2 = c(tmp_model_R2$R2, rep(NA, nrow(tmp_model_p) + length(rownames(tmp_coefficients)))),
-							R2_adjusted = c(tmp_model_R2$R2_adjusted, rep(NA, nrow(tmp_model_p) + length(rownames(tmp_coefficients)))),
+							R2data, 
 							Estimate  = c(NA, rep(NA, nrow(tmp_model_p)), tmp_coefficients$Estimate), 
 							Std.Error = c(NA, rep(NA, nrow(tmp_model_p)), tmp_coefficients$`Std. Error`), 
 							P.unadj = c(NA, tmp_model_p$`Pr(>F)`, tmp_coefficients$`Pr(>|t|)`)
@@ -374,14 +375,14 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 							}
 							tmp_summary <- summary(tmp)
 							tmp_coefficients <- as.data.frame(tmp_summary$coefficients, check.names = FALSE)
-							tmp_model_R2 <- performance::r2(tmp)
 							tmp_model_p <- anova(tmp)
 							tmp_random_p <- lmerTest::ranova(tmp)
+							R2data <- private$R2_extract(tmp, nrow(tmp_model_p) + nrow(tmp_random_p) + nrow(tmp_coefficients))
+							
 							tmp_res <- data.frame(Method = paste0(method, " formula for ", formula), 
 								Measure = k, 
 								Factors = c("Model", rownames(tmp_model_p), rownames(tmp_random_p), rownames(tmp_coefficients)), 
-								Conditional_R2 = c(tmp_model_R2$R2_conditional, rep(NA, nrow(tmp_model_p) + nrow(tmp_random_p) + length(rownames(tmp_coefficients)))),
-								Marginal_R2 = c(tmp_model_R2$R2_marginal, rep(NA, nrow(tmp_model_p) + nrow(tmp_random_p) + length(rownames(tmp_coefficients)))),
+								R2data, 
 								Estimate  = c(NA, rep(NA, nrow(tmp_model_p) + nrow(tmp_random_p)), tmp_coefficients$Estimate), 
 								Std.Error = c(NA, rep(NA, nrow(tmp_model_p) + nrow(tmp_random_p)), tmp_coefficients$`Std. Error`), 
 								P.unadj   = c(NA, tmp_model_p$`Pr(>F)`, tmp_random_p$`Pr(>Chisq)`, tmp_coefficients$`Pr(>|t|)`)
@@ -398,16 +399,12 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 							tmp_summary <- summary(tmp)
 							tmp_coefficients <- as.data.frame(tmp_summary$coefficients$cond, check.names = FALSE)
 							tmp_model_p <- car::Anova(tmp)
-							tmp_model_R2 <- try(performance::r2(tmp), silent = TRUE)
-							if(inherits(tmp_model_R2, "try-error")) {
-								message("R2 unavailable for ", k, " !")
-								tmp_model_R2 <- list(R2_conditional = NA, R2_marginal = NA)
-							}
+							R2data <- private$R2_extract(tmp, nrow(tmp_model_p) + nrow(tmp_coefficients))
+
 							tmp_res <- data.frame(Method = paste0(method, " formula for ", formula), 
 								Measure = k, 
 								Factors = c("Model", rownames(tmp_model_p), rownames(tmp_coefficients)), 
-								Conditional_R2 = c(tmp_model_R2$R2_conditional, rep(NA, nrow(tmp_model_p) + length(rownames(tmp_coefficients)))),
-								Marginal_R2 = c(tmp_model_R2$R2_marginal, rep(NA, nrow(tmp_model_p) + length(rownames(tmp_coefficients)))),
+								R2data, 
 								Estimate = c(NA, rep(NA, nrow(tmp_model_p)), tmp_coefficients$Estimate), 
 								Std.Error = c(NA, rep(NA, nrow(tmp_model_p)), tmp_coefficients$`Std. Error`), 
 								P.unadj = c(NA, tmp_model_p$`Pr(>Chisq)`, tmp_coefficients$`Pr(>|z|)`)
@@ -435,20 +432,27 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			message('The result is stored in object$res_diff ...')
 		},
 		#' @description
-		#' Plot the alpha diversity. Box plot is used for the visualization of alpha diversity when the \code{group} is found in the object.
-		#'   Heatmap is employed automatically to show the significances of differential test 
-		#' 	 when the formula is found in the \code{res_diff} table in the object.
+		#' Plot the alpha diversity. 
+		#'   Box plot (and others for visualizing data in groups of single factor) is used for the visualization of alpha diversity when the \code{group} is found in the object.
+		#'   When the formula is found in the \code{res_diff} table in the object, 
+		#'   heatmap is employed automatically to show the significances of differential test for multiple indexes, 
+		#' 	 and errorbar (coefficient and standard errors) can be used for single index.
 		#'
+		#' @param plot_type default "ggboxplot"; plot type; available options include "ggboxplot", "ggdotplot", "ggviolin", "ggstripchart", "ggerrorplot", and "errorbar".
+		#'   The options starting with "gg" are function names coming from \code{ggpubr} package.
+		#'   All those methods with \code{ggpubr} package use the \code{data_alpha} table in the object. 
+		#'   "errorbar" represents mean-sd or mean-se plot based on \code{ggplot2} package by invoking the \code{data_stat} table in the object.
 		#' @param color_values default \code{RColorBrewer::brewer.pal}(8, "Dark2"); color pallete for groups.
 		#' @param measure default "Shannon"; one alpha diversity index in the object.
 		#' @param group default NULL; group name used for the plot.
+		#' @param add default NULL; add another plot element; passed to the \code{add} parameter of the function (e.g., \code{ggboxplot}) from \code{ggpubr} package 
+		#'   when \code{plot_type} starts with "gg" (functions coming from ggpubr package).
 		#' @param add_sig default TRUE; wheter add significance label using the result of \code{cal_diff} function, i.e. \code{object$res_diff};
 		#'   This is manily designed to add post hoc test of anova or other significances to make the label mapping easy.
 		#' @param add_sig_label default "Significance"; select a colname of \code{object$res_diff} for the label text when 'Letter' is not in the table, 
 		#'   such as 'P.adj' or 'Significance'.
 		#' @param add_sig_text_size default 3.88; the size of text in added label.
 		#' @param add_sig_label_num_dec default 4; reserved decimal places when the parameter \code{add_sig_label} use numeric column, like 'P.adj'.
-		#' @param boxplot_add default "jitter"; points type, see the add parameter in \code{ggpubr::ggboxplot}.
 		#' @param order_x_mean default FALSE; whether order x axis by the means of groups from large to small.
 		#' @param y_start default 0.1; the y axis value from which to add the significance asterisk label; 
 		#' 	  the default 0.1 means \code{max(values) + 0.1 * (max(values) - min(values))}.
@@ -458,18 +462,16 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' @param xtext_size default 13; x axis text size. NULL means the default size in ggplot2.
 		#' @param ytitle_size default 17; y axis title size.
 		#' @param barwidth default 0.9; the bar width in plot; applied when by_group is not NULL.
-		#' @param use_boxplot default TRUE; TRUE denotes boxplot by using the data_alpha table in the object. 
-		#' 	  FALSE represents mean-sd or mean-se plot by invoking the data_stat table in the object.
-		#' @param plot_SE default TRUE; TRUE: the errorbar is \eqn{mean±se}; FALSE: the errorbar is \eqn{mean±sd}.
-		#' @param errorbar_size default 1; errorbar size. Available when \code{use_boxplot = FALSE}.
-		#' @param errorbar_width default 0.2; errorbar width. Available when \code{use_boxplot = FALSE} and \code{by_group} is NULL.
-		#' @param point_size default 3; point size for taxa. Available when \code{use_boxplot = FALSE}.
-		#' @param point_alpha default 0.8; point transparency. Available when \code{use_boxplot = FALSE}.
-		#' @param add_line default FALSE; whether add line. Available when \code{use_boxplot = FALSE}.
-		#' @param line_size default 0.8; line size when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.
-		#' @param line_type default 2; an integer; line type when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.
-		#' @param line_color default "grey50"; line color when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE} and \code{by_group} is NULL.
-		#' @param line_alpha default 0.5; line transparency when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.
+		#' @param plot_SE default TRUE; TRUE: the errorbar is \eqn{mean±se}; FALSE: the errorbar is \eqn{mean±sd}. Available when \code{plot_type = "errorbar"}.
+		#' @param errorbar_size default 1; errorbar size. Available when \code{plot_type = "errorbar"}.
+		#' @param errorbar_width default 0.2; errorbar width. Available when \code{plot_type = "errorbar"} and \code{by_group} is NULL.
+		#' @param point_size default 3; point size for taxa. Available when \code{plot_type = "errorbar"}.
+		#' @param point_alpha default 0.8; point transparency. Available when \code{plot_type = "errorbar"}.
+		#' @param add_line default FALSE; whether add line. Available when \code{plot_type = "errorbar"}.
+		#' @param line_size default 0.8; line size when \code{add_line = TRUE}. Available when \code{plot_type = "errorbar"}.
+		#' @param line_type default 2; an integer; line type when \code{add_line = TRUE}. Available when \code{plot_type = "errorbar"}.
+		#' @param line_color default "grey50"; line color when \code{add_line = TRUE}. Available when \code{plot_type = "errorbar"} and \code{by_group} is NULL.
+		#' @param line_alpha default 0.5; line transparency when \code{add_line = TRUE}. Available when \code{plot_type = "errorbar"}.
 		#' @param heatmap_cell default "P.unadj"; the column of \code{res_diff} table for the cell of heatmap when formula with multiple factors is found in the method.
 		#' @param heatmap_sig default "Significance"; the column of \code{res_diff} for the significance label of heatmap.
 		#' @param heatmap_x default "Factors"; the column of \code{res_diff} for the x axis of heatmap.
@@ -485,7 +487,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' 	  Point size and alpha can be adjusted with parameters \code{point_size} and \code{point_alpha}. 
 		#' 	  The significance label size can be adjusted with parameter \code{add_sig_text_size}.
 		#' 	  Furthermore, the vertical line around 0 can be adjusted with parameters \code{line_size}, \code{line_type}, \code{line_color} and \code{line_alpha}. 
-		#' @param ... parameters passing to \code{ggpubr::ggboxplot} function when box plot is used or 
+		#' @param ... parameters passing to \code{ggpubr::ggboxplot} function (or other functions shown by \code{plot_type} parameter when it starts with "gg") or 
 		#' 	  \code{plot_cor} function in \code{\link{trans_env}} class for the heatmap of multiple factors when formula is found in the \code{res_diff} of the object.
 		#' @return ggplot.
 		#' @examples
@@ -498,14 +500,15 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 		#' t1$plot_alpha(measure = "Shannon", add_sig = TRUE)
 		#' }
 		plot_alpha = function(
+			plot_type = "ggboxplot",
 			color_values = RColorBrewer::brewer.pal(8, "Dark2"),
 			measure = "Shannon",
 			group = NULL,
+			add = NULL,
 			add_sig = TRUE,
 			add_sig_label = "Significance",
 			add_sig_text_size = 3.88,
 			add_sig_label_num_dec = 4,
-			boxplot_add = "jitter",
 			order_x_mean = FALSE,
 			y_start = 0.1,
 			y_increase = 0.05,
@@ -513,7 +516,6 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			xtext_size = 13,
 			ytitle_size = 17,
 			barwidth = 0.9,
-			use_boxplot = TRUE,
 			plot_SE = TRUE,
 			errorbar_size = 1,
 			errorbar_width = 0.2,
@@ -547,14 +549,14 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				if(all(c("Estimate", "Std.Error") %in% colnames(self$res_diff))){
 					if(length(unique(self$res_diff$Measure)) == 1){
 						message("For one measure, employ coefficient point and errorbar instead of heatmap ...")
-						use_errorplot <- TRUE
+						use_single_errorplot <- TRUE
 					}else{
-						use_errorplot <- FALSE
+						use_single_errorplot <- FALSE
 					}
 				}else{
-					use_errorplot <- FALSE
+					use_single_errorplot <- FALSE
 				}
-				if(use_errorplot){
+				if(use_single_errorplot){
 					tmp_data <- self$res_diff
 					tmp_data %<>% .[!is.na(.$Estimate), ]
 					
@@ -629,7 +631,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				}
 				
 				use_data <- self$data_alpha[self$data_alpha$Measure == measure, ]
-				if(!use_boxplot){
+				if(plot_type == "errorbar"){
 					use_data_plot <- self$data_stat[self$data_stat$Measure == measure, ]
 				}
 				
@@ -647,13 +649,13 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 						}) %>% unlist
 					}
 					use_data[, group] %<>% factor(., levels = mean_orders)
-					if(!use_boxplot){
+					if(plot_type == "errorbar"){
 						use_data_plot[, group] %<>% factor(., levels = mean_orders)
 					}
 				}else{
 					if(!is.factor(use_data[, group])){
 						use_data[, group] %<>% as.factor
-						if(!use_boxplot){
+						if(plot_type == "errorbar"){
 							use_data_plot[, group] %<>% as.factor
 						}
 					}
@@ -664,21 +666,24 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					}
 				}
 				color_values <- expand_colors(color_values, length(unique(use_data[, group])))
-				if(use_boxplot){
-					if(is.null(by_group)){
-						p <- ggpubr::ggboxplot(
-							use_data, x = group, y = "Value", color = group, 
-							palette = color_values, add = boxplot_add, outlier.colour = "white", 
-							...
-							)
-					}else{
-						p <- ggpubr::ggboxplot(
-							use_data, x = by_group, y = "Value", color = group, 
-							palette = color_values, add = boxplot_add, outlier.colour = "white", 
-							...
-							)
-					}
+				
+				if(! plot_type %in% c("ggboxplot", "ggdotplot", "ggviolin", "ggstripchart", "ggerrorplot", "errorbar")){
+					stop("Unknown plot_type: ", plot_type, "!")
+				}
+				if(is.null(add)){
+					add <- "none"
 				}else{
+					require(ggpubr)
+				}
+				if(plot_type %in% c("ggboxplot", "ggdotplot", "ggviolin", "ggstripchart", "ggerrorplot")){
+					use_ggpubr_function <- eval(parse(text = paste0("ggpubr::", plot_type)))
+					if(is.null(by_group)){
+						p <- use_ggpubr_function(use_data, x = group, y = "Value", color = group, palette = color_values, add = add, ...)
+					}else{
+						p <- use_ggpubr_function(use_data, x = by_group, y = "Value", color = group, palette = color_values, add = add, ...)
+					}
+				}
+				if(plot_type == "errorbar"){
 					colnames(use_data_plot)[colnames(use_data_plot) == "Mean"] <- "Value"
 					if(is.null(by_group)){
 						p <- ggplot(use_data_plot, aes(x = .data[[group]], y = .data[["Value"]], color = .data[[group]], group = 1))
@@ -1092,6 +1097,22 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				}
 			}
 			tmp_res
+		},
+		# extract R2 from models
+		R2_extract = function(model, number_supp){
+			tmp_model_R2 <- try(performance::r2(model), silent = TRUE)
+			if(inherits(tmp_model_R2, "try-error")) {
+				R2data <- data.frame(R2 = NA)
+			}else{
+				if(all(is.na(tmp_model_R2))){
+					R2data <- data.frame(R2 = NA)
+				}else{
+					R2data <- data.frame(R2 = c(
+						paste0(unlist(lapply(tmp_model_R2, function(x){paste0(names(x), ": ", x)})), collapse = "; "), 
+						rep(NA, number_supp)))
+				}
+			}
+			R2data
 		}
 	),
 	lock_objects = FALSE,

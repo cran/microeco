@@ -316,7 +316,7 @@ Construct network based on the \code{igraph} package or \code{SpiecEasi} package
   beemStatic_t_stab = 0.8,
   add_taxa_name = "Phylum",
   delete_unlinked_nodes = TRUE,
-  usename_rawtaxa_when_taxalevel_notOTU = FALSE,
+  usename_rawtaxa_notOTU = FALSE,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -387,7 +387,7 @@ the threshold used to limit the number of interactions (stability); same with th
 
 \item{\code{delete_unlinked_nodes}}{default TRUE; whether delete the nodes without any link.}
 
-\item{\code{usename_rawtaxa_when_taxalevel_notOTU}}{default FALSE; whether use OTU name as representatives of taxa when \code{taxa_level != "OTU"}.
+\item{\code{usename_rawtaxa_notOTU}}{default FALSE; whether use OTU name as representatives of taxa when \code{taxa_level != "OTU"}.
 Default \code{FALSE} means using taxonomic information of \code{taxa_level} instead of OTU name.}
 
 \item{\code{...}}{parameters pass to \code{SpiecEasi::spiec.easi} when \code{network_method = "SpiecEasi"};
@@ -469,7 +469,7 @@ t1$cal_module(method = "cluster_fast_greedy")
 \if{html}{\out{<a id="method-trans_network-save_network"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_network-save_network}{}}}
 \subsection{Method \code{save_network()}}{
-Save network as gexf style, which can be opened by Gephi (\href{https://gephi.org/}{https://gephi.org/}).
+Save network as gexf style, which can be opened by Gephi (https://gephi.org/).
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_network$save_network(filepath = "network.gexf")}\if{html}{\out{</div>}}
 }

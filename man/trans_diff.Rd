@@ -94,7 +94,7 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
   lefse_norm = 1e+06,
   nresam = 0.6667,
   boots = 30,
-  rf_ntree = 1000,
+  rf_imp_type = 2,
   group_choose_paired = NULL,
   metagenomeSeq_count = 1,
   ALDEx2_sig = c("wi.eBH", "kw.eBH"),
@@ -158,8 +158,9 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
         Please refer to glmmTMB package to select the family function, e.g. \code{family = glmmTMB::lognormal(link = "log")}.
         The usage of formula is similar with that in 'lme' method.
         For more available parameters, please see \code{glmmTMB::glmmTMB} function and use parameter passing.
-        In the return table, Conditional_R2 and Marginal_R2 represent total variance (explained by both fixed and random effects) and the variance explained by 
-        fixed effects, respectively. The significance of fixed factors are tested by Chi-square test from function \code{car::Anova}.
+        In the result, Conditional R2 and Marginal R2 represent the variance explained by both fixed and random effects and the variance explained by 
+        fixed effects, respectively. For more details on R2 calculation, please refer to the article <doi: 10.1098/rsif.2017.0213>.
+        The significance of fixed factors are tested by Chi-square test from function \code{car::Anova}.
         The significance of 'Estimate' in each term of fixed factors comes from the model.}
   \item{\strong{'glmm_beta'}}{Generalized linear mixed model with a family function of beta distribution, 
         developed for the relative abundance (ranging from 0 to 1) of taxa specifically. 
@@ -197,15 +198,19 @@ Only available when \code{method} is one of "KW", "KW_dunn", "wilcox", "t.test",
 
 \item{\code{lefse_min_subsam}}{default 10; sample numbers required in the subgroup test.}
 
-\item{\code{lefse_norm}}{default 1000000; scale value in lefse.}
+\item{\code{lefse_norm}}{default 1000000; normalization value used in lefse to scale abundances for each level. 
+A \code{lefse_norm} value < 0 (e.g., -1) means no normalization same with the LEfSe python version.}
 
 \item{\code{nresam}}{default 0.6667; sample number ratio used in each bootstrap for method = "lefse" or "rf".}
 
 \item{\code{boots}}{default 30; bootstrap test number for method = "lefse" or "rf".}
 
-\item{\code{rf_ntree}}{default 1000; see ntree in randomForest function of randomForest package when method = "rf".}
+\item{\code{rf_imp_type}}{default 2; the type of feature importance in random forest when \code{method = "rf"}. 
+Same with \code{type} parameter in \code{importance} function of \code{randomForest} package.
+1=mean decrease in accuracy (MeanDecreaseAccuracy), 2=mean decrease in node impurity (MeanDecreaseGini).}
 
-\item{\code{group_choose_paired}}{default NULL; a vector used for selecting the required groups for paired testing, only used for method = "metastat" or "metagenomeSeq".}
+\item{\code{group_choose_paired}}{default NULL; a vector used for selecting the required groups for paired testing instead of all paired combinations across groups;
+Available when method is "metastat", "metagenomeSeq", "ALDEx2_t" or "edgeR".}
 
 \item{\code{metagenomeSeq_count}}{default 1; Filter features to have at least 'counts' counts.; see the count parameter in MRcoefs function of \code{metagenomeSeq} package.}
 
@@ -231,6 +236,7 @@ The data that equal to 1 will be replaced by \code{1/(1 + beta_pseudo)}.}
 
 \item{\code{...}}{parameters passed to \code{cal_diff} function of \code{trans_alpha} class when method is one of 
 "KW", "KW_dunn", "wilcox", "t.test", "anova", "betareg", "lme", "glmm" or "glmm_beta";
+passed to \code{randomForest::randomForest} function when method = "rf";
 passed to \code{ANCOMBC::ancombc2} function when method is "ancombc2" (except tax_level, global and fix_formula parameters);
 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw";
 passed to \code{DESeq2::DESeq} function when method = "DESeq2";
@@ -248,7 +254,8 @@ res_diff and res_abund.\cr
        For non-parametric methods, median value; For t.test, mean value;\cr
     \strong{"Taxa"}: which taxa is used in this comparision;\cr
     \strong{"Method"}: Test method used in the analysis depending on the method input;\cr
-    \strong{"LDA" or "MeanDecreaseGini"}: LDA: linear discriminant score in LEfSe; MeanDecreaseGini: mean decreasing gini index in random forest;\cr
+    \strong{"LDA" or others}: LDA: linear discriminant score in LEfSe; 
+    	  MeanDecreaseAccuracy and MeanDecreaseGini: mean decreasing in accuracy or in node impurity (gini index) in random forest;\cr
     \strong{"P.unadj"}: original p value;\cr
     \strong{"P.adj"}: adjusted p value;\cr
     \strong{"Estimate" and "Std.Error"}: When method is "betareg", "lm", "lme" or "glmm", 
@@ -289,6 +296,7 @@ Plot the abundance of differential taxa
   add_sig = FALSE,
   add_sig_label = "Significance",
   add_sig_label_color = "black",
+  add_sig_text_size = 3.88,
   add_sig_tip_length = 0.01,
   y_start = 1.01,
   y_increase = 0.05,
@@ -331,6 +339,8 @@ If provided, overlook the levels in the group of sample_table.}
 \item{\code{add_sig_label}}{default "Significance"; select a colname of object$res_diff for the label text, such as 'P.adj' or 'Significance'.}
 
 \item{\code{add_sig_label_color}}{default "black"; the color for the label text when add_sig = TRUE.}
+
+\item{\code{add_sig_text_size}}{default 3.88; the size of text in added label.}
 
 \item{\code{add_sig_tip_length}}{default 0.01; the tip length for the added line when add_sig = TRUE.}
 
@@ -522,7 +532,7 @@ If the number of provided group_order is less than the number of groups in \code
 \item{\code{filter_taxa}}{default NULL; The mean relative abundance used to filter the taxa with low abundance.}
 
 \item{\code{use_feature_num}}{default NULL; integer; The feature number used in the plot; 
-select the features according to the LDA score (method = "lefse") or MeanDecreaseGini (method = "rf") from high to low.}
+select the features according to the metric (method = "lefse" or "rf") from high to low.}
 
 \item{\code{clade_label_level}}{default 4; the taxonomic level for marking the label with letters, root is the largest.}
 

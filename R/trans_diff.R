@@ -65,8 +65,9 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'     	  Please refer to glmmTMB package to select the family function, e.g. \code{family = glmmTMB::lognormal(link = "log")}.
 		#'     	  The usage of formula is similar with that in 'lme' method.
 		#'     	  For more available parameters, please see \code{glmmTMB::glmmTMB} function and use parameter passing.
-		#'     	  In the return table, Conditional_R2 and Marginal_R2 represent total variance (explained by both fixed and random effects) and the variance explained by 
-		#'     	  fixed effects, respectively. The significance of fixed factors are tested by Chi-square test from function \code{car::Anova}.
+		#'     	  In the result, Conditional R2 and Marginal R2 represent the variance explained by both fixed and random effects and the variance explained by 
+		#'     	  fixed effects, respectively. For more details on R2 calculation, please refer to the article <doi: 10.1098/rsif.2017.0213>.
+		#'     	  The significance of fixed factors are tested by Chi-square test from function \code{car::Anova}.
 		#'     	  The significance of 'Estimate' in each term of fixed factors comes from the model.}
 		#'     \item{\strong{'glmm_beta'}}{Generalized linear mixed model with a family function of beta distribution, 
 		#'     	  developed for the relative abundance (ranging from 0 to 1) of taxa specifically. 
@@ -94,11 +95,15 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' @param remove_unknown default TRUE; whether remove unknown features that donot have clear classification information.
 		#' @param lefse_subgroup default NULL; sample sub group used for sub-comparision in lefse; Segata et al. (2011) <doi:10.1186/gb-2011-12-6-r60>.
 		#' @param lefse_min_subsam default 10; sample numbers required in the subgroup test.
-		#' @param lefse_norm default 1000000; scale value in lefse.
+		#' @param lefse_norm default 1000000; normalization value used in lefse to scale abundances for each level. 
+		#'    A \code{lefse_norm} value < 0 (e.g., -1) means no normalization same with the LEfSe python version.
 		#' @param nresam default 0.6667; sample number ratio used in each bootstrap for method = "lefse" or "rf".
 		#' @param boots default 30; bootstrap test number for method = "lefse" or "rf".
-		#' @param rf_ntree default 1000; see ntree in randomForest function of randomForest package when method = "rf".
-		#' @param group_choose_paired default NULL; a vector used for selecting the required groups for paired testing, only used for method = "metastat" or "metagenomeSeq".
+		#' @param rf_imp_type default 2; the type of feature importance in random forest when \code{method = "rf"}. 
+		#'    Same with \code{type} parameter in \code{importance} function of \code{randomForest} package.
+		#'    1=mean decrease in accuracy (MeanDecreaseAccuracy), 2=mean decrease in node impurity (MeanDecreaseGini).
+		#' @param group_choose_paired default NULL; a vector used for selecting the required groups for paired testing instead of all paired combinations across groups;
+		#'    Available when method is "metastat", "metagenomeSeq", "ALDEx2_t" or "edgeR".
 		#' @param metagenomeSeq_count default 1; Filter features to have at least 'counts' counts.; see the count parameter in MRcoefs function of \code{metagenomeSeq} package.
 		#' @param ALDEx2_sig default c("wi.eBH", "kw.eBH"); which column of the final result is used as the significance asterisk assignment;
 		#'   applied to method = "ALDEx2_t" or "ALDEx2_kw"; the first element is provided to "ALDEx2_t"; the second is provided to "ALDEx2_kw";
@@ -118,6 +123,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'   The data that equal to 1 will be replaced by \code{1/(1 + beta_pseudo)}.
 		#' @param ... parameters passed to \code{cal_diff} function of \code{trans_alpha} class when method is one of 
 		#' 	 "KW", "KW_dunn", "wilcox", "t.test", "anova", "betareg", "lme", "glmm" or "glmm_beta";
+		#' 	 passed to \code{randomForest::randomForest} function when method = "rf";
 		#' 	 passed to \code{ANCOMBC::ancombc2} function when method is "ancombc2" (except tax_level, global and fix_formula parameters);
 		#' 	 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw";
 		#' 	 passed to \code{DESeq2::DESeq} function when method = "DESeq2";
@@ -131,7 +137,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'        For non-parametric methods, median value; For t.test, mean value;\cr
 		#'     \strong{"Taxa"}: which taxa is used in this comparision;\cr
 		#'     \strong{"Method"}: Test method used in the analysis depending on the method input;\cr
-		#'     \strong{"LDA" or "MeanDecreaseGini"}: LDA: linear discriminant score in LEfSe; MeanDecreaseGini: mean decreasing gini index in random forest;\cr
+		#'     \strong{"LDA" or others}: LDA: linear discriminant score in LEfSe; 
+		#'     	  MeanDecreaseAccuracy and MeanDecreaseGini: mean decreasing in accuracy or in node impurity (gini index) in random forest;\cr
 		#'     \strong{"P.unadj"}: original p value;\cr
 		#'     \strong{"P.adj"}: adjusted p value;\cr
 		#'     \strong{"Estimate" and "Std.Error"}: When method is "betareg", "lm", "lme" or "glmm", 
@@ -161,7 +168,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			lefse_norm = 1000000,
 			nresam = 0.6667,
 			boots = 30,
-			rf_ntree = 1000,
+			rf_imp_type = 2,
 			group_choose_paired = NULL,
 			metagenomeSeq_count = 1,
 			ALDEx2_sig = c("wi.eBH", "kw.eBH"),
@@ -204,12 +211,28 @@ trans_diff <- R6Class(classname = "trans_diff",
 				}
 				check_taxa_abund(tmp_dataset)
 				
+				if(method == "lefse"){
+					if(lefse_norm > 0){
+						# ensure normalization is performed
+						tmp_dataset$taxa_abund %<>% lapply(function(x){
+							if(nrow(x) == 1){
+								x[1, ] <- 1
+								x
+							}else{
+								as.data.frame(apply(x, 2, function(y){y/sum(y)}))
+							}
+						})
+					}
+				}
+				
 				if(grepl("all", taxa_level, ignore.case = TRUE)){
 					abund_table <- do.call(rbind, unname(tmp_dataset$taxa_abund))
 				}else{
 					if(! taxa_level %in% names(tmp_dataset$taxa_abund)){
-						message("Provided taxa_level: ", taxa_level, " not in tax_table of dataset; use features in otu_table ...")
-						tmp_dataset$add_rownames2taxonomy(use_name = taxa_level)
+						if(! taxa_level %in% colnames(tmp_dataset$tax_table)){
+							message("Provided taxa_level: ", taxa_level, " not in tax_table of input data set; use features in otu_table ...")
+							tmp_dataset$add_rownames2taxonomy(use_name = taxa_level)
+						}
 						suppressMessages(tmp_dataset$cal_abund(rel = TRUE))
 					}
 					abund_table <- tmp_dataset$taxa_abund[[taxa_level]]
@@ -229,8 +252,10 @@ trans_diff <- R6Class(classname = "trans_diff",
 						}
 					}
 					if(method == "lefse"){
-						abund_table %<>% {. * lefse_norm}
-						self$lefse_norm <- lefse_norm
+						if(lefse_norm > 0){
+							abund_table %<>% {. * lefse_norm}
+							self$lefse_norm <- lefse_norm
+						}
 					}
 					
 					if(method %in% c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lm", "betareg", "lme", "glmm", "glmm_beta")){
@@ -314,9 +339,9 @@ trans_diff <- R6Class(classname = "trans_diff",
 							next
 						}
 						rf_data <- data.frame(response = as.factor(sampleinfo_resample[, group]), predictors_sub, stringsAsFactors = FALSE)
-						tem_classify <- randomForest::randomForest(response~., data = rf_data, ntree = rf_ntree)
+						tem_classify <- randomForest::randomForest(response~., data = rf_data, importance = TRUE, ...)
 						# use importance to evaluate
-						imp <- randomForest::importance(tem_classify)
+						imp <- randomForest::importance(tem_classify, type = rf_imp_type)
 						colnames(imp)[1] <- num
 						if(is.null(res)){
 							res <- imp
@@ -332,9 +357,14 @@ trans_diff <- R6Class(classname = "trans_diff",
 						Taxa = Taxa_name,
 						Group = apply(class_taxa_median_sub, 2, function(x) rownames(class_taxa_median_sub)[which.max(x)])[Taxa_name], 
 						Method = use_method,
-						MeanDecreaseGini = res[, 1], 
+						Metric = res[, 1], 
 						stringsAsFactors = FALSE)
-					output <- dplyr::arrange(res, dplyr::desc(MeanDecreaseGini))
+					output <- dplyr::arrange(res, dplyr::desc(Metric))
+					if(rf_imp_type == 1){
+						colnames(output)[colnames(output) == "Metric"] <- "MeanDecreaseAccuracy"
+					}else{
+						colnames(output)[colnames(output) == "Metric"] <- "MeanDecreaseGini"
+					}
 					rownames(output) <- output$Taxa
 					output$P.unadj <- pvalue_raw[as.character(output$Taxa)]
 					output$P.adj <- pvalue_sub[as.character(output$Taxa)]
@@ -802,7 +832,11 @@ trans_diff <- R6Class(classname = "trans_diff",
 				
 				# output taxonomic abundance mean and sd for the final res_abund and enrich group finding in metagenomeSeq or ANCOMBC
 				if(grepl("lefse", method, ignore.case = TRUE)){
-					res_abund <- reshape2::melt(rownames_to_column(abund_table_sub/lefse_norm, "Taxa"), id.vars = "Taxa")
+					if(lefse_norm > 0){
+						res_abund <- reshape2::melt(rownames_to_column(abund_table_sub/lefse_norm, "Taxa"), id.vars = "Taxa")
+					}else{
+						res_abund <- reshape2::melt(rownames_to_column(abund_table_sub, "Taxa"), id.vars = "Taxa")
+					}
 				}else{
 					if(grepl("rf", method, ignore.case = TRUE)){
 						res_abund <- reshape2::melt(rownames_to_column(abund_table_sub, "Taxa"), id.vars = "Taxa")
@@ -881,6 +915,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' @param add_sig default FALSE; whether add the significance label to the plot.
 		#' @param add_sig_label default "Significance"; select a colname of object$res_diff for the label text, such as 'P.adj' or 'Significance'.
 		#' @param add_sig_label_color default "black"; the color for the label text when add_sig = TRUE.
+		#' @param add_sig_text_size default 3.88; the size of text in added label.
 		#' @param add_sig_tip_length default 0.01; the tip length for the added line when add_sig = TRUE.
 		#' @param y_start default 1.01; the y axis position from which to add the label; the default 1.01 means 1.01 * Value;
 		#'   For method != "anova", all the start positions are same, i.e. Value = max(Mean+SD or Mean+SE); 
@@ -918,6 +953,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			add_sig = FALSE,
 			add_sig_label = "Significance",
 			add_sig_label_color = "black",
+			add_sig_text_size = 3.88,
 			add_sig_tip_length = 0.01,
 			y_start = 1.01,
 			y_increase = 0.05,
@@ -1049,7 +1085,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 						add = add_letter_text, 
 						stringsAsFactors = FALSE
 						)
-					p <- p + geom_text(aes(x = x, y = y, label = add), data = textdf, inherit.aes = FALSE)
+					p <- p + geom_text(aes(x = x, y = y, label = add), data = textdf, size = add_sig_text_size, color = add_sig_label_color, inherit.aes = FALSE)
 				}else{
 					if(! "Letter" %in% colnames(diff_data)){
 						if(any(grepl("\\s-\\s", x_axis_order))){
@@ -1081,6 +1117,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 							y_position = y_position, 
 							xmin = x_min, 
 							xmax = x_max,
+							textsize = add_sig_text_size,
 							color = add_sig_label_color,
 							tip_length = add_sig_tip_length,
 							...
@@ -1113,7 +1150,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 							add = annotations, 
 							stringsAsFactors = FALSE
 						)
-						p <- p + geom_text(aes(x = x, y = y, label = add), data = textdf, inherit.aes = FALSE)
+						p <- p + geom_text(aes(x = x, y = y, label = add), data = textdf, size = add_sig_text_size, color = add_sig_label_color, inherit.aes = FALSE)
 					}
 				}
 			}
@@ -1232,8 +1269,12 @@ trans_diff <- R6Class(classname = "trans_diff",
 					ylab_title <- "LDA score"
 				}else{
 					if(method == "rf"){
-						colnames(use_data)[colnames(use_data) == "MeanDecreaseGini"] <- "Value"
-						ylab_title <- "MeanDecreaseGini"
+						if("MeanDecreaseAccuracy" %in% colnames(use_data)){
+							ylab_title <- "MeanDecreaseAccuracy"
+						}else{
+							ylab_title <- "MeanDecreaseGini"
+						}
+						colnames(use_data)[colnames(use_data) %in% c("MeanDecreaseAccuracy", "MeanDecreaseGini")] <- "Value"
 					}else{
 						if(method == "metastat"){
 							use_data %<>% .[.$qvalue < 0.05, ]
@@ -1388,7 +1429,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' @param use_taxa_num default 200; integer; The taxa number used in the background tree plot; select the taxa according to the mean abundance .
 		#' @param filter_taxa default NULL; The mean relative abundance used to filter the taxa with low abundance.
 		#' @param use_feature_num default NULL; integer; The feature number used in the plot; 
-		#'	  select the features according to the LDA score (method = "lefse") or MeanDecreaseGini (method = "rf") from high to low.
+		#'	  select the features according to the metric (method = "lefse" or "rf") from high to low.
 		#' @param clade_label_level default 4; the taxonomic level for marking the label with letters, root is the largest.
 		#' @param select_show_labels default NULL; character vector; The features to show in the plot with full label names, not the letters.
 		#' @param only_select_show default FALSE; whether only use the the select features in the parameter \code{select_show_labels}.
@@ -1430,8 +1471,13 @@ trans_diff <- R6Class(classname = "trans_diff",
 			annotation_shape = 22,
 			annotation_shape_size = 5
 			){
-			# developed based on microbiomeMarker
+			# developed based on microbiomeMarker package
 			abund_table <- self$abund_table
+			if(! all(grepl("^.__", rownames(abund_table)))){
+				stop("It seems that there is no standard prefix for taxonomic information (e.g., k__ and p__), ",  
+					"which is necessary for this analysis. Please use the tidy_taxonomy function to tidy the tax_table of the microtable object, ",
+					"re-run cal_abund function to calculate relative abundance, and then re-perform the LEfSe analysis!")
+			}
 			marker_table <- self$res_diff %>% dropallfactors
 			method <- self$method
 			
@@ -1636,7 +1682,11 @@ trans_diff <- R6Class(classname = "trans_diff",
 				if(is.nan(res1$p.value)){
 					res1$p.value <- 1
 				}
-				med <- tapply(d1[,1], group, median) %>% as.data.frame
+				med <- tapply(d1[, 1], group, median) %>% as.data.frame
+				# if all values are same, use mean
+				if(length(unique(med[, 1])) == 1){
+					med <- tapply(d1[, 1], group, mean) %>% as.data.frame
+				}
 				colnames(med) <- taxaname
 				list(p_value = res1$p.value, med = med)
 			}

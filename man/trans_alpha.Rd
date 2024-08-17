@@ -68,9 +68,9 @@ t1$plot_alpha(measure = "Shannon", add_sig = TRUE)
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{dataset}}{an object of \code{\link{microtable}} class.}
+\item{\code{dataset}}{\code{\link{microtable}} object.}
 
-\item{\code{group}}{default NULL; a column name of \code{sample_table} used for the statistics.}
+\item{\code{group}}{default NULL; a column name of \code{sample_table} in the input microtable object used for the statistics across groups.}
 
 \item{\code{by_group}}{default NULL; a column name of \code{sample_table} used to perform the differential test 
 among groups (from \code{group} parameter) for each group (from \code{by_group} parameter) separately.}
@@ -79,7 +79,7 @@ among groups (from \code{group} parameter) for each group (from \code{by_group} 
 such as the data of plant compartments for different plant species (ID). 
 So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.}
 
-\item{\code{order_x}}{default NULL; a \code{sample_table} column name or a vector with sample names; if provided, order samples by using \code{factor}.}
+\item{\code{order_x}}{default NULL; a column name of \code{sample_table} or a vector with sample names. If provided, sort samples using \code{factor}.}
 }
 \if{html}{\out{</div>}}
 }
@@ -121,7 +121,7 @@ Differential test on alpha diversity.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{measure}}{default NULL; character vector; If NULL, all indexes will be calculated; see names of \code{microtable$alpha_diversity}, 
+\item{\code{measure}}{default NULL; character vector; If NULL, all indexes will be used; see names of \code{microtable$alpha_diversity}, 
 e.g. \code{c("Observed", "Chao1", "Shannon")}.}
 
 \item{\code{method}}{default "KW"; see the following available options:
@@ -130,8 +130,8 @@ e.g. \code{c("Observed", "Chao1", "Shannon")}.}
   \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons <10.1080/00401706.1964.10490181> based on \code{dunnTest} function in \code{FSA} package}
   \item{\strong{'wilcox'}}{Wilcoxon Rank Sum Test for all paired groups}
   \item{\strong{'t.test'}}{Student's t-Test for all paired groups}
-  \item{\strong{'anova'}}{Variance analysis. For one-way anova, the post hoc test is Duncan's new multiple range test 
-        based on \code{duncan.test} function of \code{agricolae} package. Please use \code{anova_post_test} parameter to change post hoc method.
+  \item{\strong{'anova'}}{Variance analysis. For one-way anova, the default post hoc test is Duncan's new multiple range test.
+        Please use \code{anova_post_test} parameter to change the post hoc method.
         For multi-way anova, Please use \code{formula} parameter to specify the model and see \code{\link{aov}} for more details}
   \item{\strong{'scheirerRayHare'}}{Scheirer-Ray-Hare test (nonparametric test) for a two-way factorial experiment; 
         see \code{scheirerRayHare} function of \code{rcompanion} package}
@@ -146,16 +146,16 @@ e.g. \code{c("Observed", "Chao1", "Shannon")}.}
         facilitating the fitting for proportional data (ranging from 0 to 1). The link function is fixed with \code{"logit"}.}
 }}
 
-\item{\code{formula}}{default NULL; applied to two-way or multi-factor anova when 
-method = \code{"anova"} or \code{"scheirerRayHare"} or \code{"lme"} or \code{"betareg"} or \code{"glmm"}; 
+\item{\code{formula}}{default NULL; applied to two-way or multi-factor analysis when 
+method is \code{"anova"}, \code{"scheirerRayHare"}, \code{"lm"}, \code{"lme"}, \code{"betareg"} or \code{"glmm"}; 
 specified set for independent variables, i.e. the latter part of a general formula, 
 such as \code{'block + N*P*K'}.}
 
 \item{\code{p_adjust_method}}{default "fdr" (for "KW", "wilcox", "t.test" methods) or "holm" (for "KW_dunn"); P value adjustment method; 
-For \code{method = 'KW', 'wilcox' or 't.test'}, please see method parameter of \code{p.adjust} function for available options;
+For \code{method = 'KW', 'wilcox' or 't.test'}, please see \code{method} parameter of \code{p.adjust} function for available options;
 For \code{method = 'KW_dunn'}, please see \code{dunn.test::p.adjustment.methods} for available options.}
 
-\item{\code{KW_dunn_letter}}{default TRUE; For \code{method = 'KW_dunn'}, \code{TRUE} denotes paired significances are presented by letters;
+\item{\code{KW_dunn_letter}}{default TRUE; For \code{method = 'KW_dunn'}, \code{TRUE} denotes significances are presented by letters;
 \code{FALSE} means significances are shown by asterisk for paired comparison.}
 
 \item{\code{alpha}}{default 0.05; Significant level; used for generating significance letters when method is 'anova' or 'KW_dunn'.}
@@ -163,12 +163,13 @@ For \code{method = 'KW_dunn'}, please see \code{dunn.test::p.adjustment.methods}
 \item{\code{anova_post_test}}{default "duncan.test". The post hoc test method for one-way anova. Other available options include "LSD.test" and "HSD.test". 
 All those are the function names in \code{agricolae} package.}
 
-\item{\code{return_model}}{default FALSE; whether return the original lmer or glmm model list in the object.}
+\item{\code{return_model}}{default FALSE; whether return the original "lm", "lmer" or "glmm" model list in the object.}
 
 \item{\code{...}}{parameters passed to \code{kruskal.test} (when \code{method = "KW"}) or \code{wilcox.test} function (when \code{method = "wilcox"}) or 
 \code{dunnTest} function of \code{FSA} package (when \code{method = "KW_dunn"}) or 
 \code{agricolae::duncan.test}/\code{agricolae::LSD.test}/\code{agricolae::HSD.test} (when \code{method = "anova"}, one-way anova) or 
 \code{rcompanion::scheirerRayHare} (when \code{method = "scheirerRayHare"}) or 
+\code{stats::lm} (when \code{method = "lm"}) or 
 \code{lmerTest::lmer} (when \code{method = "lme"}) or 
 \code{betareg::betareg} (when \code{method = "betareg"}) or 
 \code{glmmTMB::glmmTMB} (when \code{method = "glmm"}).}
@@ -198,19 +199,22 @@ t1$cal_diff(method = "anova")
 \if{html}{\out{<a id="method-trans_alpha-plot_alpha"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_alpha-plot_alpha}{}}}
 \subsection{Method \code{plot_alpha()}}{
-Plot the alpha diversity. Box plot is used for the visualization of alpha diversity when the \code{group} is found in the object.
-  Heatmap is employed automatically to show the significances of differential test 
-	 when the formula is found in the \code{res_diff} table in the object.
+Plot the alpha diversity. 
+  Box plot (and others for visualizing data in groups of single factor) is used for the visualization of alpha diversity when the \code{group} is found in the object.
+  When the formula is found in the \code{res_diff} table in the object, 
+  heatmap is employed automatically to show the significances of differential test for multiple indexes, 
+	 and errorbar (coefficient and standard errors) can be used for single index.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_alpha$plot_alpha(
+  plot_type = "ggboxplot",
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),
   measure = "Shannon",
   group = NULL,
+  add = NULL,
   add_sig = TRUE,
   add_sig_label = "Significance",
   add_sig_text_size = 3.88,
   add_sig_label_num_dec = 4,
-  boxplot_add = "jitter",
   order_x_mean = FALSE,
   y_start = 0.1,
   y_increase = 0.05,
@@ -218,7 +222,6 @@ Plot the alpha diversity. Box plot is used for the visualization of alpha divers
   xtext_size = 13,
   ytitle_size = 17,
   barwidth = 0.9,
-  use_boxplot = TRUE,
   plot_SE = TRUE,
   errorbar_size = 1,
   errorbar_width = 0.2,
@@ -242,11 +245,19 @@ Plot the alpha diversity. Box plot is used for the visualization of alpha divers
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
+\item{\code{plot_type}}{default "ggboxplot"; plot type; available options include "ggboxplot", "ggdotplot", "ggviolin", "ggstripchart", "ggerrorplot", and "errorbar".
+The options starting with "gg" are function names coming from \code{ggpubr} package.
+All those methods with \code{ggpubr} package use the \code{data_alpha} table in the object. 
+"errorbar" represents mean-sd or mean-se plot based on \code{ggplot2} package by invoking the \code{data_stat} table in the object.}
+
 \item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); color pallete for groups.}
 
 \item{\code{measure}}{default "Shannon"; one alpha diversity index in the object.}
 
 \item{\code{group}}{default NULL; group name used for the plot.}
+
+\item{\code{add}}{default NULL; add another plot element; passed to the \code{add} parameter of the function (e.g., \code{ggboxplot}) from \code{ggpubr} package 
+when \code{plot_type} starts with "gg" (functions coming from ggpubr package).}
 
 \item{\code{add_sig}}{default TRUE; wheter add significance label using the result of \code{cal_diff} function, i.e. \code{object$res_diff};
 This is manily designed to add post hoc test of anova or other significances to make the label mapping easy.}
@@ -257,8 +268,6 @@ such as 'P.adj' or 'Significance'.}
 \item{\code{add_sig_text_size}}{default 3.88; the size of text in added label.}
 
 \item{\code{add_sig_label_num_dec}}{default 4; reserved decimal places when the parameter \code{add_sig_label} use numeric column, like 'P.adj'.}
-
-\item{\code{boxplot_add}}{default "jitter"; points type, see the add parameter in \code{ggpubr::ggboxplot}.}
 
 \item{\code{order_x_mean}}{default FALSE; whether order x axis by the means of groups from large to small.}
 
@@ -276,28 +285,25 @@ this parameter is also used to label the letters of anova result with the fixed 
 
 \item{\code{barwidth}}{default 0.9; the bar width in plot; applied when by_group is not NULL.}
 
-\item{\code{use_boxplot}}{default TRUE; TRUE denotes boxplot by using the data_alpha table in the object. 
-FALSE represents mean-sd or mean-se plot by invoking the data_stat table in the object.}
+\item{\code{plot_SE}}{default TRUE; TRUE: the errorbar is \eqn{mean±se}; FALSE: the errorbar is \eqn{mean±sd}. Available when \code{plot_type = "errorbar"}.}
 
-\item{\code{plot_SE}}{default TRUE; TRUE: the errorbar is \eqn{mean±se}; FALSE: the errorbar is \eqn{mean±sd}.}
+\item{\code{errorbar_size}}{default 1; errorbar size. Available when \code{plot_type = "errorbar"}.}
 
-\item{\code{errorbar_size}}{default 1; errorbar size. Available when \code{use_boxplot = FALSE}.}
+\item{\code{errorbar_width}}{default 0.2; errorbar width. Available when \code{plot_type = "errorbar"} and \code{by_group} is NULL.}
 
-\item{\code{errorbar_width}}{default 0.2; errorbar width. Available when \code{use_boxplot = FALSE} and \code{by_group} is NULL.}
+\item{\code{point_size}}{default 3; point size for taxa. Available when \code{plot_type = "errorbar"}.}
 
-\item{\code{point_size}}{default 3; point size for taxa. Available when \code{use_boxplot = FALSE}.}
+\item{\code{point_alpha}}{default 0.8; point transparency. Available when \code{plot_type = "errorbar"}.}
 
-\item{\code{point_alpha}}{default 0.8; point transparency. Available when \code{use_boxplot = FALSE}.}
+\item{\code{add_line}}{default FALSE; whether add line. Available when \code{plot_type = "errorbar"}.}
 
-\item{\code{add_line}}{default FALSE; whether add line. Available when \code{use_boxplot = FALSE}.}
+\item{\code{line_size}}{default 0.8; line size when \code{add_line = TRUE}. Available when \code{plot_type = "errorbar"}.}
 
-\item{\code{line_size}}{default 0.8; line size when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.}
+\item{\code{line_type}}{default 2; an integer; line type when \code{add_line = TRUE}. Available when \code{plot_type = "errorbar"}.}
 
-\item{\code{line_type}}{default 2; an integer; line type when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.}
+\item{\code{line_color}}{default "grey50"; line color when \code{add_line = TRUE}. Available when \code{plot_type = "errorbar"} and \code{by_group} is NULL.}
 
-\item{\code{line_color}}{default "grey50"; line color when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE} and \code{by_group} is NULL.}
-
-\item{\code{line_alpha}}{default 0.5; line transparency when \code{add_line = TRUE}. Available when \code{use_boxplot = FALSE}.}
+\item{\code{line_alpha}}{default 0.5; line transparency when \code{add_line = TRUE}. Available when \code{plot_type = "errorbar"}.}
 
 \item{\code{heatmap_cell}}{default "P.unadj"; the column of \code{res_diff} table for the cell of heatmap when formula with multiple factors is found in the method.}
 
@@ -320,7 +326,7 @@ Point size and alpha can be adjusted with parameters \code{point_size} and \code
 The significance label size can be adjusted with parameter \code{add_sig_text_size}.
 Furthermore, the vertical line around 0 can be adjusted with parameters \code{line_size}, \code{line_type}, \code{line_color} and \code{line_alpha}.}
 
-\item{\code{...}}{parameters passing to \code{ggpubr::ggboxplot} function when box plot is used or 
+\item{\code{...}}{parameters passing to \code{ggpubr::ggboxplot} function (or other functions shown by \code{plot_type} parameter when it starts with "gg") or 
 \code{plot_cor} function in \code{\link{trans_env}} class for the heatmap of multiple factors when formula is found in the \code{res_diff} of the object.}
 }
 \if{html}{\out{</div>}}

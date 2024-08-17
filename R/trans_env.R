@@ -801,18 +801,24 @@ trans_env <- R6Class(classname = "trans_env",
 		#' Calculate the correlations between taxonomic abundance and environmental variables.
 		#' Actually, it can also be applied to other correlation between any two variables from two tables.
 		#'
-		#' @param use_data default "Genus"; "Genus", "all" or "other"; "Genus" or other taxonomic name: use genus or other taxonomic abundance table in \code{taxa_abund}; 
-		#'    "all": use all merged taxonomic abundance table; "other": provide additional taxa name with \code{other_taxa} parameter which is necessary.
+		#' @param use_data default "Genus"; "Genus", "all" or "other"; 
+		#'    "Genus" or other taxonomic names (e.g., "Phylum", "ASV"): invoke taxonomic abundance table in \code{taxa_abund} list of the \code{microtable} object; 
+		#'    "all": merge all the taxonomic abundance tables in \code{taxa_abund} list into one; "other": provide additional taxa names by assigning \code{other_taxa} parameter.
 		#' @param cor_method default "pearson"; "pearson", "spearman", "kendall" or "maaslin2"; correlation method.
 		#' 	  "pearson", "spearman" or "kendall" all refer to the correlation analysis based on the \code{cor.test} function in R.
 		#' 	  "maaslin2" is the method in \code{Maaslin2} package for finding associations between metadata and potentially high-dimensional microbial multi-omics data.
+		#' @param partial default FALSE; whether perform partial correlation based on the \code{ppcor} package.
+		#' @param partial_fix default NULL; selected environmental variable names used as third group of variables in all the partial correlations. 
+		#' 	  If NULL; all the variables (except the one for correlation) in the environmental data will be used as the third group of variables.
+		#' 	  Otherwise, the function will control for the provided variables (one or more) in all the partial correlations, 
+		#' 	  and the variables in \code{partial_fix} will not be employed anymore in the correlation analysis.
 		#' @param add_abund_table default NULL; additional data table to be used. Row names must be sample names.
 		#' @param filter_thres default 0; the abundance threshold, such as 0.0005 when the input is relative abundance.
 		#' 	  The features with abundances lower than filter_thres will be filtered. This parameter cannot be applied when add_abund_table parameter is provided.
 		#' @param use_taxa_num default NULL; integer; a number used to select high abundant taxa; only useful when \code{use_data} parameter is a taxonomic level, e.g., "Genus".
-		#' @param other_taxa default NULL; character vector containing a series of feature names; used when use_data = "other"; 
-		#' 	  provided names should be standard full names used to select taxa from all the tables in taxa_abund list of the microtable object;
-		#' 	  please see the example.
+		#' @param other_taxa default NULL; character vector containing a series of feature names; available when \code{use_data = "other"}; 
+		#' 	  provided names should be standard full names used to select taxa from all the tables in \code{taxa_abund} list of the \code{microtable} object;
+		#' 	  please refer to the example.
 		#' @param p_adjust_method default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for available options.
 		#' 	  \code{p_adjust_method = "none"} can disable the p value adjustment.
 		#' @param p_adjust_type default "All"; "All", "Taxa" or "Env"; P value adjustment type.
@@ -836,6 +842,8 @@ trans_env <- R6Class(classname = "trans_env",
 		cal_cor = function(
 			use_data = c("Genus", "all", "other")[1],
 			cor_method = c("pearson", "spearman", "kendall", "maaslin2")[1],
+			partial = FALSE,
+			partial_fix = NULL,
 			add_abund_table = NULL,
 			filter_thres = 0,
 			use_taxa_num = NULL,
@@ -852,10 +860,12 @@ trans_env <- R6Class(classname = "trans_env",
 			){
 			if(is.null(self$data_env)){
 				stop("The data_env is NULL! Please check the data input when creating the object !")
-			}else{
-				env_data <- self$data_env
 			}
+			env_data <- self$data_env
+			
 			cor_method <- match.arg(cor_method, c("pearson", "spearman", "kendall", "maaslin2"))
+			p_adjust_type <- match.arg(p_adjust_type, c("All", "Taxa", "Env"))
+			
 			if(cor_method != "maaslin2"){
 				env_data <- private$check_numeric(env_data)
 			}
@@ -943,11 +953,35 @@ trans_env <- R6Class(classname = "trans_env",
 				comb_names <- expand.grid(unique(groups), colnames(abund_table), colnames(env_data)) %>% 
 					t %>% 
 					as.data.frame(stringsAsFactors = FALSE)
-				res <- sapply(comb_names, function(x){
-					suppressWarnings(cor.test(abund_table[groups == x[1], x[2]], env_data[groups == x[1], x[3]], method = cor_method)) %>%
-					{c(x, Correlation = unname(.$estimate), Pvalue = unname(.$p.value))}
+				if(partial){
+					message("Conduct partial correlation ...")
+					if(is.null(partial_fix)){
+						res <- sapply(comb_names, function(x){
+							input_partial <- cbind.data.frame(abund_table[groups == x[1], x[2], drop = FALSE], env_data[groups == x[1], ])
+							raw_res <- ppcor::pcor(input_partial, method = cor_method)
+							c(x, Correlation = raw_res$estimate[x[2], x[3]], Pvalue = raw_res$p.value[x[2], x[3]])
+							}
+						)
+					}else{
+						if(!all(partial_fix %in% colnames(env_data))){
+							stop("Please provide correct partial_fix! Must be environmental variable names!")
+						}
+						comb_names <- comb_names[, !(unlist(comb_names[3, ]) %in% partial_fix)]
+						res <- sapply(comb_names, function(x){
+							input_partial <- cbind.data.frame(abund_table[groups == x[1], x[2], drop = FALSE], env_data[groups == x[1], x[3], drop = FALSE], 
+								env_data[groups == x[1], partial_fix, drop = FALSE])
+							raw_res <- ppcor::pcor(input_partial, method = cor_method)
+							c(x, Correlation = raw_res$estimate[x[2], x[3]], Pvalue = raw_res$p.value[x[2], x[3]])
+							}
+						)
 					}
-				)
+				}else{
+					res <- sapply(comb_names, function(x){
+						suppressWarnings(cor.test(abund_table[groups == x[1], x[2]], env_data[groups == x[1], x[3]], method = cor_method)) %>%
+						{c(x, Correlation = unname(.$estimate), Pvalue = unname(.$p.value))}
+						}
+					)
+				}
 				res %<>% t %>% as.data.frame(stringsAsFactors = FALSE)
 				colnames(res) <- c("by_group", "Taxa", "Env", "Correlation","Pvalue")
 				res$Pvalue %<>% as.numeric
@@ -956,12 +990,11 @@ trans_env <- R6Class(classname = "trans_env",
 				if(p_adjust_type == "All"){
 					res$AdjPvalue <- p.adjust(res$Pvalue, method = p_adjust_method)
 				}else{
-					choose_col <- which(c("Taxa", "Env") %in% p_adjust_type)
-					comb_names2 <- comb_names[choose_col, ] %>% t %>% as.data.frame %>% unique %>% t %>% as.data.frame(stringsAsFactors = FALSE)
+					choose_col <- which(c("Taxa", "Env") %in% p_adjust_type) + 1
+					for_select <- comb_names[choose_col, ] %>% unlist %>% unique
 					# p value adjustment separately
-					for(i in seq_len(ncol(comb_names2))){
-						x <- comb_names2[, i]
-						row_sel <- unlist(lapply(as.data.frame(t(res[, choose_col, drop = FALSE])), function(y) all(y %in% x)))
+					for(i in for_select){
+						row_sel <- res[, p_adjust_type] == i
 						res$AdjPvalue[row_sel] <- p.adjust(res[row_sel, "Pvalue"], method = p_adjust_method)
 					}
 				}
@@ -1264,10 +1297,10 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param point_size default 5; point size value.
 		#' @param point_alpha default 0.6; alpha value for the point color transparency.
 		#' @param line_size default 0.8; line size value.
+		#' @param line_color default "black"; fitted line color; only available when \code{group = NULL}.
 		#' @param line_se default TRUE; Whether show the confidence interval for the fitting.
 		#' @param line_se_color default "grey70"; the color to fill the confidence interval when \code{line_se = TRUE}.
-		#' @param line_alpha default 1; alpha value for the line color transparency.
-		#' @param line_color default "black"; fitted line color; only available when \code{group = NULL}.
+		#' @param line_alpha default 0.5; alpha value for the color transparency of line confidence interval.
 		#' @param pvalue_trim default 4; trim the decimal places of p value.
 		#' @param cor_coef_trim default 3; trim the decimal places of correlation coefficient.
 		#' @param lm_equation default TRUE; whether include the equation in the label when \code{type = "lm"}.
@@ -1303,10 +1336,10 @@ trans_env <- R6Class(classname = "trans_env",
 			point_size = 5,
 			point_alpha = 0.6,
 			line_size = 0.8,
-			line_alpha = 1,
 			line_color = "black",
 			line_se = TRUE,
 			line_se_color = "grey70",
+			line_alpha = 0.5,
 			pvalue_trim = 4, 
 			cor_coef_trim = 3,
 			lm_equation = TRUE,
