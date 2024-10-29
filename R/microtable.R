@@ -17,18 +17,20 @@ microtable <- R6Class(classname = "microtable",
 		#' @param sample_table data.frame; default NULL; The sample information table; rownames are samples; columns are sample metadata; 
 		#' 	 If not provided, the function can generate a table automatically according to the sample names in otu_table.
 		#' @param tax_table data.frame; default NULL; The taxonomic information table; rownames are features; column names are taxonomic classes.
-		#' @param phylo_tree phylo; default NULL; The phylogenetic tree; use \code{read.tree} function in ape package for input.
-		#' @param rep_fasta \code{DNAStringSet} or \code{list} format; default NULL; The representative sequences; 
-		#'   use \code{read.fasta} function in \code{seqinr} package or \code{readDNAStringSet} function in \code{Biostrings} package for input.
-		#' @param auto_tidy default FALSE; Whether trim the files in the \code{microtable} object automatically;
-		#'   If TRUE, running the functions in \code{microtable} class can invoke the \code{tidy_dataset} function automatically.
+		#' @param phylo_tree phylo; default NULL; The phylogenetic tree that must be read with the \code{read.tree} function of ape package.
+		#' @param rep_fasta \code{DNAStringSet}, \code{list} or \code{DNAbin} format; default NULL; The sequences.
+		#'   The sequences should be read with the \code{readDNAStringSet} function in \code{Biostrings} package (DNAStringSet class), 
+		#'   \code{read.fasta} function in \code{seqinr} package (list class),
+		#'   or \code{read.FASTA} function in \code{ape} package (DNAbin class).
+		#' @param auto_tidy default FALSE; Whether tidy the files in the \code{microtable} object automatically.
+		#'   If TRUE, the function can invoke the \code{tidy_dataset} function.
 		#' @return an object of class \code{microtable} with the following components:
 		#' \describe{
 		#'   \item{\code{sample_table}}{The sample information table.}
 		#'   \item{\code{otu_table}}{The feature table.}
 		#'   \item{\code{tax_table}}{The taxonomic table.}
 		#'   \item{\code{phylo_tree}}{The phylogenetic tree.}
-		#'   \item{\code{rep_fasta}}{The representative sequence.}
+		#'   \item{\code{rep_fasta}}{The sequence.}
 		#'   \item{\code{taxa_abund}}{default NULL; use \code{cal_abund} function to calculate.}
 		#'   \item{\code{alpha_diversity}}{default NULL; use \code{cal_alphadiv} function to calculate.}
 		#'   \item{\code{beta_diversity}}{default NULL; use \code{cal_betadiv} function to calculate.}
@@ -78,6 +80,12 @@ microtable <- R6Class(classname = "microtable",
 				}
 				if(!ape::is.rooted(phylo_tree)){
 					phylo_tree <- ape::multi2di(phylo_tree)
+				}
+			}
+			if(!is.null(rep_fasta)){
+				if(!(inherits(rep_fasta, "list") | inherits(rep_fasta, "DNAbin") | inherits(rep_fasta, "DNAStringSet"))){
+					stop("Unknown fasta format! Must be one of DNAStringSet (from readDNAStringSet function of Biostrings package), ", 
+						"list (from read.fasta function of seqinr package), and DNAbin (from read.FASTA function of ape package)!")
 				}
 			}
 			self$tax_table <- tax_table
@@ -484,7 +492,12 @@ microtable <- R6Class(classname = "microtable",
 					if(inherits(tmp, "DNAStringSet")){
 						Biostrings::writeXStringSet(x = tmp, filepath = save_path)
 					}else{
-						stop("Unknown fasta format! Must be either list (from read.fasta of seqinr package) or DNAStringSet (from readDNAStringSet of Biostrings package)!")
+						if(inherits(tmp, "DNAbin")){
+							ape::write.FASTA(tmp, file = save_path)
+						}else{
+							stop("Unknown fasta format! Must be one of DNAStringSet (from readDNAStringSet function of Biostrings package), ", 
+								"list (from read.fasta function of seqinr package), and DNAbin (from read.FASTA function of ape package)!")
+						}
 					}
 				}
 				message('Save sequences to ', save_path, ' ...')
@@ -493,19 +506,19 @@ microtable <- R6Class(classname = "microtable",
 		#' @description
 		#' Calculate the taxonomic abundance at each taxonomic level or selected levels.
 		#'
-		#' @param select_cols default NULL; numeric vector or character vector of colnames of \code{microtable$tax_table}; 
-		#'   applied to select columns to merge and calculate abundances according to ordered hierarchical levels.
-		#'   This is very useful if there are commented columns or some columns with multiple structure that cannot be used directly.
+		#' @param select_cols default NULL; numeric vector (column sequences) or character vector (column names of \code{microtable$tax_table}); 
+		#'   applied to select columns to calculate abundances according to ordered hierarchical levels.
+		#'   This parameter is very useful when only part of the columns are needed to calculate abundances.
 		#' @param rel default TRUE; if TRUE, relative abundance is used; if FALSE, absolute abundance (i.e. raw values) will be summed.
 		#' @param merge_by default "|"; the symbol to merge and concatenate taxonomic names of different levels.
-		#' @param split_group default FALSE; if TRUE, split the rows to multiple rows according to one or more columns in \code{tax_table}. 
-		#'   Very useful when multiple mapping information exist.
-		#' @param split_by default "&&"; Separator delimiting collapsed values; only useful when \code{split_group = TRUE}; 
-		#'   see \code{sep} parameter in \code{separate_rows} function of tidyr package.
-		#' @param split_column default NULL; character vector or list; only useful when \code{split_group = TRUE}; character vector: 
-		#'   fixed column or columns used for the splitting in tax_table for each abundance calculation; 
-		#'   list: containing more character vectors to assign the column names to each calculation, such as list(c("Phylum"), c("Phylum", "Class")).
-		#' @return taxa_abund list in object.
+		#' @param split_group default FALSE; if TRUE, split the rows to multiple rows according to one or more columns in \code{tax_table} 
+		#'   when there is multiple mapping information.
+		#' @param split_by default "&"; Separator delimiting collapsed values; only available when \code{split_group = TRUE}.
+		#' @param split_column default NULL; one column name used for the splitting in tax_table for each abundance calculation; 
+		#'   only available when \code{split_group = TRUE}. If not provided, the function will split each column that containing the \code{split_by} character.
+		#' @param split_special_char default "&&"; special character that will be used forcibly to split multiple mapping information in \code{tax_table} by default
+		#'   no matter \code{split_group} setting.
+		#' @return \code{taxa_abund} list in object.
 		#' @examples
 		#' \donttest{
 		#' m1$cal_abund()
@@ -515,8 +528,9 @@ microtable <- R6Class(classname = "microtable",
 			rel = TRUE, 
 			merge_by = "|",
 			split_group = FALSE, 
-			split_by = "&&", 
-			split_column = NULL
+			split_by = "&", 
+			split_column = NULL,
+			split_special_char = "&&"
 			){
 			taxa_abund <- list()
 			if(is.null(self$tax_table)){
@@ -548,24 +562,38 @@ microtable <- R6Class(classname = "microtable",
 					}
 				}
 			}
-			if(split_group){
-				if(is.null(split_column)){
-					stop("Spliting rows by one or more columns require split_column parameter! Please set split_column and try again!")
-				}
+			# built-in characters, such as those in MetaCyc mapping file
+			if(any(grepl(split_special_char, self$tax_table[, select_cols], fixed = TRUE))){
+				split_group <- TRUE
+				split_by <- split_special_char
 			}
 			for(i in seq_along(select_cols)){
+				tmp_mt <- clone(self)
+				sel <- select_cols[1:i]
 				taxrank <- colnames(self$tax_table)[select_cols[i]]
-				# assign the columns used for the splitting
-				if(!is.null(split_column)){
-					if(is.list(split_column)){
-						use_split_column <- split_column[[i]]
+				
+				test_doubleand <- lapply(1:i, function(x){any(grepl(split_special_char, self$tax_table[, select_cols[x]], fixed = TRUE))}) %>% unlist
+				if(any(test_doubleand)){
+					if(sum(test_doubleand) > 1){
+						use_split_column <- taxrank
+						sel <- select_cols[i]
 					}else{
-						use_split_column <- split_column
+						use_split_column <- colnames(self$tax_table)[select_cols[1:i]]
+					}
+				}else{
+					if(split_group){
+						# assign the columns used for the splitting
+						if(is.null(split_column)){
+							use_split_column <- colnames(self$tax_table)[select_cols[1:i]]
+						}else{
+							use_split_column <- split_column
+						}
 					}
 				}
+				
+				tmp_mt$tax_table %<>% .[, sel, drop = FALSE]
 				taxa_abund[[taxrank]] <- private$transform_data_proportion(
-											self, 
-											columns = select_cols[1:i], 
+											input = tmp_mt, 
 											rel = rel, 
 											merge_by = merge_by,
 											split_group = split_group, 
@@ -843,23 +871,21 @@ microtable <- R6Class(classname = "microtable",
 		},
 		transform_data_proportion = function(
 			input,
-			columns,
 			rel,
-			merge_by = "|",
-			split_group = FALSE,
-			split_by = "&&",
+			merge_by,
+			split_group,
+			split_by,
 			split_column
 			){
 			sampleinfo <- input$sample_table
 			abund <- input$otu_table
 			tax <- input$tax_table
-			tax <- tax[, columns, drop = FALSE]
-			# split rows to multiple rows if multiple correspondence
+			# split rows to multiple rows for multiple mapping
 			if(split_group){
 				merge_abund <- cbind.data.frame(tax, abund)
-				split_merge_abund <- tidyr::separate_rows(merge_abund, all_of(split_column), sep = split_by)
-				new_tax <- split_merge_abund[, columns, drop = FALSE]
-				new_abund <- split_merge_abund[, (ncol(tax) + 1):(ncol(merge_abund)), drop = FALSE]
+				split_merge_abund <- tidyr::separate_longer_delim(merge_abund, cols = all_of(split_column), delim = split_by)
+				new_tax <- split_merge_abund[, 1:ncol(tax), drop = FALSE]
+				new_abund <- split_merge_abund[, (ncol(tax) + 1):(ncol(split_merge_abund)), drop = FALSE]
 				abund1 <- cbind.data.frame(Display = apply(new_tax, 1, paste, collapse = merge_by), new_abund)
 			}else{
 				abund1 <- cbind.data.frame(Display = apply(tax, 1, paste, collapse = merge_by), abund)

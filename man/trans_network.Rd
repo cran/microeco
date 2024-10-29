@@ -811,18 +811,29 @@ t1$plot_taxa_roles(roles_color_background = FALSE)
 \subsection{Method \code{subset_network()}}{
 Subset of the network.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_network$subset_network(node = NULL, edge = NULL, rm_single = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_network$subset_network(
+  node = NULL,
+  edge = NULL,
+  rm_single = TRUE,
+  node_alledges = FALSE,
+  return_igraph = TRUE
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{node}}{default NULL; provide the node names that you want to use in the sub-network.}
+\item{\code{node}}{default NULL; provide the node names that will be used in the sub-network.}
 
-\item{\code{edge}}{default NULL; provide the edge name needed; must be one of "+" or "-".}
+\item{\code{edge}}{default NULL; provide the edge label or numbers that need to be remained. For the edge label, it should must be "+" or "-".
+For the numbers, they should fall within the range of rows in \code{res_edge_table} of the object.}
 
 \item{\code{rm_single}}{default TRUE; whether remove the nodes without any edge in the sub-network.
 So this function can also be used to remove the nodes withou any edge when node and edge are both NULL.}
+
+\item{\code{node_alledges}}{default FALSE; whether remain the nodes and edges that related to the nodes provided in \code{node} parameter.}
+
+\item{\code{return_igraph}}{default TRUE; whether return the network with igraph format. If FALSE, return \code{trans_network} object.}
 }
 \if{html}{\out{</div>}}
 }

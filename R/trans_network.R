@@ -705,10 +705,7 @@ trans_network <- R6Class(classname = "trans_network",
 				network <- self$res_network
 				g <- igraph::plot.igraph(network, ...)
 			}else{
-				if(is.null(self$res_node_table)){
-					message("Run get_node_table function to obtain the node property table ...")
-					self$get_node_table()
-				}
+				private$check_nodetable()
 				node_table <- self$res_node_table
 				if(!is.null(node_color)){
 					if(node_color == "module"){
@@ -750,10 +747,7 @@ trans_network <- R6Class(classname = "trans_network",
 				if(inherits(try_find, "try-error")){
 					stop("Please first install networkD3 package with command: install.packages('networkD3') !")
 				}
-				if(is.null(self$res_edge_table)){
-					message("Run get_edge_table function to obtain the edge property table ...")
-					self$get_edge_table()
-				}
+				private$check_edgetable()
 				edge_table <- self$res_edge_table
 				replace_table <- data.frame(number = 1:nrow(node_table), name = rownames(node_table))
 				rownames(replace_table) <- replace_table$name
@@ -782,10 +776,8 @@ trans_network <- R6Class(classname = "trans_network",
 			private$check_igraph()
 			private$check_network()
 			use_abund <- self$data_abund
-			if(is.null(self$res_node_table)){
-				message("Run get_node_table function to get the node property table ...")
-				self$get_node_table()
-			}
+			
+			private$check_nodetable()
 			node_table <- self$res_node_table
 			# calculate eigengene for each module
 			res_eigen <- list()
@@ -869,10 +861,7 @@ trans_network <- R6Class(classname = "trans_network",
 			shape_values = c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14),
 			...
 			){
-			if(is.null(self$res_node_table)){
-				message("Run get_node_table function to get the node property table ...")
-				self$get_node_table()
-			}
+			private$check_nodetable()
 			if(use_type == 1){
 				res <- private$plot_roles_1(node_roles = self$res_node_table, 
 					roles_color_background = roles_color_background,
@@ -907,10 +896,13 @@ trans_network <- R6Class(classname = "trans_network",
 		#' @description
 		#' Subset of the network.
 		#'
-		#' @param node default NULL; provide the node names that you want to use in the sub-network.
-		#' @param edge default NULL; provide the edge name needed; must be one of "+" or "-".
+		#' @param node default NULL; provide the node names that will be used in the sub-network.
+		#' @param edge default NULL; provide the edge label or numbers that need to be remained. For the edge label, it should must be "+" or "-".
+		#'   For the numbers, they should fall within the range of rows in \code{res_edge_table} of the object.
 		#' @param rm_single default TRUE; whether remove the nodes without any edge in the sub-network.
 		#'   So this function can also be used to remove the nodes withou any edge when node and edge are both NULL.
+		#' @param node_alledges default FALSE; whether remain the nodes and edges that related to the nodes provided in \code{node} parameter.
+		#' @param return_igraph default TRUE; whether return the network with igraph format. If FALSE, return \code{trans_network} object.
 		#' @return a new network
 		#' @examples
 		#' \donttest{
@@ -918,18 +910,35 @@ trans_network <- R6Class(classname = "trans_network",
 		#'   rownames, rm_single = TRUE)
 		#' # return a sub network that contains all nodes of module M1
 		#' }
-		subset_network = function(node = NULL, edge = NULL, rm_single = TRUE){
+		subset_network = function(node = NULL, edge = NULL, rm_single = TRUE, node_alledges = FALSE, return_igraph = TRUE){
 			private$check_igraph()
 			private$check_network()
 			network <- self$res_network
+			if(!is.null(node) & !is.null(edge)){
+				stop("Please provide either node or edge!")
+			}
+			if(node_alledges){
+				if(is.null(node)){
+					stop("When node_alledges = TRUE, node parameter must be provided!")
+				}
+				private$check_edgetable()
+				edge <- self$res_edge_table %>% {.[,1] %in% node | .[,2] %in% node} %>% which
+				node <- NULL
+			}
 			if(!is.null(node)){
 				nodes_raw <- V(network)$name
 				delete_nodes <- nodes_raw %>% .[! . %in% node]
 				sub_network <- delete_vertices(network, delete_nodes)
 			}
 			if(!is.null(edge)){
-				label_raw <- E(network)$label
-				sub_network <- delete_edges(network, which(label_raw != edge))
+				if(identical(edge, "+") | identical(edge, "-")){
+					label_raw <- E(network)$label
+					sub_network <- delete_edges(network, which(label_raw != edge))
+				}else{
+					all_seqs <- 1:ecount(network)
+					edge_filter <- all_seqs[! all_seqs %in% edge]
+					sub_network <- delete_edges(network, edge_filter)
+				}
 			}
 			if(is.null(node) & is.null(edge)){
 				sub_network <- network
@@ -938,7 +947,15 @@ trans_network <- R6Class(classname = "trans_network",
 			if(rm_single == T){
 				sub_network <- private$rm_unlinked_node(sub_network)
 			}
-			sub_network
+			if(return_igraph){
+				sub_network
+			}else{
+				subnet_obj <- clone(self)
+				subnet_obj$res_network <- sub_network
+				subnet_obj$res_edge_table <- NULL
+				subnet_obj$res_node_table <- NULL
+				subnet_obj
+			}
 		},
 		#' @description
 		#' Fit degrees to a power law distribution. First, perform a bootstrapping hypothesis test to determine whether degrees follow a power law distribution.
@@ -1002,9 +1019,7 @@ trans_network <- R6Class(classname = "trans_network",
 				taxa_table %<>% .[rownames(.) %in% replace_table[, 2], ]
 				rownames(taxa_table) <- replace_table[rownames(taxa_table), 1]
 			}
-			if(is.null(self$res_edge_table)){
-				self$get_edge_table()
-			}
+			private$check_edgetable()
 			link_table <- self$res_edge_table
 			
 			if(is.null(E(network)$label)){
@@ -1168,17 +1183,14 @@ trans_network <- R6Class(classname = "trans_network",
 					stop("Please first run cal_module function to get node modules!")
 				}
 			}
-			if(is.null(self$res_node_table)){
-				message("Run get_node_table function to get the node property table ...")
-				self$get_node_table()
-			}
-			if(!use_col %in% colnames(self$res_node_table)){
+			private$check_nodetable()
+			res_node_table <- self$res_node_table
+			if(!use_col %in% colnames(res_node_table)){
 				stop("Provided use_col must be one of the colnames of object$res_node_table !")
 			}
-			if(inherits(self$res_node_table[, use_col], "numeric")){
+			if(inherits(res_node_table[, use_col], "numeric")){
 				stop("The selected column-", use_col, " must not be numeric! Please check it!")
 			}
-			res_node_table <- self$res_node_table
 			if(any(is.na(res_node_table[, use_col]))){
 				message("Filter the taxa with NA in ", use_col, " ...")
 				res_node_table %<>% .[!is.na(.[, use_col]), ]
@@ -1233,6 +1245,28 @@ trans_network <- R6Class(classname = "trans_network",
 		check_network = function(){
 			if(is.null(self$res_network)){
 				stop("No network found! Please first run cal_network function!")
+			}
+		},
+		check_nodetable = function(...){
+			if(is.null(self$res_node_table)){
+				message("The res_node_table in the object is not found. Automatically run get_node_table function ...")
+				suppressMessages(self$get_node_table(...))
+			}else{
+				if(nrow(self$res_node_table) != vcount(self$res_network)){
+					message("Rerun get_node_table function as the node numbers in res_node_table and res_network are not same ...")
+					suppressMessages(self$get_node_table(...))
+				}
+			}
+		},
+		check_edgetable = function(){
+			if(is.null(self$res_edge_table)){
+				message("The res_edge_table in the object is not found. Automatically run get_edge_table function ...")
+				suppressMessages(self$get_edge_table())
+			}else{
+				if(nrow(self$res_edge_table) != ecount(self$res_network)){
+					message("Rerun get_edge_table function as the edge numbers in res_edge_table and res_network are not same ...")
+					suppressMessages(self$get_edge_table())
+				}
 			}
 		},
 		# x must be symmetrical matrix

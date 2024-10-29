@@ -219,13 +219,15 @@ If not provided, the function can generate a table automatically according to th
 
 \item{\code{tax_table}}{data.frame; default NULL; The taxonomic information table; rownames are features; column names are taxonomic classes.}
 
-\item{\code{phylo_tree}}{phylo; default NULL; The phylogenetic tree; use \code{read.tree} function in ape package for input.}
+\item{\code{phylo_tree}}{phylo; default NULL; The phylogenetic tree that must be read with the \code{read.tree} function of ape package.}
 
-\item{\code{rep_fasta}}{\code{DNAStringSet} or \code{list} format; default NULL; The representative sequences; 
-use \code{read.fasta} function in \code{seqinr} package or \code{readDNAStringSet} function in \code{Biostrings} package for input.}
+\item{\code{rep_fasta}}{\code{DNAStringSet}, \code{list} or \code{DNAbin} format; default NULL; The sequences.
+The sequences should be read with the \code{readDNAStringSet} function in \code{Biostrings} package (DNAStringSet class), 
+\code{read.fasta} function in \code{seqinr} package (list class),
+or \code{read.FASTA} function in \code{ape} package (DNAbin class).}
 
-\item{\code{auto_tidy}}{default FALSE; Whether trim the files in the \code{microtable} object automatically;
-If TRUE, running the functions in \code{microtable} class can invoke the \code{tidy_dataset} function automatically.}
+\item{\code{auto_tidy}}{default FALSE; Whether tidy the files in the \code{microtable} object automatically.
+If TRUE, the function can invoke the \code{tidy_dataset} function.}
 }
 \if{html}{\out{</div>}}
 }
@@ -236,7 +238,7 @@ an object of class \code{microtable} with the following components:
   \item{\code{otu_table}}{The feature table.}
   \item{\code{tax_table}}{The taxonomic table.}
   \item{\code{phylo_tree}}{The phylogenetic tree.}
-  \item{\code{rep_fasta}}{The representative sequence.}
+  \item{\code{rep_fasta}}{The sequence.}
   \item{\code{taxa_abund}}{default NULL; use \code{cal_abund} function to calculate.}
   \item{\code{alpha_diversity}}{default NULL; use \code{cal_alphadiv} function to calculate.}
   \item{\code{beta_diversity}}{default NULL; use \code{cal_betadiv} function to calculate.}
@@ -649,36 +651,38 @@ Calculate the taxonomic abundance at each taxonomic level or selected levels.
   rel = TRUE,
   merge_by = "|",
   split_group = FALSE,
-  split_by = "&&",
-  split_column = NULL
+  split_by = "&",
+  split_column = NULL,
+  split_special_char = "&&"
 )}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{select_cols}}{default NULL; numeric vector or character vector of colnames of \code{microtable$tax_table}; 
-applied to select columns to merge and calculate abundances according to ordered hierarchical levels.
-This is very useful if there are commented columns or some columns with multiple structure that cannot be used directly.}
+\item{\code{select_cols}}{default NULL; numeric vector (column sequences) or character vector (column names of \code{microtable$tax_table}); 
+applied to select columns to calculate abundances according to ordered hierarchical levels.
+This parameter is very useful when only part of the columns are needed to calculate abundances.}
 
 \item{\code{rel}}{default TRUE; if TRUE, relative abundance is used; if FALSE, absolute abundance (i.e. raw values) will be summed.}
 
 \item{\code{merge_by}}{default "|"; the symbol to merge and concatenate taxonomic names of different levels.}
 
-\item{\code{split_group}}{default FALSE; if TRUE, split the rows to multiple rows according to one or more columns in \code{tax_table}. 
-Very useful when multiple mapping information exist.}
+\item{\code{split_group}}{default FALSE; if TRUE, split the rows to multiple rows according to one or more columns in \code{tax_table} 
+when there is multiple mapping information.}
 
-\item{\code{split_by}}{default "&&"; Separator delimiting collapsed values; only useful when \code{split_group = TRUE}; 
-see \code{sep} parameter in \code{separate_rows} function of tidyr package.}
+\item{\code{split_by}}{default "&"; Separator delimiting collapsed values; only available when \code{split_group = TRUE}.}
 
-\item{\code{split_column}}{default NULL; character vector or list; only useful when \code{split_group = TRUE}; character vector: 
-fixed column or columns used for the splitting in tax_table for each abundance calculation; 
-list: containing more character vectors to assign the column names to each calculation, such as list(c("Phylum"), c("Phylum", "Class")).}
+\item{\code{split_column}}{default NULL; one column name used for the splitting in tax_table for each abundance calculation; 
+only available when \code{split_group = TRUE}. If not provided, the function will split each column that containing the \code{split_by} character.}
+
+\item{\code{split_special_char}}{default "&&"; special character that will be used forcibly to split multiple mapping information in \code{tax_table} by default
+no matter \code{split_group} setting.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-taxa_abund list in object.
+\code{taxa_abund} list in object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}

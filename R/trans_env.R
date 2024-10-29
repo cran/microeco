@@ -162,6 +162,9 @@ trans_env <- R6Class(classname = "trans_env",
 		#'
 		#' @param group default NULL; a colname of sample_table; used to perform calculations for different groups.
 		#' @param ggpairs default TRUE; whether use \code{GGally::ggpairs} function to plot the correlation results.
+		#' 	  If \code{ggpairs = FALSE}, the function will output a table with all the values instead of a graph.
+		#' 	  In this case, the function will call \code{cal_cor} to calculate autocorrelation instead of using the ggpairs function in GGally, 
+		#' 	  so please use parameter passing to control more options.
 		#' @param color_values default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette.
 		#' @param alpha default 0.8; the alpha value to add transparency in colors; useful when group is not NULL.
 		#' @param ... parameters passed to \code{GGally::ggpairs} when \code{ggpairs = TRUE} or 
@@ -757,6 +760,18 @@ trans_env <- R6Class(classname = "trans_env",
 			if(is.null(self$dataset) & is.null(add_matrix)){
 				stop("No beta diversity data found! please see add_matrix parameter or provide dataset when creating the object!")
 			}
+			if(is.null(self$data_env)){
+				stop("The data_env is NULL! Please check the data input when creating the object !")
+			}
+			env_data <- self$data_env
+			env_data <- private$check_numeric(env_data)
+			
+			if(partial_mantel){
+				if(ncol(env_data) == 1){
+					partial_mantel <- FALSE
+					message("There is only one environmental factor! Automatically set partial_mantel = FALSE ...")
+				}
+			}
 			if(is.null(add_matrix)){
 				if(is.null(self$dataset$beta_diversity)){
 					message("The beta_diversity in dataset is NULL; try to calculate it ...")
@@ -772,12 +787,7 @@ trans_env <- R6Class(classname = "trans_env",
 			}else{
 				use_matrix <- add_matrix
 			}
-			if(is.null(self$data_env)){
-				stop("The data_env is NULL! Please check the data input when creating the object !")
-			}else{
-				env_data <- self$data_env
-				env_data <- private$check_numeric(env_data)
-			}
+
 			if(is.null(by_group)){
 				veg_dist <- as.dist(use_matrix[rownames(env_data), rownames(env_data)])
 				res_mantel <- private$mantel_test(env = env_data, veg = veg_dist, partial_mantel = partial_mantel, method = method, 
@@ -786,8 +796,8 @@ trans_env <- R6Class(classname = "trans_env",
 				res_mantel <- data.frame()
 				all_groups <- self$dataset$sample_table %>% dropallfactors %>% .[, by_group] %>% unique
 				for(k in all_groups){
-					use_sample_names <- self$dataset$sample_table %>% .[.[, by_group] == k, ] %>% rownames
-					use_env_data <- env_data[use_sample_names, ]
+					use_sample_names <- self$dataset$sample_table %>% .[.[, by_group] == k, , drop = FALSE] %>% rownames
+					use_env_data <- env_data[use_sample_names, , drop = FALSE]
 					use_veg_dist <- as.dist(use_matrix[use_sample_names, use_sample_names])
 					tmp_res <- private$mantel_test(env = use_env_data, veg = use_veg_dist, partial_mantel = partial_mantel, 
 						method = method, p_adjust_method = p_adjust_method, by_group = k, ...)
@@ -1136,10 +1146,18 @@ trans_env <- R6Class(classname = "trans_env",
 					.[, -1, drop = FALSE]
 				sig_data[is.na(sig_data)] <- ""
 				if(pheatmap == F){
-					row_cluster <- hclust(dist(clu_data)) 
-					lim_y <- row_cluster %>% {.$labels[.$order]}
-					col_cluster <- hclust(dist(t(clu_data)))
-					lim_x <- col_cluster %>% {.$labels[.$order]}
+					if(ncol(clu_data) == 1){
+						lim_x <- NULL
+					}else{
+						col_cluster <- hclust(dist(t(clu_data)))
+						lim_x <- col_cluster %>% {.$labels[.$order]}
+					}
+					if(nrow(clu_data) == 1){
+						lim_y <- NULL
+					}else{
+						row_cluster <- hclust(dist(clu_data))
+						lim_y <- row_cluster %>% {.$labels[.$order]}
+					}
 				}
 			}else{
 				if(is.factor(use_data[, xvalue])){
