@@ -181,21 +181,22 @@ trans_func <- R6Class(classname = "trans_func",
 					tax1$taxon <- ""
 					# operate the matching for each level that stored in the database
 					for(i in c("Phylum", "Order", "Family", "Genus", "Species")){
-						use_database <- switch(i, 
-							Phylum = fungi_func_FUNGuild[fungi_func_FUNGuild$taxonomicLevel == "3", ], 
-							Order = fungi_func_FUNGuild[fungi_func_FUNGuild$taxonomicLevel == "7", ], 
-							Family = fungi_func_FUNGuild[fungi_func_FUNGuild$taxonomicLevel == "9", ],
-							Genus = fungi_func_FUNGuild[fungi_func_FUNGuild$taxonomicLevel == "13", ],
-							Species = fungi_func_FUNGuild[fungi_func_FUNGuild$taxonomicLevel %in% c("20", "21", "22", "24"), ]
-						)
-						# search each OTU even though it has been matched
-						for(j in rownames(tax1)){
-							if(tax1[j, i] %in% use_database[, "taxon"]){
-								tax1[j, "taxon"] <- tax1[j, i]
+						if(i %in% colnames(tax1)){
+							use_database <- switch(i, 
+								Phylum = fungi_func_FUNGuild[fungi_func_FUNGuild$taxonomicLevel == "3", ], 
+								Order = fungi_func_FUNGuild[fungi_func_FUNGuild$taxonomicLevel == "7", ], 
+								Family = fungi_func_FUNGuild[fungi_func_FUNGuild$taxonomicLevel == "9", ],
+								Genus = fungi_func_FUNGuild[fungi_func_FUNGuild$taxonomicLevel == "13", ],
+								Species = fungi_func_FUNGuild[fungi_func_FUNGuild$taxonomicLevel %in% c("20", "21", "22", "24"), ]
+							)
+							# search each OTU even though it has been matched
+							for(j in rownames(tax1)){
+								if(tax1[j, i] %in% use_database[, "taxon"]){
+									tax1[j, "taxon"] <- tax1[j, i]
+								}
 							}
 						}
 					}
-					# merge two tables
 					res_table <- dplyr::left_join(tax1, fungi_func_FUNGuild, by = c("taxon" = "taxon"))
 					rownames(res_table) <- rownames(tax1)
 					res_table <- res_table[, which(colnames(res_table) %in% "taxon"):ncol(res_table)]
@@ -217,12 +218,10 @@ trans_func <- R6Class(classname = "trans_func",
 					}
 					# generate a data frame store the binary data
 					otu_func_table <- res_table[, c("taxon"), drop = FALSE]
-					# generate trophicMode binary information
 					trophicMode <- c("Pathotroph", "Saprotroph", "Symbiotroph")
 					for(i in trophicMode){
 						otu_func_table[, i] <- grepl(i, res_table[, "trophicMode"]) %>% as.numeric
 					}
-					# generate Guild binary information
 					Guild <- private$default_fungi_func_group$FUNGuild[["Guild"]]
 					for(i in Guild){
 						otu_func_table[, i] <- grepl(i, res_table[, "guild"]) %>% as.numeric
@@ -483,47 +482,6 @@ trans_func <- R6Class(classname = "trans_func",
 				}
 			}
 			g1
-		},
-		#' @description
-		#' Predict functional potential of communities using \code{Tax4Fun} package.
-		#' please cite: Tax4Fun: Predicting functional profiles from metagenomic 16S rRNA data. Bioinformatics, 31(17), 2882-2884, <doi:10.1093/bioinformatics/btv287>.
-		#' Note that this function requires a standard prefix in taxonomic table with double underlines (e.g. 'g__') .
-		#'
-		#' @param keep_tem default FALSE; whether keep the intermediate file, that is, the feature table in local place.
-		#' @param folderReferenceData default NULL; the folder, see Tax4Fun function in Tax4Fun package.
-		#' @return \code{tax4fun_KO} and \code{tax4fun_path} in object.
-		cal_tax4fun = function(keep_tem = FALSE, folderReferenceData = NULL){
-			if(is.null(folderReferenceData)){
-				stop("No folderReferenceData provided! Please see the help document!")
-			}
-			if(!require("Tax4Fun")){
-				stop("Tax4Fun package not installed!")
-			}
-			otu_file <- self$otu_table
-			tax_file <- self$tax_table
-			otu_file <- data.frame("#OTU ID" = rownames(otu_file), otu_file, check.names = FALSE, stringsAsFactors = FALSE)
-			tax_file <- apply(tax_file, 1, function(x){paste0(x, collapse = ";")})
-
-			otu_file <- data.frame(otu_file, taxonomy = tax_file, check.names = FALSE, stringsAsFactors = FALSE)
-			otu_file$taxonomy %<>% gsub(".__", "", .) %>% paste0(., ";") %>% gsub(";{1, }$", ";", .)
-
-			pathfilename <- "otu_table_filter_tax4fun"
-			pathfilename <- tempfile(pathfilename, fileext = ".txt")
-			output <- file(pathfilename, open = "wb")
-			# must write this line, otherwise sample line will disappear
-			cat("# Constructed from biom file\n", file = output)
-			suppressWarnings(write.table(otu_file, file = output, append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE))
-			close(output)
-
-			x1 <- importQIIMEData(pathfilename)
-			self$tax4fun_KO <- Tax4Fun(x1, folderReferenceData = folderReferenceData, fctProfiling = TRUE)
-			message('The KO abundance result is stored in object$tax4fun_KO ...')
-			self$tax4fun_path <- Tax4Fun(x1, folderReferenceData = folderReferenceData, fctProfiling = FALSE)
-			message('The pathway abundance result is stored in object$tax4fun_path ...')
-
-			if(keep_tem == F){
-				unlink(pathfilename, recursive = FALSE, force = TRUE)
-			}
 		},
 		#' @description
 		#' Predict functional potential of communities with Tax4Fun2 method. 

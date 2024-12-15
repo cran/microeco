@@ -75,9 +75,10 @@ t1$plot_alpha(measure = "Shannon", add_sig = TRUE)
 \item{\code{by_group}}{default NULL; a column name of \code{sample_table} used to perform the differential test 
 among groups (from \code{group} parameter) for each group (from \code{by_group} parameter) separately.}
 
-\item{\code{by_ID}}{default NULL; a column name of \code{sample_table} used to perform paired t test or paired wilcox test for the paired data,
-such as the data of plant compartments for different plant species (ID). 
-So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.}
+\item{\code{by_ID}}{default NULL; a column name of \code{sample_table} used to perform paired T test or paired Wilcoxon test for the paired data,
+such as continuous sampling of individual animals or plant compartments for different plant species (ID). 
+So \code{by_ID} in sample_table should be the smallest unit of sample collection without any repetition in it.
+When the \code{by_ID} parameter is provided, the function can automatically perform paired test, and no more parameters is required.}
 
 \item{\code{order_x}}{default NULL; a column name of \code{sample_table} or a vector with sample names. If provided, sort samples using \code{factor}.}
 }
@@ -113,6 +114,7 @@ Differential test on alpha diversity.
   KW_dunn_letter = TRUE,
   alpha = 0.05,
   anova_post_test = "duncan.test",
+  anova_varequal_test = FALSE,
   return_model = FALSE,
   ...
 )}\if{html}{\out{</div>}}
@@ -128,8 +130,10 @@ e.g. \code{c("Observed", "Chao1", "Shannon")}.}
 \describe{
   \item{\strong{'KW'}}{Kruskal-Wallis Rank Sum Test for all groups (>= 2)}
   \item{\strong{'KW_dunn'}}{Dunn's Kruskal-Wallis Multiple Comparisons <10.1080/00401706.1964.10490181> based on \code{dunnTest} function in \code{FSA} package}
-  \item{\strong{'wilcox'}}{Wilcoxon Rank Sum Test for all paired groups}
-  \item{\strong{'t.test'}}{Student's t-Test for all paired groups}
+  \item{\strong{'wilcox'}}{Wilcoxon Rank Sum Test for all paired groups
+        When \code{by_ID} parameter is provided in creating the object of the class, paired Wilcoxon test will be performed.}
+  \item{\strong{'t.test'}}{Student's t-Test for all paired groups. 
+        When \code{by_ID} parameter is provided in creating the object of the class, paired t-test will be performed.}
   \item{\strong{'anova'}}{Variance analysis. For one-way anova, the default post hoc test is Duncan's new multiple range test.
         Please use \code{anova_post_test} parameter to change the post hoc method.
         For multi-way anova, Please use \code{formula} parameter to specify the model and see \code{\link{aov}} for more details}
@@ -164,6 +168,9 @@ For \code{method = 'KW_dunn'}, please see \code{dunn.test::p.adjustment.methods}
 The default option represents the Duncan's new multiple range test.
 Other available options include "LSD.test" (LSD post hoc test) and "HSD.test" (HSD post hoc test). 
 All those are the function names from \code{agricolae} package.}
+
+\item{\code{anova_varequal_test}}{default FALSE; whether conduct Levene's Test for equality of variances.
+Only available for one-way anova. Significant P value means the variance among groups is not equal.}
 
 \item{\code{return_model}}{default FALSE; whether return the original "lm", "lmer" or "glmm" model list in the object.}
 
@@ -267,7 +274,7 @@ All those methods with \code{ggpubr} package use the \code{data_alpha} table in 
 \item{\code{add}}{default NULL; add another plot element; passed to the \code{add} parameter of the function (e.g., \code{ggboxplot}) from \code{ggpubr} package 
 when \code{plot_type} starts with "gg" (functions coming from ggpubr package).}
 
-\item{\code{add_sig}}{default TRUE; wheter add significance label using the result of \code{cal_diff} function, i.e. \code{object$res_diff};
+\item{\code{add_sig}}{default TRUE; whether add significance label using the result of \code{cal_diff} function, i.e. \code{object$res_diff};
 This is manily designed to add post hoc test of anova or other significances to make the label mapping easy.}
 
 \item{\code{add_sig_label}}{default "Significance"; select a colname of \code{object$res_diff} for the label text when 'Letter' is not in the table, 

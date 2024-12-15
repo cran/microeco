@@ -27,7 +27,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' @param use_percentage default TRUE; show the abundance percentage.
 		#' @param input_taxaname default NULL; character vector; input taxa names to select some taxa.
 		#' @param high_level default NULL; a taxonomic rank, such as "Phylum", used to add the taxonomic information of higher level.
-		#'   It is necessary for the legend with nested taxonomic levels in the bar plot.
+		#'   It is required for the legend with nested taxonomic levels in the bar plot or the higher taxonomic level in facets of y axis in the heatmap.
 		#' @param high_level_fix_nsub default NULL; an integer, used to fix the number of selected abundant taxa in each taxon from higher taxonomic level.
 		#'   If the total number under one taxon of higher level is less than the high_level_fix_nsub, the total number will be used.
 		#'   When \code{high_level_fix_nsub} is provided, the taxa number of higher level is calculated as: \code{ceiling(ntaxa/high_level_fix_nsub)}.
@@ -109,8 +109,11 @@ trans_abund <- R6Class(classname = "trans_abund",
 				}
 				message("Add higher taxonomic level into the table ...")
 				if(! high_level %in% colnames(dataset$tax_table)){
-					stop("Provided high_level must be a colname of input dataset$tax_table!")
+					stop("Provided high_level must be a column name of input dataset$tax_table!")
 				}else{
+					if(identical(high_level, taxrank)){
+						stop("Provided high_level should not be same with taxrank !")
+					}
 					extract_tax_table <- dataset$tax_table[, c(high_level, taxrank)] %>% unique
 					if(!delete_taxonomy_lineage){
 						stop("The delete_taxonomy_lineage should be TRUE when high_level is provided!")
@@ -414,6 +417,11 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#'    Please adjust the facet orders in the plot by assigning factors in \code{sample_table} before creating \code{trans_abund} object or 
 		#'    assigning factors in the \code{data_abund} table of \code{trans_abund} object.
 		#'    When multiple facets are used, please first install package \code{ggh4x} using the command \code{install.packages("ggh4x")}.
+		#' @param facet_switch default "y"; By default, the labels in facets are displayed on the top and right of the plot. 
+		#'    If "x", the top labels will be displayed to the bottom. If "y", the right-hand side labels will be displayed to the left. Can also be set to "both".
+		#'    When the \code{high_level} is found in the object, the function will generate facets for the higher taxonomy in y axis.
+		#'    So the default "y" of the parameter is to make the visualization better when \code{high_level} is found.
+		#'    This parameter will be passed to the \code{switch} parameter in \code{ggplot2::facet_grid} or \code{ggh4x::facet_nested} function.		
 		#' @param x_axis_name NULL; a character string; a column name of sample_table used to show the sample names in x axis.
 		#' @param order_x default NULL; vector; used to order the sample names in x axis; must be the samples vector, such as, c("S1", "S3", "S2").
 		#' @param withmargin default TRUE; whether retain the tile margin.
@@ -443,6 +451,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 		plot_heatmap = function(
 			color_values = rev(RColorBrewer::brewer.pal(n = 11, name = "RdYlBu")), 
 			facet = NULL,
+			facet_switch = "y",
 			x_axis_name = NULL,
 			order_x = NULL,
 			withmargin = TRUE,
@@ -499,13 +508,30 @@ trans_abund <- R6Class(classname = "trans_abund",
 					p <- p + scale_fill_gradientn(colours = color_values, trans = plot_colorscale, breaks = plot_breaks, na.value = "#00008B",
 						limits = c(min_abundance, max_abundance))
 				}
-				if(!is.null(facet)){
-					if(length(facet) == 1){
-						p <- p + facet_grid(reformulate(facet, "."), scales = "free", space = "free")
+				if(!is.null(facet) | !is.null(self$high_level)){
+					if(is.null(self$high_level)){
+						y_facet <- "."
 					}else{
-						p <- p + ggh4x::facet_nested(reformulate(facet), nest_line = element_line(linetype = 2), scales = "free", space = "free")
+						y_facet <- self$high_level
+						if(is.null(facet)){
+							facet <- "."
+						}
 					}
-					p <- p + theme(strip.background = element_rect(color = "white", fill = "grey92"), strip.text = element_text(size=strip_text))
+					facet_formula <- reformulate(facet, y_facet)
+					if(length(facet) == 1){
+						p <- p + facet_grid(facet_formula, scales = "free", space = "free", switch = facet_switch)
+					}else{
+						p <- p + ggh4x::facet_nested(facet_formula, nest_line = element_line(linetype = 2), scales = "free", space = "free", switch = facet_switch)
+					}
+					p <- p + theme(strip.background = element_rect(color = "white", fill = "grey92"), strip.text = element_text(size = strip_text))
+					p <- p + theme(strip.text.y.left = element_text(angle = 360), strip.text.y.right = element_text(angle = 360))
+					if(!is.null(self$high_level)){
+						if(!is.null(facet_switch)){
+							if(facet_switch != "x"){
+								p <- p + scale_y_discrete(position = "right")
+							}
+						}
+					}
 				}
 				p <- p + labs(x = "", y = "", fill = legend_title)
 				if (!is.null(ytext_size)){
@@ -829,12 +855,20 @@ trans_abund <- R6Class(classname = "trans_abund",
 			colnames(plot_data)[2] <- "Abundance"
 			if(is.factor(data_abund$Sample)){
 				sample_names <- levels(data_abund$Sample)
+				if(length(sample_names) > 3){
+					data_names <- colnames(plot_data)[3:ncol(plot_data)]
+					if(all(data_names %in% sample_names)){
+						sample_names %<>% .[. %in% data_names]
+					}else{
+						sample_names <- data_names
+					}
+				}
 			}else{
 				sample_names <- unique(data_abund$Sample)
 			}
 			color_values <- expand_colors(color_values, length(use_taxanames))
 
-			p <- ggtern::ggtern(data = plot_data, aes_meco(x = sample_names[1], y = sample_names[2], z = sample_names[3])) +
+			p <- ggtern::ggtern(data = plot_data, aes(x = .data[[sample_names[1]]], y = .data[[sample_names[2]]], z = .data[[sample_names[3]]])) +
 				theme_bw() +
 				geom_point(aes(color = Taxonomy, size = Abundance)) +
 				scale_color_manual(values = color_values) +

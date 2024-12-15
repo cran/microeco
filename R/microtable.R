@@ -51,9 +51,8 @@ microtable <- R6Class(classname = "microtable",
 			if(missing(otu_table)){
 				stop("otu_table must be provided!")
 			}
-			if(!inherits(otu_table, "data.frame")){
-				stop("The input otu_table must be data.frame format!")
-			}
+			private$check_df(otu_table, "otu_table")
+			private$check_tbldf(otu_table, "otu_table")
 			otu_table <- private$check_abund_table(otu_table)
 			self$otu_table <- otu_table
 			if(is.null(sample_table)){
@@ -61,18 +60,13 @@ microtable <- R6Class(classname = "microtable",
 				self$sample_table <- data.frame(SampleID = colnames(otu_table), Group = colnames(otu_table)) %>% 
 					`row.names<-`(.$SampleID)
 			}else{
-				if(!inherits(sample_table, "data.frame")){
-					stop("Input sample_table must be data.frame format!")
-				}
-				if(inherits(sample_table, "tbl_df")){
-					stop("Input sample_table is of tbl_df class! It may be created using tibble package! Please convert it to traditional data.frame class!")
-				}
+				private$check_df(sample_table, "sample_table")
+				private$check_tbldf(sample_table, "sample_table")
 				self$sample_table <- sample_table
 			}
 			if(!is.null(tax_table)){
-				if(!inherits(tax_table, "data.frame")){
-					stop("The input tax_table must be data.frame format!")
-				}
+				private$check_df(tax_table, "tax_table")
+				private$check_tbldf(tax_table, "tax_table")
 			}
 			if(!is.null(phylo_tree)){
 				if(!inherits(phylo_tree, "phylo")){
@@ -180,7 +174,7 @@ microtable <- R6Class(classname = "microtable",
 				if(length(filter_names) == nrow(raw_otu_table)){
 					stop("All features are filtered! Please adjust the parameters")
 				}
-				new_table <- raw_otu_table[! rownames(raw_otu_table) %in% filter_names, ]
+				new_table <- raw_otu_table[! rownames(raw_otu_table) %in% filter_names, , drop = FALSE]
 			}
 			self$otu_table <- new_table
 			self$tidy_dataset()
@@ -198,7 +192,7 @@ microtable <- R6Class(classname = "microtable",
 		#' \donttest{
 		#' m1$rarefy_samples(sample.size = min(m1$sample_sums()))
 		#' }
-		rarefy_samples = function(method = c("rarefy", "SRS")[1], sample.size, ...){
+		rarefy_samples = function(method = c("rarefy", "SRS")[1], sample.size = NULL, ...){
 			self$tidy_dataset()
 			if(method == "rarefying"){
 				method <- "rarefy"
@@ -833,6 +827,16 @@ microtable <- R6Class(classname = "microtable",
 		}
 		),
 	private = list(
+		check_df = function(input_table, showname){
+			if(!inherits(input_table, "data.frame")){
+				stop("The input ", showname, " must be data.frame format!")
+			}
+		},
+		check_tbldf = function(input_table, showname){
+			if(inherits(input_table, "tbl_df")){
+				stop("Input ", showname, " is tbl_df format! It may be created using tibble package! Please convert it to traditional data.frame class!")
+			}
+		},
 		# check and remove OTU or sample with 0 abundance
 		check_abund_table = function(otu_table){
 			if(!all(sapply(otu_table, is.numeric))){
