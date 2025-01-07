@@ -3,7 +3,7 @@
 #'
 #' @description
 #' This class is a wrapper for a series of network analysis methods, 
-#' including the network construction, network attributes analysis,
+#' including the network construction, topological attributes analysis,
 #' eigengene analysis, network subsetting, node and edge properties, network visualization and other operations.
 #'
 #' @export
@@ -488,6 +488,7 @@ trans_network <- R6Class(classname = "trans_network",
 			}else{
 				message('No network_method selected! Please manually assign object$res_network!')
 			}
+			invisible(self)
 		},
 		#' @description
 		#' Calculate network modules and add module names to the network node properties.
@@ -526,7 +527,7 @@ trans_network <- R6Class(classname = "trans_network",
 			}else{
 				message('Use ', method, ' function to partition modules ...')
 			}
-			# use NSE
+			
 			res_member <- parse(text = paste0(method, "(network)")) %>% eval
 			
 			mod1 <- as.character(res_member$membership)
@@ -538,23 +539,48 @@ trans_network <- R6Class(classname = "trans_network",
 			network <- set_vertex_attr(network, "module", value = mod1)
 			message('Modules are assigned in network with attribute name -- module ...')
 			self$res_network <- network
+			invisible(self)
 		},
 		#' @description
 		#' Save network as gexf style, which can be opened by Gephi (https://gephi.org/).
 		#'
 		#' @param filepath default "network.gexf"; file path to save the network.
+		#' @param ... parameters pass to \code{gexf} function of rgexf package except for \code{nodes}, 
+		#' 	  \code{edges}, \code{edgesLabel}, \code{edgesWeight}, \code{nodesAtt}, \code{edgesAtt} and \code{meta}.
 		#' @return None
 		#' @examples
 		#' \dontrun{
 		#' t1$save_network(filepath = "network.gexf")
 		#' }
-		save_network = function(filepath = "network.gexf"){
+		save_network = function(filepath = "network.gexf", ...){
 			if(!require("rgexf")){
 				stop("Please first install rgexf package with command: install.packages('rgexf') !")
 			}
 			private$check_igraph()
 			private$check_network()
-			private$saveAsGEXF(network = self$res_network, filepath = filepath)
+			network <- self$res_network
+			
+			nodes <- data.frame(cbind(V(network), V(network)$name))
+			edges <- get.edges(network, 1:ecount(network))
+			node_attr_name <- base::setdiff(vertex_attr_names(network), "name")
+			node_attr <- data.frame(sapply(node_attr_name, function(x) vertex_attr(network, x)))
+			if("RelativeAbundance" %in% node_attr_name){
+				node_attr$RelativeAbundance %<>% as.numeric
+			}
+			edge_attr_name <- base::setdiff(edge_attr_names(network), "weight")
+			edge_attr <- data.frame(sapply(edge_attr_name, function(x) edge_attr(network, x)))
+			# combine all graph attributes into a meta-data
+			graphAtt <- sapply(graph_attr_names(network), function(x) graph_attr(network, x))
+			output_gexf <- write.gexf(nodes, edges,
+				edgesLabel = as.data.frame(E(network)$label),
+				edgesWeight = E(network)$weight,
+				nodesAtt = node_attr,
+				edgesAtt = edge_attr,
+				meta = c(list(creator="trans_network class", description="igraph -> gexf converted file", keywords="igraph, gexf, R, rgexf"), graphAtt), 
+				...)
+			cat(output_gexf$graph, file = filepath)
+			
+			invisible(self)
 		},
 		#' @description
 		#' Calculate network properties.
@@ -567,8 +593,31 @@ trans_network <- R6Class(classname = "trans_network",
 		cal_network_attr = function(){
 			private$check_igraph()
 			private$check_network()
-			self$res_network_attr <- private$network_attribute(self$res_network)
+			network <- self$res_network
+			
+			if(is_directed(network)){
+				ms <- cluster_walktrap(network)
+			}else{
+				ms <- cluster_fast_greedy(network)
+			}
+			res <- data.frame(
+				Vertex = round(vcount(network), 0), 
+				Edge = round(ecount(network), 0), 
+				Average_degree = sum(igraph::degree(network))/length(igraph::degree(network)), 
+				Average_path_length = mean_distance(network), 
+				Network_diameter = round(diameter(network, directed = FALSE), 0), 
+				Clustering_coefficient = transitivity(network), 
+				Density = edge_density(network), 
+				Heterogeneity = sd(igraph::degree(network))/mean(igraph::degree(network)), 
+				Centralization = centr_degree(network)$centralization,
+				Modularity = modularity(ms)
+				)
+			res <- base::as.data.frame(t(res))
+			colnames(res) <- NULL
+			
+			self$res_network_attr <- res
 			message('Result is stored in object$res_network_attr ...')
+			invisible(self)
 		},
 		#' @description
 		#' Get the node property table. The properties include the node names, modules allocation, degree, betweenness, abundance, 
@@ -629,6 +678,7 @@ trans_network <- R6Class(classname = "trans_network",
 			}
 			self$res_node_table <- node_table
 			message('Result is stored in object$res_node_table ...')
+			invisible(self)
 		},
 		#' @description
 		#' Get the edge property table, including connected nodes, label and weight.
@@ -649,6 +699,7 @@ trans_network <- R6Class(classname = "trans_network",
 			}
 			self$res_edge_table <- res_edge_table
 			message('Result is stored in object$res_edge_table ...')
+			invisible(self)
 		},
 		#' @description
 		#' Get the adjacency matrix from the network graph.
@@ -665,6 +716,7 @@ trans_network <- R6Class(classname = "trans_network",
 			network <- self$res_network
 			self$res_adjacency_matrix <- as_adjacency_matrix(network, ...) %>% as.matrix
 			message('Result is stored in object$res_adjacency_matrix ...')
+			invisible(self)
 		},
 		#' @description
 		#' Plot the network based on a series of methods from other packages, such as \code{igraph}, \code{ggraph} and \code{networkD3}. 
@@ -817,18 +869,21 @@ trans_network <- R6Class(classname = "trans_network",
 			self$res_eigen <- res_eigen
 			self$res_eigen_expla <- res_eigen_expla
 			message('Result is stored in object$res_eigen and object$res_eigen_expla ...')
+			invisible(self)
 		},
 		#' @description
 		#' Plot the roles or metrics of nodes based on the \code{res_node_table} data (coming from function \code{get_node_table}) stored in the object.
 		#' 
 		#' @param use_type default 1; 1 or 2; 1 represents taxa roles plot (node roles include Module hubs, Network hubs, 
-		#'   Connectors and Peripherals <doi:10.1038/nature03288; 10.1186/1471-2105-13-113>); 
+		#'   Connectors and Peripherals <doi:10.1038/nature03288; 10.1186/1471-2105-13-113>). 
+		#'   The 'p' column (Pi, among-module connectivity) in \code{res_node_table} table is used in x-axis. The 'z' column (Zi, within-module connectivity) is used in y-axis; 
 		#'   2 represents the layered plot with taxa as x axis and the index (e.g., Zi and Pi) as y axis.
 		#'   Please refer to \code{res_node_table} data stored in the object for the detailed information.
 		#' @param roles_color_background default FALSE; for use_type=1; TRUE: use background colors for each area; FALSE: use classic point colors.
 		#' @param roles_color_values default NULL; for use_type=1; color palette for background or points.
 		#' @param add_label default FALSE; for use_type = 1; whether add labels for the points.
-		#' @param add_label_group default "Network hubs"; If add_label = TRUE; which part of tax_roles is used to show labels; character vectors.
+		#' @param add_label_group default c("Network hubs", "Module hubs", "Connectors"); 
+		#'   If \code{add_label = TRUE}, which part in \code{taxa_roles} column is used to show labels; character vectors.
 		#' @param add_label_text default "name"; If add_label = TRUE; which column of object$res_node_table is used to label the text.
 		#' @param label_text_size default 4; The text size of the label.
 		#' @param label_text_color default "grey50"; The text color of the label.
@@ -855,7 +910,7 @@ trans_network <- R6Class(classname = "trans_network",
 			roles_color_background = FALSE,
 			roles_color_values = NULL,
 			add_label = FALSE, 
-			add_label_group = "Network hubs", 
+			add_label_group = c("Network hubs", "Module hubs", "Connectors"), 
 			add_label_text = "name", 
 			label_text_size = 4, 
 			label_text_color = "grey50", 
@@ -1005,6 +1060,7 @@ trans_network <- R6Class(classname = "trans_network",
 				self$res_powerlaw_fit <- res_powerlaw_fit
 				message('Powerlaw fitting result is stored in object$res_powerlaw_fit ...')
 			}
+			invisible(self)
 		},
 		#' @description
 		#' This function is used to sum the links number from one taxa to another or in the same taxa, for example, at Phylum level.
@@ -1057,6 +1113,7 @@ trans_network <- R6Class(classname = "trans_network",
 					message('No negative edges found ...')
 				}
 			}
+			invisible(self)
 		},
 		#' @description
 		#' Plot the summed linkages among taxa.
@@ -1241,7 +1298,7 @@ trans_network <- R6Class(classname = "trans_network",
 			}
 			invisible(self)
 		}
-		),
+	),
 	private = list(
 		check_filter_number = function(input, param = "filter_thres"){
 			if(nrow(input) == 0){
@@ -1361,47 +1418,6 @@ trans_network <- R6Class(classname = "trans_network",
 		nnsd = function(x){
 			abs(diff(x))
 		},
-		saveAsGEXF = function(network, filepath = "network.gexf"){
-			require("rgexf")
-			nodes <- data.frame(cbind(V(network), V(network)$name))
-			edges <- get.edges(network, 1:ecount(network))
-			node_attr_name <- setdiff(list.vertex.attributes(network), "name")
-			node_attr <- data.frame(sapply(node_attr_name, function(attr) sub("&", "&", get.vertex.attribute(network, attr))))
-			node_attr$RelativeAbundance %<>% as.numeric
-			edge_attr_name <- setdiff(list.edge.attributes(network), "weight")
-			edge_attr <- data.frame(sapply(edge_attr_name, function(attr) sub("&", "&", get.edge.attribute(network, attr))))
-			# combine all graph attributes into a meta-data
-			graphAtt <- sapply(list.graph.attributes(network), function(attr) sub("&", "&",get.graph.attribute(network, attr)))
-			output_gexf <- write.gexf(nodes, edges,
-				edgesLabel = as.data.frame(E(network)$label),
-				edgesWeight = E(network)$weight,
-				nodesAtt = node_attr,
-				edgesAtt = edge_attr,
-				meta=c(list(creator="trans_network class", description="igraph -> gexf converted file", keywords="igraph, gexf, R, rgexf"), graphAtt))
-			cat(output_gexf$graph, file = filepath)
-		},
-		network_attribute = function(x){
-			if(is_directed(x)){
-				ms <- cluster_walktrap(x)
-			}else{
-				ms <- cluster_fast_greedy(x)
-			}
-			res <- data.frame(
-				Vertex = round(vcount(x), 0), 
-				Edge = round(ecount(x), 0), 
-				Average_degree = sum(igraph::degree(x))/length(igraph::degree(x)), 
-				Average_path_length = average.path.length(x), 
-				Network_diameter = round(diameter(x, directed = FALSE), 0), 
-				Clustering_coefficient = transitivity(x), 
-				Density = graph.density(x), 
-				Heterogeneity = sd(igraph::degree(x))/mean(igraph::degree(x)), 
-				Centralization = centr_degree(x)$centralization,
-				Modularity = modularity(ms)
-				)
-			res <- base::as.data.frame(t(res))
-			colnames(res) <- NULL
-			res
-		},
 		# modified from microbiomeSeq (http://www.github.com/umerijaz/microbiomeSeq) 
 		module_roles = function(comm_graph){
 			td <- igraph::degree(comm_graph) %>% data.frame(taxa = names(.), total_links = ., stringsAsFactors = FALSE)
@@ -1419,7 +1435,7 @@ trans_network <- R6Class(classname = "trans_network",
 		},
 		#compute within-module degree
 		within_module_degree = function(comm_graph){
-			mods <- get.vertex.attribute(comm_graph, "module")
+			mods <- vertex_attr(comm_graph, "module")
 			if(is.null(mods)){
 				stop("No modules found! Please first calculate network modules using function cal_module !")
 			}
@@ -1427,7 +1443,7 @@ trans_network <- R6Class(classname = "trans_network",
 			res <- data.frame()
 			for(mod in unique(modvs$mod)){
 				mod_nodes <- subset(modvs$taxon, modvs$mod == mod)
-				mod_subgraph <- induced.subgraph(graph = comm_graph, vids = mod_nodes)
+				mod_subgraph <- induced_subgraph(graph = comm_graph, vids = mod_nodes)
 				mod_degree <- igraph::degree(mod_subgraph)
 				for(i in mod_nodes){
 					ki <- mod_degree[names(mod_degree) == i]
@@ -1453,7 +1469,7 @@ trans_network <- R6Class(classname = "trans_network",
 		},
 		#calculate the degree (links) of each node to nodes in other modules
 		among_module_connectivity = function(comm_graph){
-			modvs <- data.frame(taxon = V(comm_graph)$name, mod = get.vertex.attribute(comm_graph, "module"), stringsAsFactors = FALSE)
+			modvs <- data.frame(taxon = V(comm_graph)$name, mod = vertex_attr(comm_graph, "module"), stringsAsFactors = FALSE)
 			edges <- t(sapply(1:ecount(comm_graph), function(x) ends(comm_graph, x)))
 			res <- lapply(modvs$taxon, function(x){
 						sapply(unique(c(edges[edges[, 1] == x, 2], edges[edges[, 2] == x, 1])), function(y){

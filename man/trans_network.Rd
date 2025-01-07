@@ -5,7 +5,7 @@
 \title{Create \code{trans_network} object for network analysis.}
 \description{
 This class is a wrapper for a series of network analysis methods, 
-including the network construction, network attributes analysis,
+including the network construction, topological attributes analysis,
 eigengene analysis, network subsetting, node and edge properties, network visualization and other operations.
 }
 \examples{
@@ -477,13 +477,16 @@ t1$cal_module(method = "cluster_fast_greedy")
 \subsection{Method \code{save_network()}}{
 Save network as gexf style, which can be opened by Gephi (https://gephi.org/).
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_network$save_network(filepath = "network.gexf")}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_network$save_network(filepath = "network.gexf", ...)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{filepath}}{default "network.gexf"; file path to save the network.}
+
+\item{\code{...}}{parameters pass to \code{gexf} function of rgexf package except for \code{nodes}, 
+\code{edges}, \code{edgesLabel}, \code{edgesWeight}, \code{nodesAtt}, \code{edgesAtt} and \code{meta}.}
 }
 \if{html}{\out{</div>}}
 }
@@ -727,7 +730,7 @@ Plot the roles or metrics of nodes based on the \code{res_node_table} data (comi
   roles_color_background = FALSE,
   roles_color_values = NULL,
   add_label = FALSE,
-  add_label_group = "Network hubs",
+  add_label_group = c("Network hubs", "Module hubs", "Connectors"),
   add_label_text = "name",
   label_text_size = 4,
   label_text_color = "grey50",
@@ -751,7 +754,8 @@ Plot the roles or metrics of nodes based on the \code{res_node_table} data (comi
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{use_type}}{default 1; 1 or 2; 1 represents taxa roles plot (node roles include Module hubs, Network hubs, 
-Connectors and Peripherals <doi:10.1038/nature03288; 10.1186/1471-2105-13-113>); 
+Connectors and Peripherals <doi:10.1038/nature03288; 10.1186/1471-2105-13-113>). 
+The 'p' column (Pi, among-module connectivity) in \code{res_node_table} table is used in x-axis. The 'z' column (Zi, within-module connectivity) is used in y-axis; 
 2 represents the layered plot with taxa as x axis and the index (e.g., Zi and Pi) as y axis.
 Please refer to \code{res_node_table} data stored in the object for the detailed information.}
 
@@ -761,7 +765,8 @@ Please refer to \code{res_node_table} data stored in the object for the detailed
 
 \item{\code{add_label}}{default FALSE; for use_type = 1; whether add labels for the points.}
 
-\item{\code{add_label_group}}{default "Network hubs"; If add_label = TRUE; which part of tax_roles is used to show labels; character vectors.}
+\item{\code{add_label_group}}{default c("Network hubs", "Module hubs", "Connectors"); 
+If \code{add_label = TRUE}, which part in \code{taxa_roles} column is used to show labels; character vectors.}
 
 \item{\code{add_label_text}}{default "name"; If add_label = TRUE; which column of object$res_node_table is used to label the text.}
 

@@ -144,6 +144,7 @@ trans_env <- R6Class(classname = "trans_env",
 			self$res_diff_tmp <- tmp_alpha
 			self$group <- group
 			message('The result is stored in object$res_diff ...')
+			invisible(self)
 		},
 		#' @description
 		#' Plot environmental variables across groups and add the significance label.
@@ -351,6 +352,7 @@ trans_env <- R6Class(classname = "trans_env",
 			message('The original ordination result is stored in object$res_ordination ...')
 			self$res_ordination_R2 <- unlist(RsquareAdj(res_ordination))
 			message('The R2 is stored in object$res_ordination_R2 ...')
+			invisible(self)
 		},
 		#' @description
 		#' Use anova to test the significance of the terms and axis in ordination.
@@ -370,6 +372,7 @@ trans_env <- R6Class(classname = "trans_env",
 				self$res_ordination_axis <- anova(self$res_ordination, by = "axis", perm.max = 1000, ...)
 				message('The axis anova result is stored in object$res_ordination_axis ...')
 			}
+			invisible(self)
 		},
 		#' @description
 		#' Fit each environmental vector onto the ordination to obtain the contribution of each variable.
@@ -387,6 +390,7 @@ trans_env <- R6Class(classname = "trans_env",
 				self$res_ordination_envfit <- vegan::envfit(self$res_ordination, self$data_env, ...)
 				message('Result is stored in object$res_ordination_envfit ...')
 			}
+			invisible(self)
 		},
 		#' @description
 		#' Transform ordination results for the following plot.
@@ -468,6 +472,7 @@ trans_env <- R6Class(classname = "trans_env",
 				df_arrows_spe = df_arrows_spe
 				)
 			message('The result list is stored in object$res_ordination_trans ...')
+			invisible(self)
 		},
 		#' @description
 		#' plot ordination result.
@@ -808,6 +813,7 @@ trans_env <- R6Class(classname = "trans_env",
 			}
 			self$res_mantel <- res_mantel
 			message('The result is stored in object$res_mantel ...')
+			invisible(self)
 		},
 		#' @description
 		#' Calculate the correlations between taxonomic abundance and environmental variables.
@@ -891,23 +897,22 @@ trans_env <- R6Class(classname = "trans_env",
 				if(use_data %in% names(self$dataset$taxa_abund)){
 					abund_table <- self$dataset$taxa_abund[[use_data]]
 				}else{
-					if(grepl("all|other", use_data, ignore.case = TRUE)){
-						abund_table <- do.call(rbind, unname(self$dataset$taxa_abund))
-						if(use_data == "other"){
-							if(is.null(other_taxa)){
-								stop("You select other, but other_taxa parameter is not provided!")
-							}
-							if(any(is.na(other_taxa))){
-								other_taxa %<>% .[!is.na(.)]
-								message("NA is found in provided other_taxa. Filter out NA ...")
-							}
-							if(!any(other_taxa %in% rownames(abund_table))){
-								stop("Provided other_taxa is unavailable! Please check the taxonomic information in other_taxa parameter!")
-							}
-							abund_table <- abund_table[other_taxa, ]
+					if(!grepl("all|other", use_data, ignore.case = TRUE)){
+						stop("Unknown use_data parameter input!")
+					}
+					abund_table <- do.call(rbind, unname(self$dataset$taxa_abund))
+					if(use_data == "other"){
+						if(is.null(other_taxa)){
+							stop("The other_taxa parameter must be provided when use_data = 'other'!")
 						}
-					}else{
-						stop("Unknown use_data parameter provided!")
+						if(any(is.na(other_taxa))){
+							other_taxa %<>% .[!is.na(.)]
+							message("NA is found in provided other_taxa. Filter out NA ...")
+						}
+						if(!any(other_taxa %in% rownames(abund_table))){
+							stop("Provided other_taxa is unavailable! Please check the taxonomic information in other_taxa parameter!")
+						}
+						abund_table <- abund_table[other_taxa, ]
 					}
 				}
 				abund_table %<>% .[!grepl("__$", rownames(.)), ]
@@ -921,7 +926,7 @@ trans_env <- R6Class(classname = "trans_env",
 						abund_table %<>% .[1:use_taxa_num, ] 
 					}
 				}
-				abund_table <- as.data.frame(t(abund_table))
+				abund_table %<>% t %>% as.data.frame
 			}
 			# filter samples by one group
 			if(!is.null(group_use)){
@@ -931,10 +936,10 @@ trans_env <- R6Class(classname = "trans_env",
 				sel_sample_names <- self$dataset$sample_table %>% 
 					.[.[, group_use] %in% group_select, ] %>% 
 					rownames
-				abund_table <- abund_table[sel_sample_names, ]
+				abund_table %<>% .[sel_sample_names, ]
 			}
 			env_data %<>% .[rownames(.) %in% rownames(abund_table), , drop = FALSE]
-			abund_table <- abund_table[rownames(env_data), , drop = FALSE]
+			abund_table %<>% .[rownames(env_data), , drop = FALSE]
 			if(cor_method == "maaslin2"){
 				save_env_data <- data.frame(ID = rownames(env_data), env_data)
 				save_abund_table <- data.frame(ID = rownames(abund_table), abund_table)
@@ -1019,6 +1024,7 @@ trans_env <- R6Class(classname = "trans_env",
 			self$res_cor <- res
 			message('The correlation result is stored in object$res_cor ...')
 			self$cor_method <- cor_method
+			invisible(self)
 		},
 		#' @description
 		#' Plot correlation heatmap.
@@ -1234,7 +1240,6 @@ trans_env <- R6Class(classname = "trans_env",
 				p <- p + theme(text = element_text(family = font_family))
 			}
 			p
-			
 		},
 		#' @description
 		#' 	Scatter plot with fitted line based on the correlation or regression.\cr
@@ -1461,6 +1466,7 @@ trans_env <- R6Class(classname = "trans_env",
 			}else{
 				cat("No environmental variable table stored in the object.\n")
 			}
+			invisible(self)
 		}
 	),
 	private = list(

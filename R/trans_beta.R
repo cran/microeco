@@ -96,6 +96,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' 	  Only available when \code{scale_species = TURE}.
 		#' @param orthoI default NA; number of orthogonal components (for OPLS-DA only). Default NA means the number of orthogonal components is automatically computed.
 		#' 	  Please also see \code{orthoI} parameter in \code{opls} function of ropls package.
+		#' @param ordination deprecated. Please use \code{method} argument instead.
 		#' @param ... parameters passed to \code{vegan::rda} function when \code{method = "PCA"}, 
 		#' 	  or \code{vegan::decorana} function when \code{method = "DCA"}, 
 		#' 	  or \code{ape::pcoa} function when \code{method = "PCoA"}, 
@@ -111,12 +112,15 @@ trans_beta <- R6Class(classname = "trans_beta",
 			scale_species = FALSE,
 			scale_species_ratio = 0.8,
 			orthoI = NA,
+			ordination = deprecated(),
 			...
 			){
-			all_parameters <- c(as.list(environment()), list(...))
-			if("ordination" %in% names(all_parameters)){
-				stop("Parameter ordination is deprecated! Please use method instead of it!")
+			
+			if(lifecycle::is_present(ordination)) {
+				lifecycle::deprecate_warn("1.8.0", "cal_ordination(ordination)", "cal_ordination(method)")
+				method <- ordination
 			}
+			
 			if(is.null(method)){
 				stop("Input method should not be NULL !")
 			}
@@ -207,6 +211,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			self$res_ordination <- outlist
 			message('The result is stored in object$res_ordination ...')
 			self$ordination_method <- method
+			invisible(self)
 		},
 		#' @description
 		#' Plot the ordination result.
@@ -414,6 +419,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#'    Only available when \code{manova_all = FALSE} and \code{manova_set} is not provided.
 		#' @param p_adjust_method default "fdr"; p.adjust method; available when \code{manova_all = FALSE}; 
 		#'    see \code{method} parameter of \code{p.adjust} function for available options.
+		#' @param by default "terms"; same with the \code{by} parameter in \code{adonis2} function of vegan package. 
+		#' @param permutations default 999; same with the \code{permutations} parameter in \code{adonis2} function of vegan package. 
 		#' @param ... parameters passed to \code{adonis2} function of \code{vegan} package.
 		#' @return \code{res_manova} stored in object with \code{data.frame} class.
 		#' @examples
@@ -424,6 +431,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 			group = NULL,
 			by_group = NULL,
 			p_adjust_method = "fdr",
+			by = "terms",
+			permutations = 999,
 			...
 			){
 			if(is.null(self$use_matrix)){
@@ -433,7 +442,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			metadata <- self$sample_table
 			if(!is.null(manova_set)){
 				use_formula <- reformulate(manova_set, substitute(as.dist(use_matrix)))
-				res <- adonis2(use_formula, data = metadata, ...)
+				res <- adonis2(use_formula, data = metadata, by = by, permutations = permutations, ...)
 			}else{
 				if(is.null(group)){
 					if(is.null(self$group)){
@@ -446,7 +455,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 				}
 				if(manova_all){
 					use_formula <- reformulate(group, substitute(as.dist(use_matrix)))
-					res <- adonis2(use_formula, data = metadata, ...)
+					res <- adonis2(use_formula, data = metadata, by = by, permutations = permutations, ...)
 				}else{
 					res <- private$paired_manova_anosim_bygroup(
 						by_group = by_group,
@@ -456,6 +465,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 						group = group, 
 						measure = self$measure, 
 						p_adjust_method = p_adjust_method,
+						permutations = permutations,
 						...
 					)
 				}
@@ -466,6 +476,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			}
 			self$res_manova <- res
 			message('The result is stored in object$res_manova ...')
+			invisible(self)
 		},
 		#' @description
 		#' Analysis of similarities (ANOSIM) based on the \code{anosim} function of vegan package.
@@ -475,6 +486,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @param by_group default NULL; one column name in \code{sample_table}; used to perform paired comparisions within each group. 
 		#'    Only available when \code{paired = TRUE}.
 		#' @param p_adjust_method default "fdr"; p.adjust method; available when \code{paired = TRUE}; see method parameter of \code{p.adjust} function for available options.
+		#' @param permutations default 999; same with the \code{permutations} parameter in \code{anosim} function of vegan package. 
 		#' @param ... parameters passed to \code{anosim} function of \code{vegan} package.
 		#' @return \code{res_anosim} stored in object with \code{data.frame} class.
 		#' @examples
@@ -484,6 +496,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			group = NULL,
 			by_group = NULL,
 			p_adjust_method = "fdr",
+			permutations = 999,
 			...
 			){
 			if(is.null(self$use_matrix)){
@@ -510,12 +523,14 @@ trans_beta <- R6Class(classname = "trans_beta",
 					group = group, 
 					measure = self$measure, 
 					p_adjust_method = p_adjust_method,
+					permutations = permutations,
 					...
 				)
 			}else{
 				tmp <- anosim(
 					x = use_matrix, 
 					grouping = metadata[, group], 
+					permutations = permutations,
 					...
 				)
 				res <- data.frame(Test = "ANOSIM for all groups", permutations = tmp$permutations, statistic.R = tmp$statistic, p.value = tmp$signif)
@@ -523,6 +538,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			}
 			self$res_anosim <- res
 			message('The original result is stored in object$res_anosim ...')
+			invisible(self)
 		},
 		#' @description
 		#' Multivariate homogeneity test of groups dispersions (PERMDISP) based on \code{betadisper} function in vegan package.
@@ -540,6 +556,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			res2 <- permutest(res1, pairwise = TRUE)
 			self$res_betadisper <- res2
 			message('The result is stored in object$res_betadisper ...')
+			invisible(self)
 		},
 		#' @description
 		#' Convert symmetric distance matrix to distance table of paired samples that are within groups or between groups.
@@ -575,6 +592,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			colnames(res)[colnames(res) == "value"] <- "Value"
 			self$res_group_distance <- res
 			message('The result is stored in object$res_group_distance ...')
+			invisible(self)
 		},
 		#' @description
 		#' Differential test of converted distances across groups.
@@ -625,6 +643,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			self$res_group_distance_diff <- temp1$res_diff
 			self$res_group_distance_diff_tmp <- temp1
 			message('The result is stored in object$res_group_distance_diff ...')
+			invisible(self)
 		},
 		#' @description
 		#' Plot the distances of paired groups within or between groups.
@@ -849,7 +868,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			}
 			res
 		},
-		paired_manova_anosim_bygroup = function(by_group, test, sample_info_use, use_matrix, group, measure, p_adjust_method, ...){
+		paired_manova_anosim_bygroup = function(by_group, test, sample_info_use, use_matrix, group, measure, p_adjust_method, permutations, ...){
 			if(is.null(by_group)){
 				res <- private$paired_group_manova_anosim(
 					test = test,
@@ -858,6 +877,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 					group = group, 
 					measure = measure, 
 					p_adjust_method = p_adjust_method,
+					permutations = permutations,
 					...
 				)
 			}else{
@@ -878,6 +898,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 						group = group, 
 						measure = measure, 
 						p_adjust_method = p_adjust_method,
+						permutations = permutations,
 						...
 					)
 					tmp <- data.frame(by_group = i, tmp)
@@ -886,7 +907,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 			}
 			res
 		},
-		paired_group_manova_anosim = function(test, sample_info_use, use_matrix, group, measure, p_adjust_method, ...){
+		paired_group_manova_anosim = function(test, sample_info_use, use_matrix, group, measure, p_adjust_method, permutations, ...){
 			comnames <- c()
 			test <- match.arg(test, choices = c("permanova", "anosim"))
 			if(test == "permanova"){
@@ -904,12 +925,12 @@ trans_beta <- R6Class(classname = "trans_beta",
 				sample_info_compare <- sample_info_use[groupvec %in% as.character(all_name[,i]), , drop = FALSE]
 				comnames <- c(comnames, paste0(as.character(all_name[,i]), collapse = " vs "))
 				if(test == "permanova"){
-					tmp_result <- adonis2(reformulate(group, substitute(as.dist(matrix_compare))), data = sample_info_compare, ...)
+					tmp_result <- adonis2(reformulate(group, substitute(as.dist(matrix_compare))), data = sample_info_compare, permutations = permutations, ...)
 					F %<>% c(., tmp_result$F[1])
 					R2 %<>% c(., tmp_result$R2[1])
 					p_value %<>% c(., tmp_result$`Pr(>F)`[1])
 				}else{
-					tmp_result <- anosim(x = matrix_compare, grouping = sample_info_compare[, group], ...)
+					tmp_result <- anosim(x = matrix_compare, grouping = sample_info_compare[, group], permutations = permutations, ...)
 					R %<>% c(., tmp_result$statistic[1])
 					p_value %<>% c(., tmp_result$signif[1])
 				}

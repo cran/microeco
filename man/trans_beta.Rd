@@ -145,6 +145,7 @@ Unconstrained ordination.
   scale_species = FALSE,
   scale_species_ratio = 0.8,
   orthoI = NA,
+  ordination = deprecated(),
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -169,6 +170,8 @@ Only available when \code{scale_species = TURE}.}
 
 \item{\code{orthoI}}{default NA; number of orthogonal components (for OPLS-DA only). Default NA means the number of orthogonal components is automatically computed.
 Please also see \code{orthoI} parameter in \code{opls} function of ropls package.}
+
+\item{\code{ordination}}{deprecated. Please use \code{method} argument instead.}
 
 \item{\code{...}}{parameters passed to \code{vegan::rda} function when \code{method = "PCA"}, 
 or \code{vegan::decorana} function when \code{method = "DCA"}, 
@@ -316,6 +319,8 @@ Calculate perMANOVA (Permutational Multivariate Analysis of Variance) based on t
   group = NULL,
   by_group = NULL,
   p_adjust_method = "fdr",
+  by = "terms",
+  permutations = 999,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -338,6 +343,10 @@ Only available when \code{manova_all = FALSE} and \code{manova_set} is not provi
 
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; available when \code{manova_all = FALSE}; 
 see \code{method} parameter of \code{p.adjust} function for available options.}
+
+\item{\code{by}}{default "terms"; same with the \code{by} parameter in \code{adonis2} function of vegan package.}
+
+\item{\code{permutations}}{default 999; same with the \code{permutations} parameter in \code{adonis2} function of vegan package.}
 
 \item{\code{...}}{parameters passed to \code{adonis2} function of \code{vegan} package.}
 }
@@ -366,6 +375,7 @@ Analysis of similarities (ANOSIM) based on the \code{anosim} function of vegan p
   group = NULL,
   by_group = NULL,
   p_adjust_method = "fdr",
+  permutations = 999,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -381,6 +391,8 @@ Analysis of similarities (ANOSIM) based on the \code{anosim} function of vegan p
 Only available when \code{paired = TRUE}.}
 
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; available when \code{paired = TRUE}; see method parameter of \code{p.adjust} function for available options.}
+
+\item{\code{permutations}}{default 999; same with the \code{permutations} parameter in \code{anosim} function of vegan package.}
 
 \item{\code{...}}{parameters passed to \code{anosim} function of \code{vegan} package.}
 }

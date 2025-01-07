@@ -1,12 +1,12 @@
 #' @title
-#' Create \code{trans_nullmodel} object for phylogeny- and taxonomy-based null model analysis.
+#' Create \code{trans_nullmodel} object for null model related analysis.
 #'
 #' @description
 #' This class is a wrapper for a series of null model related approaches, 
 #' including the mantel correlogram analysis of phylogenetic signal, beta nearest taxon index (betaNTI), 
-#' beta net relatedness index (betaNRI), NTI, NRI and RCbray calculations;
-#' See Stegen et al. (2013) <10.1038/ismej.2013.93> and Liu et al. (2017) <doi:10.1038/s41598-017-17736-w> for the algorithms and applications.
-#'
+#' beta net relatedness index (betaNRI), NTI, NRI and RCbray (Raup–Crick Bray–Curtis) calculations.
+#' See <doi:10.1111/j.1600-0587.2010.06548.x; 10.1890/ES10-00117.1; 10.1038/ismej.2013.93; 10.1038/s41598-017-17736-w> for the algorithms and applications.
+#' 
 #' @export
 trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 	public = list(
@@ -91,7 +91,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 		#' 	 use PCA (principal component analysis) to reduce dimensionality.
 		#' @param break.pts default seq(0, 1, 0.02); see break.pts parameter in \code{mantel.correlog} of \code{vegan} package.
 		#' @param cutoff default FALSE; see cutoff parameter in \code{mantel.correlog}.
-		#' @param ... parameters pass to \code{mantel.correlog}.
+		#' @param ... parameters pass to \code{mantel.correlog} function in vegan package.
 		#' @return res_mantel_corr in object.
 		#' @examples
 		#' \dontrun{
@@ -143,6 +143,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			message("---------------- ", Sys.time()," : Finish ----------------")
 			self$res_mantel_corr <- res_mantel_corr
 			message('The result is stored in object$res_mantel_corr ...')
+			invisible(self)
 		},
 		#' @description
 		#' Plot mantel correlogram.
@@ -203,9 +204,10 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			}
 			self$res_betampd <- private$betampd(comm = comm, dis = dis, abundance.weighted = abundance.weighted)
 			message('The result is stored in object$res_betampd ...')
+			invisible(self)
 		},
 		#' @description
-		#' Calculate betaMNTD (mean nearest taxon distance). Same with \code{picante::comdistnt} package, but faster.
+		#' Calculate betaMNTD (mean nearest taxon distance). Same with \code{picante::comdistnt} function, but faster.
 		#'
 		#' @param abundance.weighted default TRUE; whether use abundance-weighted method.
 		#' @param exclude.conspecifics default FALSE; see \code{exclude.conspecifics} parameter in \code{comdistnt} function of \code{picante} package.
@@ -258,6 +260,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			}
 			self$res_betamntd <- res_betamntd
 			message('The result is stored in object$res_betamntd ...')
+			invisible(self)
 		},
 		#' @description
 		#' Calculate standardized effect size of betaMPD, i.e. beta net relatedness index (betaNRI).
@@ -304,6 +307,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			beta_obs_z <- (betaobs_vec - beta_rand_mean)/beta_rand_sd
 			self$res_ses_betampd <- private$fin_matrix(all_samples = all_samples, beta_obs_z = beta_obs_z)
 			message('The result is stored in object$res_ses_betampd ...')
+			invisible(self)
 		},
 		#' @description
 		#' Calculate standardized effect size of betaMNTD, i.e. beta nearest taxon index (betaNTI).
@@ -406,6 +410,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			message("---------------- ", Sys.time()," : Finish ----------------")
 			self$res_ses_betamntd <- res_ses_betamntd
 			message('The result is stored in object$res_ses_betamntd ...')
+			invisible(self)
 		},
 		#' @description
 		#' Calculate Bray–Curtis-based Raup–Crick (RCbray) <doi: 10.1890/ES10-00117.1>.
@@ -434,6 +439,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			beta_obs_z <- (beta_obs_z - 0.5) * 2
 			self$res_rcbray <- private$fin_matrix(all_samples = all_samples, beta_obs_z = beta_obs_z)
 			message('The result is stored in object$res_rcbray ...')
+			invisible(self)
 		},
 		#' @description
 		#' Infer the ecological processes according to ses.betaMNTD/ses.betaMPD and rcbray.
@@ -480,6 +486,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			}
 			self$res_process <- res
 			message('The result is stored in object$res_process ...')
+			invisible(self)
 		},
 		#' @description
 		#' Calculates Nearest Relative Index (NRI), equivalent to -1 times the standardized effect size of MPD.
@@ -504,6 +511,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			res$NRI <- res$mpd.obs.z * (-1)
 			self$res_NRI <- res
 			message('The result is stored in object$res_NRI ...')
+			invisible(self)
 		},
 		#' @description
 		#' Calculates Nearest Taxon Index (NTI), equivalent to -1 times the standardized effect size of MNTD.
@@ -528,6 +536,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			res$NTI <- res$mntd.obs.z * (-1)
 			self$res_NTI <- res
 			message('The result is stored in object$res_NTI ...')
+			invisible(self)
 		},
 		#' @description
 		#' Calculates the (normalised) mean number of checkerboard combinations (C-score) using \code{C.score} function in \code{bipartite} package.
@@ -585,6 +594,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			}
 			self$res_NST <- res
 			message('The result is stored in object$res_NST ...')
+			invisible(self)
 		},
 		#' @description
 		#' Test the significance of NST difference between each pair of groups.
@@ -705,7 +715,7 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 				.[, -1, drop = FALSE]
 			as.matrix(res1[all_samples, all_samples])
 		},
-		# from v0.7.5, use the method of iCAMP to calculate betamntd
+		# from v0.7.5, use the algorithm in iCAMP to calculate betamntd
 		betamntd = function(
 			comm = NULL, 
 			dis = NULL, 
@@ -748,9 +758,9 @@ trans_nullmodel <- R6Class(classname = "trans_nullmodel",
 			res
 		},
 		null_model = function(null.model, comm = NULL, dis = NULL, tip.label = NULL, iterations = 1000){
-				if(is.null(comm)){
-					stop("comm should not be NULL!")
-				}
+			if(is.null(comm)){
+				stop("comm should not be NULL!")
+			}
 			if(null.model %in% c("taxa.labels", "phylogeny.pool")){
 				if(is.null(dis)){
 					if(is.null(tip.label)){
