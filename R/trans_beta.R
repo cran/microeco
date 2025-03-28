@@ -89,9 +89,16 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' 	  PLS-DA: partial least squares discriminant analysis; OPLS-DA: orthogonal partial least squares discriminant analysis.
 		#' 	  For the methods details, please refer to the papers <doi:10.1111/j.1574-6941.2007.00375.x> (for PCoA, NMDS, PCA and DCA) and 
 		#' 	  <doi:10.1186/s12859-019-3310-7> (for PLS-DA or OPLS-DA).
-		#' @param ncomp default 3; dimensions shown in the results (except method "NMDS").
+		#' @param ncomp default 2; dimensions in the result. 
+		#' 	  For the method "NMDS", this argument will be passed to the \code{k} parameter in the \code{vegan::metaMDS} function.
+		#' @param taxa_level default NULL; available for PCA, DCA or NMDS (\code{NMDS_matrix = TRUE}).
+		#' 	  Default NULL means using the \code{otu_table} in the microtable object.
+		#' 	  For other options, please	provide the taxonomic rank names in \code{tax_table}, such as "Phylum" or "Genus".
+		#' 	  In such cases, the data will be merged according to the provided taxonomic levels to generated a new abundance table.		
+		#' @param NMDS_matrix default TRUE; For the NMDS method, whether use a distance matrix as input like PCoA. If it is FALSE, the input will be the abundance table like PCA.
 		#' @param trans default FALSE; whether species abundance will be square root transformed; only available when \code{method} is "PCA" or "DCA".
-		#' @param scale_species default FALSE; whether species loading in PCA or DCA is scaled.
+		#' 	  For method "NMDS" and \code{NMDS_matrix = FALSE}, please set the \code{autotransform} parameter, which will be passed to \code{vegan::metaMDS} function directly.
+		#' @param scale_species default FALSE; whether species loading in PCA, DCA or NMDS (\code{NMDS_matrix = FALSE}) is scaled.
 		#' @param scale_species_ratio default 0.8; the ratio to scale up the loading; multiply by the maximum distance between samples and origin. 
 		#' 	  Only available when \code{scale_species = TURE}.
 		#' @param orthoI default NA; number of orthogonal components (for OPLS-DA only). Default NA means the number of orthogonal components is automatically computed.
@@ -102,12 +109,15 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' 	  or \code{ape::pcoa} function when \code{method = "PCoA"}, 
 		#' 	  or \code{vegan::metaMDS} function when \code{method = "NMDS"},
 		#' 	  or \code{ropls::opls} function when \code{method = "PLS-DA"} or \code{method = "OPLS-DA"} .
-		#' @return \code{res_ordination} stored in the object.
+		#' @return \code{res_ordination} list stored in the object.
+		#' 	  In the list, \code{model} is the original analysis results; \code{scores} is the sample scores table; \code{loading} is the feature loading table.
 		#' @examples
 		#' t1$cal_ordination(method = "PCoA")
 		cal_ordination = function(
 			method = "PCoA",
-			ncomp = 3,
+			ncomp = 2,
+			taxa_level = NULL,
+			NMDS_matrix = TRUE,
 			trans = FALSE, 
 			scale_species = FALSE,
 			scale_species_ratio = 0.8,
@@ -128,6 +138,10 @@ trans_beta <- R6Class(classname = "trans_beta",
 				stop("Input method should be one of 'PCoA', 'NMDS', 'PCA', 'DCA', 'PLS-DA' and 'OPLS-DA' !")
 			}
 			use_data <- self$dataset
+			if(! is.null(taxa_level)){
+				check_tax_level(taxa_level, use_data)
+				use_data <- use_data$merge_taxa(taxa_level)
+			}
 			if(method %in% c("PCA", "DCA", "PLS-DA", "OPLS-DA")){
 				plot.x <- switch(method, PCA = "PC1", DCA = "DCA1", 'PLS-DA' = "p1", 'OPLS-DA' = "p1")
 				plot.y <- switch(method, PCA = "PC2", DCA = "DCA2", 'PLS-DA' = "p2", 'OPLS-DA' = "o1")
@@ -166,7 +180,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 					}else{
 						model_score <- cbind.data.frame(model@scoreMN, model@orthoScoreMN)
 					}
-					scores_sites <- model_score[, 1:2, drop = FALSE]
+					scores_sites <- model_score[, 1:ncomp, drop = FALSE]
 				}
 				combined <- cbind.data.frame(scores_sites, use_data$sample_table[rownames(scores_sites), , drop = FALSE])
 				if(method %in% c("PCA", "DCA")){
@@ -177,25 +191,23 @@ trans_beta <- R6Class(classname = "trans_beta",
 					}else{
 						model_loading <- cbind.data.frame(model@loadingMN, model@orthoLoadingMN)
 					}
-					loading <- model_loading[, 1:2, drop = FALSE]
+					loading <- model_loading[, 1:ncomp, drop = FALSE]
 				}
 				loading %<>% as.data.frame
 				if(scale_species){
-					maxx <- max(abs(scores_sites[, plot.x]))/max(abs(loading[, plot.x]))
-					loading[, plot.x] %<>% {. * maxx * scale_species_ratio}
-					maxy <- max(abs(scores_sites[, plot.y]))/max(abs(loading[, plot.y]))
-					loading[, plot.y] %<>% {. * maxy * scale_species_ratio}
+					for(i in 1:ncomp){
+						maxratio <- max(abs(scores_sites[, i]))/max(abs(loading[, i]))
+						loading[, i] %<>% {. * maxratio * scale_species_ratio}
+					}
 				}
-				loading[, "dist"] <- loading[, plot.x]^2 + loading[, plot.y]^2
+				loading[, "dist"] <- apply(loading, 1, function(x){sum(x^2)})
 				loading <- loading[order(loading[, "dist"], decreasing = TRUE), ]
 				outlist <- list(model = model, scores = combined, loading = loading, eig = expla)
 			}
-			if(method %in% c("PCoA", "NMDS")){
+			if(method == "PCoA"){
 				if(is.null(self$use_matrix)){
 					stop("Please recreate the object and set the parameter measure !")
 				}
-			}
-			if(method == "PCoA"){
 				model <- ape::pcoa(as.dist(self$use_matrix), ...)
 				combined <- cbind.data.frame(model$vectors[,1:ncomp], use_data$sample_table)
 				colnames(combined)[1:ncomp] <- paste0("PCo", 1:ncomp)
@@ -204,11 +216,35 @@ trans_beta <- R6Class(classname = "trans_beta",
 				outlist <- list(model = model, scores = combined, eig = expla)
 			}
 			if(method == "NMDS"){
-				model <- vegan::metaMDS(as.dist(self$use_matrix), ...)
+				if(NMDS_matrix){
+					if(is.null(self$use_matrix)){
+						stop("Please recreate the object and set the parameter measure !")
+					}
+					model <- vegan::metaMDS(as.dist(self$use_matrix), k = ncomp, ...)
+				}else{
+					abund <- use_data$otu_table %>% t
+					model <- vegan::metaMDS(abund, k = ncomp, ...)
+				}
 				combined <- cbind.data.frame(model$points, use_data$sample_table)
 				outlist <- list(model = model, scores = combined)
+				if(! NMDS_matrix){
+					loading <- scores(model, choices = 1:ncomp, display = "species") %>% as.data.frame
+					if(scale_species){
+						for(i in 1:ncomp){
+							maxratio <- max(abs(combined[, i]))/max(abs(loading[, i]))
+							loading[, i] %<>% {. * maxratio * scale_species_ratio}
+						}
+					}
+					loading[, "dist"] <- apply(loading, 1, function(x){sum(x^2)})
+					loading <- loading[order(loading[, "dist"], decreasing = TRUE), ]
+					outlist$loading <- loading
+				}
 			}
+			outlist$ncomp <- ncomp
 			self$res_ordination <- outlist
+			if(! is.null(taxa_level)){
+				self$res_ordination$taxa_level <- taxa_level
+			}
 			message('The result is stored in object$res_ordination ...')
 			self$ordination_method <- method
 			invisible(self)
@@ -223,6 +259,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#'     \item{\strong{'chull'}}{add convex hull for points of each group}
 		#'     \item{\strong{'centroid'}}{add centroid line of each group}
 		#'   }
+		#' @param choices default c(1, 2); selected axis for the visualization; must be numeric vector.
+		#'   The maximum value must not exceed the parameter \code{ncomp} in the \code{cal_ordination} function.
 		#' @param color_values default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for different groups.
 		#' @param shape_values default c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14); a vector for point shape types of groups, see \code{ggplot2} tutorial.
 		#' @param plot_color default NULL; a colname of \code{sample_table} to assign colors to different groups in plot.
@@ -230,6 +268,7 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @param plot_group_order default NULL; a vector used to order the groups in the legend of plot.
 		#' @param add_sample_label default NULL; a column name in \code{sample_table}; If provided, show the point name in plot.
 		#' @param point_size default 3; point size when "point" is in \code{plot_type} parameter.
+		#'   \code{point_size} can also be a variable name in \code{sample_table}, such as "pH".
 		#' @param point_alpha default .8; point transparency in plot when "point" is in \code{plot_type} parameter.
 		#' @param centroid_segment_alpha default 0.6; segment transparency in plot when "centroid" is in \code{plot_type} parameter.
 		#' @param centroid_segment_size default 1; segment size in plot when "centroid" is in \code{plot_type} parameter.
@@ -247,9 +286,12 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @param NMDS_stress_text_prefix default ""; If NMDS_stress_pos is not NULL, this parameter can be used to add text in front of the stress value.
 		#' @param loading_arrow default FALSE; whether show the loading using arrow.
 		#' @param loading_taxa_num default 10; the number of taxa used for the loading. Only available when \code{loading_arrow = TRUE}.
+		#' @param loading_text_taxlevel default NULL; which level of taxonomic table will be used.
+		#'   Default NULL means using the \code{taxa_level} parameter in the previous \code{cal_ordination} function.
 		#' @param loading_text_color default "black"; the color of taxa text. Only available when \code{loading_arrow = TRUE}.
 		#' @param loading_arrow_color default "grey30"; the color of taxa arrow. Only available when \code{loading_arrow = TRUE}.
 		#' @param loading_text_size default 3; the size of taxa text. Only available when \code{loading_arrow = TRUE}.
+		#' @param loading_text_prefix default FALSE; whether show the prefix (e.g., g__) in the taxa text. Only available when \code{loading_arrow = TRUE}.
 		#' @param loading_text_italic default FALSE; whether using italic for the taxa text. Only available when \code{loading_arrow = TRUE}.
 		#' @return \code{ggplot}.
 		#' @examples
@@ -259,7 +301,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' t1$plot_ordination(plot_color = "Group", plot_type = c("point", "centroid"), 
 		#' 	  centroid_segment_linetype = 1)
 		plot_ordination = function(
-			plot_type = "point",
+			plot_type = "point", 
+			choices = c(1, 2), 
 			color_values = RColorBrewer::brewer.pal(8, "Dark2"), 
 			shape_values = c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14),
 			plot_color = NULL,
@@ -279,9 +322,11 @@ trans_beta <- R6Class(classname = "trans_beta",
 			NMDS_stress_text_prefix = "",
 			loading_arrow = FALSE,
 			loading_taxa_num = 10, 
+			loading_text_taxlevel = NULL,
 			loading_text_color = "black",
 			loading_arrow_color = "grey30",
 			loading_text_size = 3,
+			loading_text_prefix = FALSE,
 			loading_text_italic = FALSE
 			){
 			ordination_method <- self$ordination_method
@@ -299,8 +344,14 @@ trans_beta <- R6Class(classname = "trans_beta",
 			combined <- self$res_ordination$scores
 			eig <- self$res_ordination$eig
 			model <- self$res_ordination$model
-			plot_x <- colnames(self$res_ordination$scores)[1]
-			plot_y <- colnames(self$res_ordination$scores)[2]
+			if(length(choices) > 2){
+				stop("The maximum input length of choices parameter should be 2!")
+			}
+			if(max(choices) > self$res_ordination$ncomp){
+				stop("Maximum of input choices is larger than the dimension, please try to enlarge the ncomp parameter in the cal_ordination function!")
+			}
+			plot_x <- colnames(self$res_ordination$scores)[choices[1]]
+			plot_y <- colnames(self$res_ordination$scores)[choices[2]]
 			if(!is.null(plot_group_order)){
 				combined[, plot_color] %<>% factor(., levels = plot_group_order)
 			}
@@ -308,9 +359,17 @@ trans_beta <- R6Class(classname = "trans_beta",
 				color_values <- expand_colors(color_values, length(unique(combined[, plot_color])))
 			}			
 			
-			p <- ggplot(combined, aes_meco(x = plot_x, y = plot_y, colour = plot_color, shape = plot_shape))
-			if("point" %in% plot_type){
-				p <- p + geom_point(alpha = point_alpha, size = point_size)
+			if(is.numeric(point_size)){
+				p <- ggplot(combined, aes_meco(x = plot_x, y = plot_y, colour = plot_color, shape = plot_shape))
+				if("point" %in% plot_type){
+					p <- p + geom_point(alpha = point_alpha, size = point_size)
+				}
+			}else{
+				check_table_variable(combined, point_size, "point_size", "res_ordination$scores")
+				p <- ggplot(combined, aes_meco(x = plot_x, y = plot_y, colour = plot_color, shape = plot_shape, size = point_size))
+				if("point" %in% plot_type){
+					p <- p + geom_point(alpha = point_alpha)
+				}
 			}
 			if(ordination_method %in% c("PCA", "PCoA", "DCA", "PLS-DA", "OPLS-DA")){
 				p <- p + xlab(paste(plot_x, " [", eig[plot_x],"%]", sep = "")) + 
@@ -375,33 +434,46 @@ trans_beta <- R6Class(classname = "trans_beta",
 			if(!is.null(plot_shape)){
 				p <- p + scale_shape_manual(values = shape_values)
 			}
-			if(loading_arrow & ordination_method %in% c("PCA", "DCA", "PLS-DA", "OPLS-DA")){
-				df_arrows <- self$res_ordination$loading[1:loading_taxa_num, ]
-				colnames(df_arrows)[1:2] <- c("x", "y")
-				p <- p + geom_segment(
-					data = df_arrows, 
-					aes(x = 0, y = 0, xend = x, yend = y), 
-					arrow = arrow(length = unit(0.2, "cm")), 
-					color = loading_arrow_color, 
-					alpha = .6,
-					inherit.aes = FALSE
+			if(loading_arrow){
+				if(! is.null(self$res_ordination$loading)){
+					df_arrows <- self$res_ordination$loading[1:loading_taxa_num, ]
+					colnames(df_arrows)[choices] <- c("x", "y")
+					p <- p + geom_segment(
+						data = df_arrows, 
+						aes(x = 0, y = 0, xend = x, yend = y), 
+						arrow = arrow(length = unit(0.2, "cm")), 
+						color = loading_arrow_color, 
+						alpha = .6,
+						inherit.aes = FALSE
+						)
+					if(is.null(loading_text_taxlevel)){
+						if(is.null(self$res_ordination$taxa_level)){
+							df_arrows$label <- rownames(df_arrows)
+						}else{
+							df_arrows$label <- self$dataset$tax_table[rownames(df_arrows), self$res_ordination$taxa_level]
+						}
+					}else{
+						df_arrows$label <- self$dataset$tax_table[rownames(df_arrows), loading_text_taxlevel]
+					}
+					if(! loading_text_prefix){
+						df_arrows$label %<>% gsub("^.__", "", .)
+					}
+					if(loading_text_italic){
+						df_arrows$label %<>% paste0("italic('", .,"')")
+						loading_text_parse <- TRUE
+					}else{
+						loading_text_parse <- FALSE
+					}
+					p <- p + ggrepel::geom_text_repel(
+						data = df_arrows, 
+						aes_meco("x", "y", label = "label"), 
+						size = loading_text_size, 
+						color = loading_text_color, 
+						segment.alpha = .01, 
+						parse = loading_text_parse,
+						inherit.aes = FALSE
 					)
-				df_arrows$label <- rownames(df_arrows)
-				if(loading_text_italic){
-					df_arrows$label %<>% paste0("italic('", .,"')")
-					loading_text_parse <- TRUE
-				}else{
-					loading_text_parse <- FALSE
 				}
-				p <- p + ggrepel::geom_text_repel(
-					data = df_arrows, 
-					aes_meco("x", "y", label = "label"), 
-					size = loading_text_size, 
-					color = loading_text_color, 
-					segment.alpha = .01, 
-					parse = loading_text_parse,
-					inherit.aes = FALSE
-				)
 			}
 			p
 		},

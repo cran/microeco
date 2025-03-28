@@ -140,7 +140,9 @@ Unconstrained ordination.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_beta$cal_ordination(
   method = "PCoA",
-  ncomp = 3,
+  ncomp = 2,
+  taxa_level = NULL,
+  NMDS_matrix = TRUE,
   trans = FALSE,
   scale_species = FALSE,
   scale_species_ratio = 0.8,
@@ -159,11 +161,20 @@ PLS-DA: partial least squares discriminant analysis; OPLS-DA: orthogonal partial
 For the methods details, please refer to the papers <doi:10.1111/j.1574-6941.2007.00375.x> (for PCoA, NMDS, PCA and DCA) and 
 <doi:10.1186/s12859-019-3310-7> (for PLS-DA or OPLS-DA).}
 
-\item{\code{ncomp}}{default 3; dimensions shown in the results (except method "NMDS").}
+\item{\code{ncomp}}{default 2; dimensions in the result. 
+For the method "NMDS", this argument will be passed to the \code{k} parameter in the \code{vegan::metaMDS} function.}
 
-\item{\code{trans}}{default FALSE; whether species abundance will be square root transformed; only available when \code{method} is "PCA" or "DCA".}
+\item{\code{taxa_level}}{default NULL; available for PCA, DCA or NMDS (\code{NMDS_matrix = TRUE}).
+Default NULL means using the \code{otu_table} in the microtable object.
+For other options, please    provide the taxonomic rank names in \code{tax_table}, such as "Phylum" or "Genus".
+In such cases, the data will be merged according to the provided taxonomic levels to generated a new abundance table.}
 
-\item{\code{scale_species}}{default FALSE; whether species loading in PCA or DCA is scaled.}
+\item{\code{NMDS_matrix}}{default TRUE; For the NMDS method, whether use a distance matrix as input like PCoA. If it is FALSE, the input will be the abundance table like PCA.}
+
+\item{\code{trans}}{default FALSE; whether species abundance will be square root transformed; only available when \code{method} is "PCA" or "DCA".
+For method "NMDS" and \code{NMDS_matrix = FALSE}, please set the \code{autotransform} parameter, which will be passed to \code{vegan::metaMDS} function directly.}
+
+\item{\code{scale_species}}{default FALSE; whether species loading in PCA, DCA or NMDS (\code{NMDS_matrix = FALSE}) is scaled.}
 
 \item{\code{scale_species_ratio}}{default 0.8; the ratio to scale up the loading; multiply by the maximum distance between samples and origin. 
 Only available when \code{scale_species = TURE}.}
@@ -182,7 +193,8 @@ or \code{ropls::opls} function when \code{method = "PLS-DA"} or \code{method = "
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-\code{res_ordination} stored in the object.
+\code{res_ordination} list stored in the object.
+	  In the list, \code{model} is the original analysis results; \code{scores} is the sample scores table; \code{loading} is the feature loading table.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -201,6 +213,7 @@ Plot the ordination result.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_beta$plot_ordination(
   plot_type = "point",
+  choices = c(1, 2),
   color_values = RColorBrewer::brewer.pal(8, "Dark2"),
   shape_values = c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14),
   plot_color = NULL,
@@ -220,9 +233,11 @@ Plot the ordination result.
   NMDS_stress_text_prefix = "",
   loading_arrow = FALSE,
   loading_taxa_num = 10,
+  loading_text_taxlevel = NULL,
   loading_text_color = "black",
   loading_arrow_color = "grey30",
   loading_text_size = 3,
+  loading_text_prefix = FALSE,
   loading_text_italic = FALSE
 )}\if{html}{\out{</div>}}
 }
@@ -238,6 +253,9 @@ Plot the ordination result.
   \item{\strong{'centroid'}}{add centroid line of each group}
 }}
 
+\item{\code{choices}}{default c(1, 2); selected axis for the visualization; must be numeric vector.
+The maximum value must not exceed the parameter \code{ncomp} in the \code{cal_ordination} function.}
+
 \item{\code{color_values}}{default \code{RColorBrewer::brewer.pal}(8, "Dark2"); colors palette for different groups.}
 
 \item{\code{shape_values}}{default c(16, 17, 7, 8, 15, 18, 11, 10, 12, 13, 9, 3, 4, 0, 1, 2, 14); a vector for point shape types of groups, see \code{ggplot2} tutorial.}
@@ -250,7 +268,8 @@ Plot the ordination result.
 
 \item{\code{add_sample_label}}{default NULL; a column name in \code{sample_table}; If provided, show the point name in plot.}
 
-\item{\code{point_size}}{default 3; point size when "point" is in \code{plot_type} parameter.}
+\item{\code{point_size}}{default 3; point size when "point" is in \code{plot_type} parameter.
+\code{point_size} can also be a variable name in \code{sample_table}, such as "pH".}
 
 \item{\code{point_alpha}}{default .8; point transparency in plot when "point" is in \code{plot_type} parameter.}
 
@@ -281,11 +300,16 @@ and the y-axis position is equal to \code{max(points of y axis) * NMDS_stress_po
 
 \item{\code{loading_taxa_num}}{default 10; the number of taxa used for the loading. Only available when \code{loading_arrow = TRUE}.}
 
+\item{\code{loading_text_taxlevel}}{default NULL; which level of taxonomic table will be used.
+Default NULL means using the \code{taxa_level} parameter in the previous \code{cal_ordination} function.}
+
 \item{\code{loading_text_color}}{default "black"; the color of taxa text. Only available when \code{loading_arrow = TRUE}.}
 
 \item{\code{loading_arrow_color}}{default "grey30"; the color of taxa arrow. Only available when \code{loading_arrow = TRUE}.}
 
 \item{\code{loading_text_size}}{default 3; the size of taxa text. Only available when \code{loading_arrow = TRUE}.}
+
+\item{\code{loading_text_prefix}}{default FALSE; whether show the prefix (e.g., g__) in the taxa text. Only available when \code{loading_arrow = TRUE}.}
 
 \item{\code{loading_text_italic}}{default FALSE; whether using italic for the taxa text. Only available when \code{loading_arrow = TRUE}.}
 }

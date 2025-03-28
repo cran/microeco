@@ -220,8 +220,8 @@ trans_env <- R6Class(classname = "trans_env",
 		#'
 		#' @param method default c("RDA", "dbRDA", "CCA")[1]; the ordination method.
 		#' @param feature_sel default FALSE; whether perform the feature selection based on forward selection method.
-		#' @param taxa_level default NULL; If use RDA or CCA, provide the taxonomic rank, such as "Phylum" or "Genus";
-		#'   If use otu_table; please set \code{taxa_level = "OTU"}.
+		#' @param taxa_level default NULL; the taxonomic level used in RDA or CCA.
+		#'   Default NULL means using the merged data at "Genus" level. "ASV" or "OTU" can also be provided for the use of \code{otu_table} in microtable object.
 		#' @param taxa_filter_thres default NULL; relative abundance threshold used to filter taxa when method is "RDA" or "CCA".
 		#' @param use_measure default NULL; a name of beta diversity matrix; only available when parameter \code{method = "dbRDA"};
 		#' 	 If not provided, use the first beta diversity matrix in the \code{microtable$beta_diversity} automatically.
@@ -487,6 +487,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param taxa_arrow_color default "firebrick1"; taxa arrow color.
 		#' @param env_text_size default 3.7; environmental variable text size.
 		#' @param taxa_text_size default 3; taxa text size.
+		#' @param taxa_text_prefix default FALSE; whether show the prefix (e.g., g__) of taxonomic information in the text.
 		#' @param taxa_text_italic default TRUE; "italic"; whether use "italic" style for the taxa text.
 		#' @param plot_type default "point"; plotting type of samples;
 		#' one or more elements of "point", "ellipse", "chull", "centroid" and "none"; "none" denotes nothing.
@@ -497,6 +498,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#'     \item{\strong{'centroid'}}{add centroid line of each group}
 		#'   }
 		#' @param point_size default 3; point size in plot when "point" is in \code{plot_type}.
+		#'   \code{point_size} can also be a variable name in \code{sample_table}, such as "pH".
 		#' @param point_alpha default .8; point transparency in plot when "point" is in \code{plot_type}.
 		#' @param centroid_segment_alpha default 0.6; segment transparency in plot when "centroid" is in \code{plot_type}.
 		#' @param centroid_segment_size default 1; segment size in plot when "centroid" is in \code{plot_type}.
@@ -544,6 +546,7 @@ trans_env <- R6Class(classname = "trans_env",
 			taxa_arrow_color = "firebrick1",
 			env_text_size = 3.7,
 			taxa_text_size = 3,
+			taxa_text_prefix = FALSE,
 			taxa_text_italic = TRUE,
 			plot_type = "point",
 			point_size = 3,
@@ -579,14 +582,27 @@ trans_env <- R6Class(classname = "trans_env",
 			p <- p + theme(panel.grid=element_blank())
 			p <- p + geom_vline(xintercept = 0, linetype = "dashed", color = "grey80")
 			p <- p + geom_hline(yintercept = 0, linetype = "dashed", color = "grey80")
-			if("point" %in% plot_type){
-				p <- p + geom_point(
-					data = df_sites, 
-					aes_meco("x", "y", colour = plot_color, shape = plot_shape), 
-					size = point_size,
-					alpha = point_alpha,
-					...
+			
+			if(is.numeric(point_size)){
+				if("point" %in% plot_type){
+					p <- p + geom_point(
+						data = df_sites, 
+						aes_meco("x", "y", colour = plot_color, shape = plot_shape), 
+						size = point_size,
+						alpha = point_alpha,
+						...
 					)
+				}
+			}else{
+				check_table_variable(df_sites, point_size, "point_size", "res_ordination_trans$df_sites")
+				if("point" %in% plot_type){
+					p <- p + geom_point(
+						data = df_sites, 
+						aes_meco("x", "y", colour = plot_color, shape = plot_shape, size = point_size), 
+						alpha = point_alpha,
+						...
+					)
+				}
 			}
 			
 			env_text_data <- self$res_ordination_trans$df_arrows %>% dplyr::mutate(label = gsub("`", "", rownames(.)))
@@ -691,7 +707,9 @@ trans_env <- R6Class(classname = "trans_env",
 					color = taxa_arrow_color, 
 					alpha = .6
 					)
-				df_arrows_spe1[, self$taxa_level] %<>% gsub(".*__", "", .) %>% gsub("Candidatus ", "", .) 
+				if(! taxa_text_prefix){
+					df_arrows_spe1[, self$taxa_level] %<>% gsub(".*__", "", .)
+				}
 				if(taxa_text_italic == T){
 					df_arrows_spe1[, self$taxa_level] %<>% paste0("italic('", .,"')")
 				}
