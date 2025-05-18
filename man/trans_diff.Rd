@@ -151,7 +151,7 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
         The parameter \code{feature.dat.type = 'count'} has been fixed. Other parameters can be passed to the \code{linda} function.
         Reference: <doi:10.1186/s13059-022-02655-5>}
   \item{\strong{'maaslin2'}}{finding associations between metadata and potentially high-dimensional microbial multi-omics data based on the Maaslin2 package.
-        Using this option can invoke the \code{trans_env$cal_cor} function with \code{cor_method = "maaslin2"}.}
+        Using this option can invoke the \code{trans_env$cal_cor} function with \code{method = "maaslin2"}.}
   \item{\strong{'betareg'}}{Beta Regression based on the \code{betareg} package. 
         Please see the \code{beta_pseudo} parameter for the use of pseudo value when there is 0 or 1 in the data}
   \item{\strong{'lme'}}{Linear Mixed Effect Model based on the \code{lmerTest} package.
@@ -306,7 +306,7 @@ If the user filters out the non-significant taxa from the 'res_diff' table, thes
   simplify_names = TRUE,
   keep_prefix = TRUE,
   group_order = NULL,
-  order_x_mean = TRUE,
+  order_x_mean = FALSE,
   coord_flip = TRUE,
   add_sig = TRUE,
   xtext_angle = 45,
@@ -335,7 +335,8 @@ The taxa names should be same with the names shown in the plot, not the 'Taxa' c
 If NULL, the function can first check whether the group column of sample_table is factor. If yes, use the levels in it.
 If provided, overlook the levels in the group of sample_table.}
 
-\item{\code{order_x_mean}}{default TRUE; whether order x axis by the means of groups from large to small.}
+\item{\code{order_x_mean}}{default FALSE; whether order the taxa in x axis by the means of abundances from large to small. 
+If \code{TRUE}, all other factors in the data will become invalid.}
 
 \item{\code{coord_flip}}{default TRUE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical becomes horizontal.}
 

@@ -172,7 +172,8 @@ Otherwise, please use \code{add_data} parameter.}
 This parameter should be used when the \code{microtable$sample_table} object does not have environmental data. 
 Under this circumstance, the \code{env_cols} parameter can not be used because no data can be selected.}
 
-\item{\code{character2numeric}}{default FALSE; whether convert the characters or factors to numeric values.}
+\item{\code{character2numeric}}{default FALSE; whether convert all the character or factor columns to numeric type using the \code{dropallfactors} function.
+If TRUE, character columns will first be attempted to convert to numeric. If that fails, they will be converted to the factor type and then to numeric.}
 
 \item{\code{standardize}}{default FALSE; whether scale environmental variables to zero mean and unit variance.}
 
@@ -685,7 +686,7 @@ Actually, it can also be applied to other correlation between any two variables 
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_cor(
   use_data = c("Genus", "all", "other")[1],
-  cor_method = c("pearson", "spearman", "kendall", "maaslin2")[1],
+  method = c("pearson", "spearman", "kendall", "maaslin2")[1],
   partial = FALSE,
   partial_fix = NULL,
   add_abund_table = NULL,
@@ -700,6 +701,7 @@ Actually, it can also be applied to other correlation between any two variables 
   taxa_name_full = TRUE,
   tmp_input_maaslin2 = "tmp_input",
   tmp_output_maaslin2 = "tmp_output",
+  cor_method = deprecated(),
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -711,11 +713,12 @@ Actually, it can also be applied to other correlation between any two variables 
 "Genus" or other taxonomic names (e.g., "Phylum", "ASV"): invoke taxonomic abundance table in \code{taxa_abund} list of the \code{microtable} object; 
 "all": merge all the taxonomic abundance tables in \code{taxa_abund} list into one; "other": provide additional taxa names by assigning \code{other_taxa} parameter.}
 
-\item{\code{cor_method}}{default "pearson"; "pearson", "spearman", "kendall" or "maaslin2"; correlation method.
+\item{\code{method}}{default "pearson"; "pearson", "spearman", "kendall" or "maaslin2"; correlation method.
 "pearson", "spearman" or "kendall" all refer to the correlation analysis based on the \code{cor.test} function in R.
 "maaslin2" is the method in \code{Maaslin2} package for finding associations between metadata and potentially high-dimensional microbial multi-omics data.}
 
-\item{\code{partial}}{default FALSE; whether perform partial correlation based on the \code{ppcor} package.}
+\item{\code{partial}}{default FALSE; whether perform partial correlation based on the \code{ppcor} package. 
+Available when \code{method} is "pearson", "spearman" or "kendall".}
 
 \item{\code{partial_fix}}{default NULL; selected environmental variable names used as third group of variables in all the partial correlations. 
 If NULL; all the variables (except the one for correlation) in the environmental data will be used as the third group of variables.
@@ -752,6 +755,8 @@ please refer to the example.}
 \item{\code{tmp_input_maaslin2}}{default "tmp_input"; the temporary folder used to save the input files for Maaslin2.}
 
 \item{\code{tmp_output_maaslin2}}{default "tmp_output"; the temporary folder used to save the output files of Maaslin2.}
+
+\item{\code{cor_method}}{deprecated. Please use \code{method} argument instead.}
 
 \item{\code{...}}{parameters passed to \code{Maaslin2} function of \code{Maaslin2} package.}
 }

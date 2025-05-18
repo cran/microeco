@@ -109,18 +109,18 @@ t1$plot_clustering(group = "Group", replace_name = c("Saline", "Type"))
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{dataset}}{the object of \code{\link{microtable}} class.}
+\item{\code{dataset}}{an object of \code{\link{microtable}} class.}
 
 \item{\code{measure}}{default NULL; a matrix name stored in \code{microtable$beta_diversity} list, such as "bray" or "jaccard", or a customized matrix; 
 used for ordination, manova, group distance comparision, etc.;
 Please see \code{cal_betadiv} function of \code{\link{microtable}} class for more details.}
 
-\item{\code{group}}{default NULL; sample group used for manova, betadisper or group distance comparision.}
+\item{\code{group}}{default NULL; a column name of \code{sample_table} in the input dataset; group information will be used for manova, betadisper or distance comparision.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-measure, group and dataset stored in the object.
+\code{measure}, \code{group} and \code{dataset} stored in the object.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -161,8 +161,10 @@ PLS-DA: partial least squares discriminant analysis; OPLS-DA: orthogonal partial
 For the methods details, please refer to the papers <doi:10.1111/j.1574-6941.2007.00375.x> (for PCoA, NMDS, PCA and DCA) and 
 <doi:10.1186/s12859-019-3310-7> (for PLS-DA or OPLS-DA).}
 
-\item{\code{ncomp}}{default 2; dimensions in the result. 
-For the method "NMDS", this argument will be passed to the \code{k} parameter in the \code{vegan::metaMDS} function.}
+\item{\code{ncomp}}{default 2; dimensions in the result. For the \code{method} option "PCA", "PCoA" or "DCA", 
+the corresponding dimension information will be selected from the original model based on this parameter..
+For all the dimension information, please refer to \code{model} in the results.
+For the \code{method} option "NMDS", this argument will be passed to the \code{k} parameter in the \code{vegan::metaMDS} function.}
 
 \item{\code{taxa_level}}{default NULL; available for PCA, DCA or NMDS (\code{NMDS_matrix = TRUE}).
 Default NULL means using the \code{otu_table} in the microtable object.
@@ -250,7 +252,7 @@ Plot the ordination result.
   \item{\strong{'point'}}{add sample points}
   \item{\strong{'ellipse'}}{add confidence ellipse for points of each group}
   \item{\strong{'chull'}}{add convex hull for points of each group}
-  \item{\strong{'centroid'}}{add centroid line of each group}
+  \item{\strong{'centroid'}}{add centroid line for points in each group}
 }}
 
 \item{\code{choices}}{default c(1, 2); selected axis for the visualization; must be numeric vector.
@@ -344,6 +346,7 @@ Calculate perMANOVA (Permutational Multivariate Analysis of Variance) based on t
   by_group = NULL,
   p_adjust_method = "fdr",
   by = "terms",
+  by_auto_set = TRUE,
   permutations = 999,
   ...
 )}\if{html}{\out{</div>}}
@@ -369,6 +372,12 @@ Only available when \code{manova_all = FALSE} and \code{manova_set} is not provi
 see \code{method} parameter of \code{p.adjust} function for available options.}
 
 \item{\code{by}}{default "terms"; same with the \code{by} parameter in \code{adonis2} function of vegan package.}
+
+\item{\code{by_auto_set}}{default TRUE; Whether automatically set the options for \code{by} parameter ("marginal" or "terms") when \code{manova_set} is provided.
+The primary reason for setting this parameter is that using marginal effects (also known as "Type III" effects) is more robust for unbalanced experimental designs. 
+Since the option \code{by = "margin"} in the \code{adonis2} function ignores main effects when interaction effects are present, 
+we automatically set \code{by = "margin"} when there are no interaction effects, and set \code{by = "terms"} when interaction effects exist.
+If the user wants to use parameter \code{by}, please set \code{by_auto_set = FALSE}. Note that this parameter is only available when \code{manova_set} is provided.}
 
 \item{\code{permutations}}{default 999; same with the \code{permutations} parameter in \code{adonis2} function of vegan package.}
 

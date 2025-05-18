@@ -57,7 +57,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'     	  The parameter \code{feature.dat.type = 'count'} has been fixed. Other parameters can be passed to the \code{linda} function.
 		#'     	  Reference: <doi:10.1186/s13059-022-02655-5>}
 		#'     \item{\strong{'maaslin2'}}{finding associations between metadata and potentially high-dimensional microbial multi-omics data based on the Maaslin2 package.
-		#'     	  Using this option can invoke the \code{trans_env$cal_cor} function with \code{cor_method = "maaslin2"}.}
+		#'     	  Using this option can invoke the \code{trans_env$cal_cor} function with \code{method = "maaslin2"}.}
 		#'     \item{\strong{'betareg'}}{Beta Regression based on the \code{betareg} package. 
 		#'     	  Please see the \code{beta_pseudo} parameter for the use of pseudo value when there is 0 or 1 in the data}
 		#'     \item{\strong{'lme'}}{Linear Mixed Effect Model based on the \code{lmerTest} package.
@@ -864,7 +864,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				}
 				if(method == "maaslin2"){
 					tmp_trans_env <- trans_env$new(dataset = tmp_dataset, env_cols = 1:ncol(tmp_dataset$sample_table))
-					tmp_trans_env$cal_cor(use_data = taxa_level, cor_method = method, filter_thres = filter_thres,
+					tmp_trans_env$cal_cor(use_data = taxa_level, method = method, filter_thres = filter_thres,
 						plot_heatmap = FALSE, plot_scatter = FALSE, ...)
 					output <- tmp_trans_env$res_cor
 					self$res_trans_env <- tmp_trans_env
@@ -955,7 +955,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' @param group_order default NULL; a vector to order groups, i.e. reorder the legend and colors in plot; 
 		#' 	  If NULL, the function can first check whether the group column of sample_table is factor. If yes, use the levels in it.
 		#' 	  If provided, overlook the levels in the group of sample_table.
-		#' @param order_x_mean default TRUE; whether order x axis by the means of groups from large to small.
+		#' @param order_x_mean default FALSE; whether order the taxa in x axis by the means of abundances from large to small. 
+		#' 	  If \code{TRUE}, all other factors in the data will become invalid.
 		#' @param coord_flip default TRUE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical becomes horizontal.
 		#' @param add_sig default TRUE; whether add the significance label to the plot.
 		#' @param xtext_angle default 45; number (e.g. 45). Angle of text in x axis.
@@ -982,7 +983,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			simplify_names = TRUE,
 			keep_prefix = TRUE,
 			group_order = NULL,
-			order_x_mean = TRUE,
+			order_x_mean = FALSE,
 			coord_flip = TRUE,
 			add_sig = TRUE,
 			xtext_angle = 45,
