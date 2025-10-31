@@ -13,15 +13,16 @@
 #' @export
 microtable <- R6Class(classname = "microtable",
 	public = list(
-		#' @param otu_table data.frame class; The feature abundance table; rownames are features (e.g. OTUs/ASVs/species/genes); column names are samples.
+		#' @param otu_table data.frame class; Feature abundance table; rownames are features (e.g. OTUs/ASVs/species/genes); column names are samples.
 		#' @param sample_table default NULL; data.frame; The sample information table; rownames are samples; columns are sample metadata; 
-		#' 	 If not provided, the function can generate a table automatically according to the sample names in otu_table.
-		#' @param tax_table default NULL; data.frame class; The taxonomic information table; rownames are features; column names are taxonomic classes.
-		#' @param phylo_tree default NULL; phylo class; The phylogenetic tree that must be read with the \code{read.tree} function of ape package.
-		#' @param rep_fasta default NULL; \code{DNAStringSet}, \code{list} or \code{DNAbin} class; The representative sequences of OTUs/ASVs.
-		#'   The sequences should be read with the \code{readDNAStringSet} function in \code{Biostrings} package (DNAStringSet class), 
-		#'   \code{read.fasta} function in \code{seqinr} package (list class),
-		#'   or \code{read.FASTA} function in \code{ape} package (DNAbin class).
+		#' 	 If not provided, the function can generate a table automatically according to the sample names in \code{otu_table}.
+		#' @param tax_table default NULL; data.frame class; Taxonomic information table; rownames are features; column names are taxonomic ranks.
+		#' 	 This can also be other hierarchical information tables, such as traits, genes, or metabolic pathways.
+		#' @param phylo_tree default NULL; phylo class; Phylogenetic tree; It must be read with the \code{read.tree} function of ape package.
+		#' @param rep_fasta default NULL; \code{DNAStringSet}, \code{list} or \code{DNAbin} class; Representative sequences of OTUs/ASVs.
+		#'   The sequences should be read with the \code{readDNAStringSet} function of \code{Biostrings} package (DNAStringSet class), 
+		#'   \code{read.fasta} function of \code{seqinr} package (list class),
+		#'   or \code{read.FASTA} function of \code{ape} package (DNAbin class).
 		#' @param auto_tidy default FALSE; Whether tidy the data in the \code{microtable} object automatically.
 		#'   If TRUE, the function can invoke the \code{tidy_dataset} function.
 		#' @return an object of \code{microtable} class with the following components:
@@ -44,7 +45,7 @@ microtable <- R6Class(classname = "microtable",
 		#' m1 <- microtable$new(otu_table = otu_table_16S)
 		#' m1 <- microtable$new(sample_table = sample_info_16S, otu_table = otu_table_16S, 
 		#'   tax_table = taxonomy_table_16S, phylo_tree = phylo_tree_16S)
-		#' # trim the files in the dataset
+		#' # trim each data in the object
 		#' m1$tidy_dataset()
 		initialize = function(otu_table, sample_table = NULL, tax_table = NULL, phylo_tree = NULL, rep_fasta = NULL, auto_tidy = FALSE)
 			{
@@ -62,6 +63,7 @@ microtable <- R6Class(classname = "microtable",
 			}else{
 				private$check_df(sample_table, "sample_table")
 				private$check_tbldf(sample_table, "sample_table")
+				sample_table <- private$check_colnames(sample_table, "sample_table")
 				self$sample_table <- sample_table
 			}
 			if(!is.null(tax_table)){
@@ -548,7 +550,10 @@ microtable <- R6Class(classname = "microtable",
 		#' @param split_column default NULL; one column name used for the splitting in tax_table for each abundance calculation; 
 		#'   only available when \code{split_group = TRUE}. If not provided, the function will split each column that containing the \code{split_by} character.
 		#' @param split_special_char default "&&"; special character that will be used forcibly to split multiple mapping information in \code{tax_table} by default
-		#'   no matter \code{split_group} setting.
+		#'   no matter \code{split_group} setting. 
+		#'   For example, the hierarchical information of MetaCyc metabolic pathways from the file2meco package may have multiple ontology entries linked together. 
+		#'   In this case, the default parameters are automatically changed to \code{split_group = TRUE} and \code{split_by = split_special_char}, which is the default "&&". 
+		#'   If users have other multi-label data in \code{tax_table}, they can adjust the \code{split_group}, \code{split_by}, and \code{split_column} parameters accordingly.
 		#' @return \code{taxa_abund} list in object.
 		#' @examples
 		#' \donttest{
@@ -885,6 +890,16 @@ microtable <- R6Class(classname = "microtable",
 			if(inherits(input_table, "tbl_df")){
 				stop("Input ", showname, " is tbl_df format! It may be created using tibble package! Please convert it to traditional data.frame class!")
 			}
+		},
+		check_colnames = function(input_table, showname){
+			if(any(colnames(input_table) == "")){
+				if(sum(colnames(input_table) != "") == 0){
+					stop("Please add column names to the ", showname, " ! The column name is necessary!")
+				}
+				message("The input ", showname, " has empty column name! Such column will be removed! If the user wants to retain the column, please add a column name!")
+				input_table <- input_table[, colnames(input_table) != "", drop = FALSE]
+			}
+			input_table
 		},
 		# check and remove OTU or sample with 0 abundance
 		check_abund_table = function(otu_table){

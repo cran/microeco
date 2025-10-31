@@ -217,9 +217,10 @@ trans_env <- R6Class(classname = "trans_env",
 			}
 		},
 		#' @description
-		#' Redundancy analysis (RDA) and Correspondence Analysis (CCA) based on the \code{vegan} package.
+		#' Constrained ordination analysis.
 		#'
-		#' @param method default c("RDA", "dbRDA", "CCA")[1]; the ordination method.
+		#' @param method default c("RDA", "dbRDA", "CCA")[1]; the ordination method; 
+		#'   "RDA": redundancy analysis, "dbRDA": distance-based RDA, "CCA": correspondence analysis.
 		#' @param feature_sel default FALSE; whether perform the feature selection based on forward selection method.
 		#' @param taxa_level default NULL; the taxonomic level used in RDA or CCA.
 		#'   Default NULL means using the merged data at "Genus" level. "ASV" or "OTU" can also be provided for the use of \code{otu_table} in microtable object.
@@ -228,7 +229,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' 	 If not provided, use the first beta diversity matrix in the \code{microtable$beta_diversity} automatically.
 		#' @param add_matrix default NULL; additional distance matrix provided, when the user does not want to use the beta diversity matrix within the dataset;
 		#'   only available when method = "dbRDA".
-		#' @param ... paremeters passed to \code{dbrda}, \code{rda} or \code{cca} function according to the \code{method} parameter.
+		#' @param ... paremeters passed to \code{rda}, \code{dbrda} or \code{cca} function of \code{vegan} package according to the \code{method} parameter.
 		#' @return \code{res_ordination} and \code{res_ordination_R2} stored in the object.
 		#' @examples
 		#' \donttest{
@@ -1075,6 +1076,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param ytext_position default "right"; "left" or "right"; the y axis text position.
 		#' @param sig_label_size default 4; the size of significance label shown in the cell.
 		#' @param font_family default NULL; font family used.
+		#' @param legend_title default NULL; legend title; default NULL means 'Pearson' for pearson method and 'Spearman' for spearman method.
 		#' @param cluster_ggplot default "none"; add clustering dendrogram for \code{ggplot2} based heatmap. Available options: "none", "row", "col" or "both". 
 		#'   "none": no any clustering used; "row": add clustering for rows; "col": add clustering for columns; "both": add clustering for both rows and columns.
 		#' @param cluster_height_rows default 0.2, the dendrogram plot height for rows; available when \code{cluster_ggplot} is not "none".
@@ -1108,6 +1110,7 @@ trans_env <- R6Class(classname = "trans_env",
 			ytext_position = "right",
 			sig_label_size = 4,
 			font_family = NULL,
+			legend_title = NULL,
 			cluster_ggplot = "none",
 			cluster_height_rows = 0.2,
 			cluster_height_cols = 0.2,
@@ -1245,7 +1248,12 @@ trans_env <- R6Class(classname = "trans_env",
 				p <- p + scale_fill_gradientn(colours = color_palette, na.value = na.value, trans = trans)
 			}
 			
-			legend_fill <- ifelse(self$cal_cor_method == "maaslin2", paste0("maaslin2\ncoef"), paste0(toupper(substring(self$cal_cor_method, 1, 1)), substring(self$cal_cor_method, 2)))
+			if(is.null(legend_title)){
+				legend_fill <- ifelse(self$cal_cor_method == "maaslin2", paste0("maaslin2\ncoef"), 
+					paste0(toupper(substring(self$cal_cor_method, 1, 1)), substring(self$cal_cor_method, 2)))
+			}else{
+				legend_fill <- legend_title
+			}
 			
 			p <- p + geom_text(aes(label = Significance), color = "black", size = sig_label_size) + 
 				labs(y = NULL, x = "Measure", fill = legend_fill) +

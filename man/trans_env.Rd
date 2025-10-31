@@ -330,7 +330,7 @@ t1$cal_autocor(upper = list(continuous = GGally::wrap("cor", method= "spearman")
 \if{html}{\out{<a id="method-trans_env-cal_ordination"></a>}}
 \if{latex}{\out{\hypertarget{method-trans_env-cal_ordination}{}}}
 \subsection{Method \code{cal_ordination()}}{
-Redundancy analysis (RDA) and Correspondence Analysis (CCA) based on the \code{vegan} package.
+Constrained ordination analysis.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_env$cal_ordination(
   method = c("RDA", "dbRDA", "CCA")[1],
@@ -346,7 +346,8 @@ Redundancy analysis (RDA) and Correspondence Analysis (CCA) based on the \code{v
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{method}}{default c("RDA", "dbRDA", "CCA")[1]; the ordination method.}
+\item{\code{method}}{default c("RDA", "dbRDA", "CCA")[1]; the ordination method; 
+"RDA": redundancy analysis, "dbRDA": distance-based RDA, "CCA": correspondence analysis.}
 
 \item{\code{feature_sel}}{default FALSE; whether perform the feature selection based on forward selection method.}
 
@@ -361,7 +362,7 @@ If not provided, use the first beta diversity matrix in the \code{microtable$bet
 \item{\code{add_matrix}}{default NULL; additional distance matrix provided, when the user does not want to use the beta diversity matrix within the dataset;
 only available when method = "dbRDA".}
 
-\item{\code{...}}{paremeters passed to \code{dbrda}, \code{rda} or \code{cca} function according to the \code{method} parameter.}
+\item{\code{...}}{paremeters passed to \code{rda}, \code{dbrda} or \code{cca} function of \code{vegan} package according to the \code{method} parameter.}
 }
 \if{html}{\out{</div>}}
 }
@@ -802,6 +803,7 @@ Plot correlation heatmap.
   ytext_position = "right",
   sig_label_size = 4,
   font_family = NULL,
+  legend_title = NULL,
   cluster_ggplot = "none",
   cluster_height_rows = 0.2,
   cluster_height_cols = 0.2,
@@ -852,6 +854,8 @@ The input should be consistent with the feature names in the \code{res_cor} tabl
 \item{\code{sig_label_size}}{default 4; the size of significance label shown in the cell.}
 
 \item{\code{font_family}}{default NULL; font family used.}
+
+\item{\code{legend_title}}{default NULL; legend title; default NULL means 'Pearson' for pearson method and 'Spearman' for spearman method.}
 
 \item{\code{cluster_ggplot}}{default "none"; add clustering dendrogram for \code{ggplot2} based heatmap. Available options: "none", "row", "col" or "both". 
 "none": no any clustering used; "row": add clustering for rows; "col": add clustering for columns; "both": add clustering for both rows and columns.}

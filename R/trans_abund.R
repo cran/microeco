@@ -200,7 +200,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#'    When multiple facets are used, please first install package \code{ggh4x} using the command \code{install.packages("ggh4x")}.
 		#' @param order_x default NULL; vector; used to order the sample names in x axis; must be the samples vector, such as \code{c("S1", "S3", "S2")}.
 		#' @param x_axis_name NULL; a character string; a column name of sample_table in dataset; used to show the sample names in x axis.
-		#' @param barwidth default NULL; bar width, see \code{width} in \code{geom_bar}.
+		#' @param barwidth default 0.9; bar width, see \code{width} in \code{geom_bar} of ggplot2 package.
 		#' @param use_alluvium default FALSE; whether add alluvium plot. If \code{TRUE}, please first install \code{ggalluvial} package.
 		#' @param clustering default FALSE; whether order samples by the clustering.
 		#' @param clustering_plot default FALSE; whether add clustering plot.
@@ -211,14 +211,23 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' @param legend_text_italic default FALSE; whether use italic in legend.
 		#' @param xtext_angle default 0; number ranging from 0 to 90; used to adjust x axis text angle to reduce text overlap; 
 		#' @param xtext_size default 10; x axis text size.
-		#' @param xtext_keep default TRUE; whether retain x text.
-		#' @param xtitle_keep default TRUE; whether retain x title.
+		#' @param xtext_keep default TRUE; whether to keep the text on the x-axis.
+		#' @param xtitle_keep default TRUE; whether to keep the title of the x-axis.
 		#' @param ytitle_size default 17; y axis title size.
 		#' @param coord_flip default FALSE; whether flip cartesian coordinates so that horizontal becomes vertical, and vertical becomes horizontal.
 		#' @param ggnested default FALSE; whether use nested legend. Need \code{ggnested} package to be installed (https://github.com/gmteunisse/ggnested).
 		#'   To make it available, please assign \code{high_level} parameter when creating the object.
 		#' @param high_level_add_other default FALSE; whether add 'Others' (all the unknown taxa) in each taxon of higher taxonomic level.
 		#'   Only available when \code{ggnested = TRUE}.
+		#' @param sample_plot default NULL; Use the heatmap colors to represent sample information. 
+		#'   The input should be column names from \code{sample_table}, e.g., \code{c("Group", "pH")}.
+		#' @param sample_plot_color default NULL; Color settings. The input must be a list that corresponds to \code{sample_plot}, 
+		#'   e.g. \code{list(Group = RColorBrewer::brewer.pal(6, "Set2"), pH = c("white", "red"))}.
+		#'   When the input factor is a numerical variable, it will be displayed with a color gradient; 
+		#'   therefore, two colors should be provided for the input (as shown for "pH" above).
+		#' @param sample_plot_height default NULL; Height of the sample heatmap; defaults to 1/10 of the main bar plot. 
+		#'   The input must be a vector whose length equals that of \code{sample_plot}, e.g., \code{c(0.1, 0.1)}.
+		#' @param sample_plot_mainnames default FALSE; whether show the sample names in the main bar plot.
 		#' @param bar_type deprecated. Please use \code{bar_full} argument instead.
 		#' @return ggplot2 object. 
 		#' @examples
@@ -232,7 +241,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 			facet = NULL,
 			order_x = NULL,
 			x_axis_name = NULL,
-			barwidth = NULL,
+			barwidth = 0.9,
 			use_alluvium = FALSE,
 			clustering = FALSE,
 			clustering_plot = FALSE,
@@ -248,6 +257,10 @@ trans_abund <- R6Class(classname = "trans_abund",
 			coord_flip = FALSE,
 			ggnested = FALSE,
 			high_level_add_other = FALSE,
+			sample_plot = NULL, 
+			sample_plot_color = NULL, 
+			sample_plot_height = NULL,
+			sample_plot_mainnames = FALSE,
 			bar_type = deprecated()
 			){
 			
@@ -408,6 +421,76 @@ trans_abund <- R6Class(classname = "trans_abund",
 				left_plot <- ggtree::ggtree(tmp_hclust, hang = 0)
 				p %<>% aplot::insert_left(left_plot, width = cluster_plot_width)
 			}
+			if(!is.null(sample_plot)){
+				if(coord_flip){
+					stop("The sample_plot cannot be applied currently when using coord_flip!")
+				}
+				if(!is.vector(sample_plot)){
+					stop("Input sample_plots parameter must be a vector!")
+				}
+				if(!sample_plot_mainnames){
+					p <- p + theme(
+						axis.text.x = element_blank(),
+						axis.ticks.x = element_blank(),
+						axis.title.x = element_blank()
+						)
+				}
+				
+				metadata_table <- plot_data[plot_data$Taxonomy == use_taxanames[1], ]
+				
+				sample_plot_list <- list()
+				for(i in sample_plot){
+					tmp <- metadata_table[, c("Sample", i)]
+					tmp2 <- reshape2::melt(tmp, id.vars = "Sample", value.name = "Value")
+					if(!is.null(facet)){
+						tmp2 <- dplyr::left_join(tmp2, metadata_table[, c("Sample", facet)], by = c("Sample" = "Sample"))
+					}
+					g1 <- ggplot(tmp2, aes(x = Sample, y = variable, fill = Value)) +
+						geom_tile()
+					if(is.numeric(tmp[, i])){
+						if(!is.null(sample_plot_color)){
+							g1 <- g1 + scale_fill_gradient2(low = sample_plot_color[[i]][1], high = sample_plot_color[[i]][2])
+						}else{
+							g1 <- g1 + scale_fill_gradient2()
+						}
+					}else{
+						if(!is.null(sample_plot_color)){
+							g1 <- g1 + scale_fill_manual(values = sample_plot_color[[i]])
+						}else{
+							g1 <- g1 + scale_fill_discrete()
+						}
+					}
+					if(!is.null(facet)){
+						if(length(facet) == 1){
+							g1 <- g1 + facet_grid(facet_formula, scales = "free", space = "free")
+						}else{
+							g1 <- g1 + ggh4x::facet_nested(facet_formula, nest_line = element_line(linetype = 2), scales = "free", space = "free")
+						}
+					}
+					g1 <- g1 + theme_minimal() +
+						labs(fill = i) + 
+						theme(
+							axis.text.x = element_blank(),
+							axis.ticks.x = element_blank(),
+							axis.title.x = element_blank(),
+							axis.title.y = element_blank(),
+							panel.grid = element_blank(),
+							strip.background = element_blank(),
+							strip.text       = element_blank(),
+							panel.border     = element_blank(),
+							panel.background = element_blank(),
+							legend.position = "right"
+						)
+					sample_plot_list[[i]] <- g1
+				}
+				if(is.null(sample_plot_height)){
+					sample_plot_height <- rep(0.1, length(sample_plot))
+				}
+
+				p <- patchwork::wrap_plots(c(list(p), sample_plot_list), byrow = TRUE) +
+					patchwork::plot_layout(ncol = 1, axes = "collect", heights = c(1, sample_plot_height))
+			
+			}
 			p
 		},
 		#' @description
@@ -437,11 +520,11 @@ trans_abund <- R6Class(classname = "trans_abund",
 		#' @param min_abundance default .01; the minimum abundance percentage in plot.
 		#' @param max_abundance default NULL; the maximum abundance percentage in plot, NULL reprensent the max percentage.
 		#' @param strip_text default 11; facet text size.
-		#' @param xtext_keep default TRUE; whether retain x text.
+		#' @param xtext_keep default TRUE; whether to keep the text on the x-axis.
 		#' @param xtext_angle default 0; number ranging from 0 to 90; used to adjust x axis text angle to reduce text overlap; 
 		#' @param xtext_size default 10; x axis text size.
 		#' @param ytext_size default 11; y axis text size.
-		#' @param xtitle_keep default TRUE; whether retain x title.
+		#' @param xtitle_keep default TRUE; whether to keep the title of the x-axis.
 		#' @param grid_clean default TRUE; whether remove grid lines.
 		#' @param legend_title default "\% Relative\\nAbundance"; legend title text.
 		#' @param pheatmap default FALSE; whether use pheatmap package to plot the heatmap.
@@ -740,7 +823,7 @@ trans_abund <- R6Class(classname = "trans_abund",
 			if(add_label){
 				p <- p + ggrepel::geom_label_repel(position = position_stack(vjust = 0.5), show.legend = FALSE)
 			}
-			p <- p + private$blank_theme +
+			p <- p + private$blank_theme() +
 				scale_fill_manual(values = color_values) +
 				theme(axis.text.x = element_blank()) +
 				facet_wrap(~Sample, nrow = facet_nrow) +
@@ -912,6 +995,9 @@ trans_abund <- R6Class(classname = "trans_abund",
 				if(length(order_x) == 1){
 					stop("This may be wrong. Only one sample used to order the samples!")
 				}else{
+					if(!all(unique(plot_data$Sample) %in% order_x)){
+						message("Some sample names are not found in provided order_x parameter! This will cause the results in the figure to be abnormal!")
+					}
 					plot_data$Sample %<>% factor(., levels = order_x)
 				}
 			}
@@ -932,16 +1018,17 @@ trans_abund <- R6Class(classname = "trans_abund",
 				}
 			}
 		},
-		blank_theme = 
+		blank_theme = function(){
 			theme_minimal() +
 			theme(
-			axis.title = element_blank(),
-			panel.border = element_blank(),
-			panel.grid=element_blank(),
-			axis.ticks = element_blank(),
-			legend.position="right",
-			plot.title=element_text(size=14, face="bold")
-		)
+				axis.title = element_blank(),
+				panel.border = element_blank(),
+				panel.grid = element_blank(),
+				axis.ticks = element_blank(),
+				legend.position = "right",
+				plot.title = element_text(size = 14, face = "bold")
+			)
+		}
 	),
 	lock_objects = FALSE,
 	lock_class = FALSE

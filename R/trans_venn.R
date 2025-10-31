@@ -10,9 +10,11 @@ trans_venn <- R6Class(classname = "trans_venn",
 	public = list(
 		#' @param dataset the object of \code{\link{microtable}} class or a matrix-like table (data.frame or matrix object).
 		#' 	 If dataset is a matrix-like table, features must be rows.
-		#' @param ratio default NULL; NULL, "numratio" or "seqratio"; "numratio": calculate the percentage of feature number; 
-		#' 	 "seqratio": calculate the percentage of feature abundance; NULL: no additional percentage.
+		#' @param ratio default NULL; NULL, "numratio", "seqratio" or "both"; "numratio": calculate the percentage of feature number; 
+		#' 	 "seqratio": calculate the percentage of feature abundance; "both": "numratio" + "seqratio"; NULL: no additional percentage (raw counts).
 		#' @param name_joint default "&"; the joint mark for generating multi-sample names.
+		#' @param ratio_both_joint default "; "; the joint mark for the "both" option in \code{ratio} parameter.
+		#'    If you need to insert a line break, you can use ")\\n(".
 		#' @return \code{data_details} and \code{data_summary} stored in the object.
 		#' @examples
 		#' \donttest{
@@ -20,7 +22,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 		#' t1 <- dataset$merge_samples("Group")
 		#' t1 <- trans_venn$new(dataset = t1, ratio = "numratio")
 		#' }
-		initialize = function(dataset, ratio = NULL, name_joint = "&"
+		initialize = function(dataset, ratio = NULL, name_joint = "&", ratio_both_joint = "; "
 			){
 			if(is.null(dataset)){
 				stop("The input dataset must be provided!")
@@ -60,14 +62,16 @@ trans_venn <- R6Class(classname = "trans_venn",
 			})
 			venn_count_abund <- data.frame(Counts = sapply(venn_list, length), Abundance = venn_abund)
 			if(!is.null(ratio)){
-				if(!ratio %in% c("seqratio", "numratio")){
-					stop("Provided parameter ratio must be one of NULL, 'seqratio' or 'numratio' !")
+				if(!ratio %in% c("seqratio", "numratio", "both")){
+					stop("Provided parameter ratio must be one of NULL, 'seqratio', 'numratio' or 'both' !")
 				}
-				if(ratio == "seqratio"){
-					venn_count_abund[, 2] <- paste0(round(venn_count_abund[,2]/sum(venn_count_abund[, 2]), 3) * 100, "%")
-				}else{
-					venn_count_abund[, 2] <- paste0(round(venn_count_abund[,1]/sum(venn_count_abund[, 1]), 3) * 100, "%")
+				if(ratio %in% c("seqratio", "both")){
+					seq_ratio <- paste0(round(venn_count_abund[,2]/sum(venn_count_abund[, 2]), 3) * 100, "%")
 				}
+				if(ratio %in% c("numratio", "both")){
+					num_ratio <- paste0(round(venn_count_abund[,1]/sum(venn_count_abund[, 1]), 3) * 100, "%")
+				}
+				venn_count_abund[, 2] <- switch(ratio, 'seqratio' = seq_ratio, 'numratio' = num_ratio, 'both' = paste0(seq_ratio, ratio_both_joint, num_ratio))
 			}
 			# make the length of elements same
 			venn_maxlen <- max(sapply(venn_list, length))
@@ -167,7 +171,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 				p <- ggplot(data.frame(), aes(x = c(5, 5), y = 0)) + 
 					xlim(1, 9) + 
 					ylim(2.5, 9) + 
-					private$main_theme
+					private$main_theme()
 				
 				if(fill_color == T){
 					p <- p + 
@@ -185,7 +189,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 				p <- ggplot(data.frame(), aes(x = c(5, 5), y = 0)) +
 					xlim(1, 9) +	
 					ylim(1, 9) + 
-					private$main_theme
+					private$main_theme()
 				
 				if(fill_color == T){
 					p <- p + 
@@ -207,7 +211,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 				p <- ggplot(data.frame(), aes(x = c(5,5), y = 0)) + 
 					xlim(0, 10) + 
 					ylim(0, 10) + 
-					private$main_theme
+					private$main_theme()
 				
 				map_data_1 <- private$plotellipse(center = c(3.5, 3.6), rotate = -35)
 				map_data_2 <- private$plotellipse(center = c(4.7, 4.4), rotate = -35)
@@ -232,7 +236,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 				p <- ggplot(data.frame(), aes(x = c(5, 5), y = 0)) + 
 					xlim(0, 10.4) + 
 					ylim(-0.5, 10.8) + 
-					private$main_theme
+					private$main_theme()
 				
 				map_data_1 <- private$plotellipse(center = c(4.83, 6.2), radius = c(1.43, 4.11), rotate = 0)
 				map_data_2 <- private$plotellipse(center = c(6.25, 5.4), radius = c(1.7, 3.6), rotate = 66)
@@ -286,7 +290,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 				p <- ggplot(data.frame(), aes(x=c(0, 0), y = 0)) +
 					  xlim(petal_use_lim[1], petal_use_lim[2]) +
 					  ylim(petal_use_lim[1], petal_use_lim[2]) +
-					  private$main_theme
+					  private$main_theme()
 					  
 				for(i in 1:nPetals){
 					rotate <- 90 - (i - 1) * 360/nPetals
@@ -609,16 +613,19 @@ trans_venn <- R6Class(classname = "trans_venn",
 			colnames(xy) <- c("x", "y")
 			xy
 		},
-		main_theme = theme(panel.grid.major=element_blank(), 
-			panel.grid.minor=element_blank(), 
-			axis.text=element_blank(),
-			axis.title=element_blank(),
-			axis.ticks=element_blank(),
-			panel.border=element_blank(),
+		main_theme = function(){
+			theme(
+			panel.grid.major = element_blank(), 
+			panel.grid.minor = element_blank(), 
+			axis.text = element_text(color = NA),
+			axis.title = element_text(color = NA),
+			axis.ticks = element_line(color = NA),
+			panel.border = element_blank(),
 			panel.background = element_blank(),
-			legend.key = element_blank(),
+			legend.key = element_rect(fill = NA, color = NA),
 			plot.margin = unit(c(0,0,0,0), "mm")
-		)
+			)
+		}
 	),
 	lock_class = FALSE,
 	lock_objects = FALSE

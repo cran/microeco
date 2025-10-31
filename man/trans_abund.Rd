@@ -200,7 +200,7 @@ Bar plot.
   facet = NULL,
   order_x = NULL,
   x_axis_name = NULL,
-  barwidth = NULL,
+  barwidth = 0.9,
   use_alluvium = FALSE,
   clustering = FALSE,
   clustering_plot = FALSE,
@@ -216,6 +216,10 @@ Bar plot.
   coord_flip = FALSE,
   ggnested = FALSE,
   high_level_add_other = FALSE,
+  sample_plot = NULL,
+  sample_plot_color = NULL,
+  sample_plot_height = NULL,
+  sample_plot_mainnames = FALSE,
   bar_type = deprecated()
 )}\if{html}{\out{</div>}}
 }
@@ -241,7 +245,7 @@ When multiple facets are used, please first install package \code{ggh4x} using t
 
 \item{\code{x_axis_name}}{NULL; a character string; a column name of sample_table in dataset; used to show the sample names in x axis.}
 
-\item{\code{barwidth}}{default NULL; bar width, see \code{width} in \code{geom_bar}.}
+\item{\code{barwidth}}{default 0.9; bar width, see \code{width} in \code{geom_bar} of ggplot2 package.}
 
 \item{\code{use_alluvium}}{default FALSE; whether add alluvium plot. If \code{TRUE}, please first install \code{ggalluvial} package.}
 
@@ -262,9 +266,9 @@ If \code{clustering_plot = TRUE}, \code{clustering} will be also TRUE in any cas
 
 \item{\code{xtext_size}}{default 10; x axis text size.}
 
-\item{\code{xtext_keep}}{default TRUE; whether retain x text.}
+\item{\code{xtext_keep}}{default TRUE; whether to keep the text on the x-axis.}
 
-\item{\code{xtitle_keep}}{default TRUE; whether retain x title.}
+\item{\code{xtitle_keep}}{default TRUE; whether to keep the title of the x-axis.}
 
 \item{\code{ytitle_size}}{default 17; y axis title size.}
 
@@ -275,6 +279,19 @@ To make it available, please assign \code{high_level} parameter when creating th
 
 \item{\code{high_level_add_other}}{default FALSE; whether add 'Others' (all the unknown taxa) in each taxon of higher taxonomic level.
 Only available when \code{ggnested = TRUE}.}
+
+\item{\code{sample_plot}}{default NULL; Use the heatmap colors to represent sample information. 
+The input should be column names from \code{sample_table}, e.g., \code{c("Group", "pH")}.}
+
+\item{\code{sample_plot_color}}{default NULL; Color settings. The input must be a list that corresponds to \code{sample_plot}, 
+e.g. \code{list(Group = RColorBrewer::brewer.pal(6, "Set2"), pH = c("white", "red"))}.
+When the input factor is a numerical variable, it will be displayed with a color gradient; 
+therefore, two colors should be provided for the input (as shown for "pH" above).}
+
+\item{\code{sample_plot_height}}{default NULL; Height of the sample heatmap; defaults to 1/10 of the main bar plot. 
+The input must be a vector whose length equals that of \code{sample_plot}, e.g., \code{c(0.1, 0.1)}.}
+
+\item{\code{sample_plot_mainnames}}{default FALSE; whether show the sample names in the main bar plot.}
 
 \item{\code{bar_type}}{deprecated. Please use \code{bar_full} argument instead.}
 }
@@ -368,7 +385,7 @@ This parameter will be passed to the \code{switch} parameter in \code{ggplot2::f
 
 \item{\code{strip_text}}{default 11; facet text size.}
 
-\item{\code{xtext_keep}}{default TRUE; whether retain x text.}
+\item{\code{xtext_keep}}{default TRUE; whether to keep the text on the x-axis.}
 
 \item{\code{xtext_angle}}{default 0; number ranging from 0 to 90; used to adjust x axis text angle to reduce text overlap;}
 
@@ -376,7 +393,7 @@ This parameter will be passed to the \code{switch} parameter in \code{ggplot2::f
 
 \item{\code{ytext_size}}{default 11; y axis text size.}
 
-\item{\code{xtitle_keep}}{default TRUE; whether retain x title.}
+\item{\code{xtitle_keep}}{default TRUE; whether to keep the title of the x-axis.}
 
 \item{\code{grid_clean}}{default TRUE; whether remove grid lines.}
 
