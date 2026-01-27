@@ -60,6 +60,14 @@ t1$plot_diff_bar(use_number = 1:20)
 \dontrun{
 t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_labels = NULL)
 }
+
+## ------------------------------------------------
+## Method `trans_diff$plot_volcano`
+## ------------------------------------------------
+
+\dontrun{
+t1$plot_volcano()
+}
 }
 \section{Methods}{
 \subsection{Public methods}{
@@ -68,6 +76,7 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
 \item \href{#method-trans_diff-plot_diff_abund}{\code{trans_diff$plot_diff_abund()}}
 \item \href{#method-trans_diff-plot_diff_bar}{\code{trans_diff$plot_diff_bar()}}
 \item \href{#method-trans_diff-plot_diff_cladogram}{\code{trans_diff$plot_diff_cladogram()}}
+\item \href{#method-trans_diff-plot_volcano}{\code{trans_diff$plot_volcano()}}
 \item \href{#method-trans_diff-clone}{\code{trans_diff$clone()}}
 }
 }
@@ -133,7 +142,7 @@ t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_lab
         drawn from the Dirichlet distribution; Reference: <doi:10.1371/journal.pone.0067019> and <doi:10.1186/2049-2618-2-15>; 
         require \code{ALDEx2} package to be installed 
         (\href{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html}{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html})}
-  \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallace and generalized linear model (glm) test with \code{ALDEx2} package; 
+  \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallis and generalized linear model (glm) test with \code{ALDEx2} package; 
         see also the \code{test} parameter in \code{ALDEx2::aldex} function.}
   \item{\strong{'DESeq2'}}{Differential expression analysis based on the Negative Binomial (a.k.a. Gamma-Poisson) distribution based on the \code{DESeq2} package.}
   \item{\strong{'edgeR'}}{The \code{exactTest} method of \code{edgeR} package is implemented.}
@@ -531,7 +540,7 @@ select the features according to the metric (method = "lefse" or "rf") from high
 
 \item{\code{select_show_labels}}{default NULL; character vector; The features to show in the plot with full label names, not the letters.}
 
-\item{\code{only_select_show}}{default FALSE; whether only use the the select features in the parameter \code{select_show_labels}.}
+\item{\code{only_select_show}}{default FALSE; whether only use the the selected features in the parameter \code{select_show_labels}.}
 
 \item{\code{sep}}{default "|"; the seperate character in the taxonomic information.}
 
@@ -565,6 +574,56 @@ ggplot.
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
 t1$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 30, select_show_labels = NULL)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_diff-plot_volcano"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_diff-plot_volcano}{}}}
+\subsection{Method \code{plot_volcano()}}{
+Volcano plot.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_diff$plot_volcano(
+  select_group = NULL,
+  log2fc_cutoff = 1,
+  pvalue_cutoff = 0.05,
+  color_values = c("#e74c3c", "#3498db", "gray80"),
+  label_top_n = 10,
+  label_fullname = FALSE
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{select_group}}{default NULL; which group is select if multiple paired groups are found in 'Comparison' column of \code{res_diff} table.
+It should be either a number or one element of 'Comparison' column.}
+
+\item{\code{log2fc_cutoff}}{default 1; cutoff value of log2FoldChange.}
+
+\item{\code{pvalue_cutoff}}{default 0.05; cutoff value of adjusted P value.}
+
+\item{\code{color_values}}{default c("#e74c3c", "#3498db", "gray80"); color palette for different types of points (i.e. "up", "down" and "none").}
+
+\item{\code{label_top_n}}{default 10; number of features shown in the plot. 0 means no label.}
+
+\item{\code{label_fullname}}{default FALSE; whether show the full taxonomic lineage of each label.
+If the user considers that the full name is too long in the figure when \code{label_fullname = TRUE}, 
+the "Taxa" column in the \code{res_diff} table of the object should be modified to retain the required taxonomic information.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+ggplot.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$plot_volcano()
 }
 }
 \if{html}{\out{</div>}}

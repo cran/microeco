@@ -417,7 +417,8 @@ trans_env <- R6Class(classname = "trans_env",
 			max_perc_tax = 0.8
 			){
 			if(is.null(self$res_ordination)){
-				stop("Please first run cal_ordination function !")
+				message("The res_ordination is not found! Call the cal_ordination function automatically with default settings ... ")
+				self$cal_ordination()
 			}
 			res_ordination <- self$res_ordination
 			scrs <- scores(res_ordination)
@@ -502,6 +503,11 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param point_size default 3; point size in plot when "point" is in \code{plot_type}.
 		#'   \code{point_size} can also be a variable name in \code{sample_table}, such as "pH".
 		#' @param point_alpha default .8; point transparency in plot when "point" is in \code{plot_type}.
+		#' @param point_second default FALSE; whether plot the second group of points.
+		#'   Only available when input \code{point_size} is numeric value.
+		#' @param point_second_size default NULL; size value of the second type of point. Default means \code{point_size * 0.6}
+		#' @param point_second_alpha default NULL; point transparency of the second type of point.
+		#' @param point_second_color default NULL; a color value of the second type of point. If \code{NULL}, same with previous setting.
 		#' @param centroid_segment_alpha default 0.6; segment transparency in plot when "centroid" is in \code{plot_type}.
 		#' @param centroid_segment_size default 1; segment size in plot when "centroid" is in \code{plot_type}.
 		#' @param centroid_segment_linetype default 3; an integer; the line type related with centroid in plot when "centroid" is in \code{plot_type}.
@@ -553,6 +559,10 @@ trans_env <- R6Class(classname = "trans_env",
 			plot_type = "point",
 			point_size = 3,
 			point_alpha = 0.8,
+			point_second = FALSE,
+			point_second_size = NULL,
+			point_second_alpha = NULL,
+			point_second_color = NULL,
 			centroid_segment_alpha = 0.6,
 			centroid_segment_size = 1,
 			centroid_segment_linetype = 3,
@@ -568,7 +578,8 @@ trans_env <- R6Class(classname = "trans_env",
 			...
 			){
 			if(is.null(self$res_ordination_trans)){
-				stop("Please first run trans_ordination function!")
+				message("The res_ordination_trans is not found! Call the trans_ordination function automatically with empirical parameter settings ... ")
+				self$trans_ordination(adjust_arrow_length = TRUE)
 			}
 			if(is.null(plot_color)){
 				if(any(c("ellipse", "chull", "centroid") %in% plot_type)){
@@ -594,6 +605,17 @@ trans_env <- R6Class(classname = "trans_env",
 						alpha = point_alpha,
 						...
 					)
+					if(point_second){
+						if(is.null(point_second_size)) point_second_size <- point_size * 3 / 5
+						if(is.null(point_second_alpha)) point_second_alpha <- 1
+						if(is.null(point_second_color)){
+							p <- p + geom_point(data = df_sites, aes_meco("x", "y", colour = plot_color, shape = plot_shape), 
+								alpha = point_second_alpha, size = point_second_size)
+						}else{
+							p <- p + geom_point(data = df_sites, aes_meco("x", "y", colour = plot_color, shape = plot_shape), 
+								alpha = point_second_alpha, size = point_second_size, color = point_second_color)
+						}
+					}
 				}
 			}else{
 				check_table_variable(df_sites, point_size, "point_size", "res_ordination_trans$df_sites")
@@ -854,6 +876,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param add_abund_table default NULL; additional data table to be used. Row names must be sample names.
 		#' @param filter_thres default 0; the abundance threshold, such as 0.0005 when the input is relative abundance.
 		#' 	  The features with abundances lower than filter_thres will be filtered. This parameter cannot be applied when add_abund_table parameter is provided.
+		#' @param filter_unknown default TRUE; Whether filter out the unknown taxa ending with "__".
 		#' @param use_taxa_num default NULL; integer; a number used to select high abundant taxa; only useful when \code{use_data} parameter is a taxonomic level, e.g., "Genus".
 		#' @param other_taxa default NULL; character vector containing a series of feature names; available when \code{use_data = "other"}; 
 		#' 	  provided names should be standard full names used to select taxa from all the tables in \code{taxa_abund} list of the \code{microtable} object;
@@ -886,6 +909,7 @@ trans_env <- R6Class(classname = "trans_env",
 			partial_fix = NULL,
 			add_abund_table = NULL,
 			filter_thres = 0,
+			filter_unknown = TRUE,
 			use_taxa_num = NULL,
 			other_taxa = NULL,
 			p_adjust_method = "fdr",
@@ -942,7 +966,9 @@ trans_env <- R6Class(classname = "trans_env",
 						abund_table <- abund_table[other_taxa, ]
 					}
 				}
-				abund_table %<>% .[!grepl("__$", rownames(.)), ]
+				if(filter_unknown){
+					abund_table %<>% .[!grepl("__$", rownames(.)), ]
+				}
 				if(nrow(abund_table) == 0){
 					stop("No available feature! Please check the input data!")
 				}
@@ -1130,7 +1156,8 @@ trans_env <- R6Class(classname = "trans_env",
 			}
 			
 			if(is.null(self$res_cor)){
-				stop("Please first run cal_cor function to get plot data!")
+				message("The res_cor is not found! It is necessary for the visualization! Call the cal_cor function automatically with default settings ... ")
+				self$cal_cor()
 			}
 			if(length(color_vector) != 3){
 				stop("color_vector parameter must have three values!")
@@ -1475,9 +1502,9 @@ trans_env <- R6Class(classname = "trans_env",
 			}
 			p <- p + geom_point(size = point_size, alpha = point_alpha)
 			if(is.null(group)){
-				p <- p + geom_smooth(method = "lm", size = line_size, color = line_color, alpha = line_alpha, se = line_se, fill = line_se_color)
+				p <- p + geom_smooth(method = "lm", linewidth = line_size, color = line_color, alpha = line_alpha, se = line_se, fill = line_se_color)
 			}else{
-				p <- p + geom_smooth(method = "lm", size = line_size, alpha = line_alpha, se = line_se, fill = line_se_color)
+				p <- p + geom_smooth(method = "lm", linewidth = line_size, alpha = line_alpha, se = line_se, fill = line_se_color)
 			}
 			p <- p + stat_corlm(
 				type = type, 

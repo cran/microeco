@@ -12,7 +12,7 @@ trans_norm <- R6Class(classname = "trans_norm",
 		#'   This can make the further operations same with the traditional ecological methods.
 		#' @param dataset the \code{\link{microtable}} object or \code{data.frame} object. 
 		#' 	 If it is \code{data.frame} object, please make sure that rows are samples, and columns are features.
-		#' @return data_table, stored in the object. 
+		#' @return \code{data_table}, stored in the object. 
 		#' @examples
 		#' library(microeco)
 		#' data(dataset)
@@ -43,7 +43,7 @@ trans_norm <- R6Class(classname = "trans_norm",
 		#' \cr 
 		#' Methods for normalization:
 		#' \itemize{
-		#'   \item \code{"rarefy"}: classic rarefaction based on R sample function.
+		#'   \item \code{"rarefy"}: classic rarefaction based on the R \code{sample} function.
 		#'   \item \code{"SRS"}: scaling with ranked subsampling method based on the SRS package provided by Lukas Beule and Petr Karlovsky (2020) <doi:10.7717/peerj.9593>.
 		#'   \item \code{"clr"}: Centered log-ratio normalization <ISBN:978-0-412-28060-3> <doi: 10.3389/fmicb.2017.02224>. 
 		#' 	   	 It is defined:  \deqn{clr_{ki} = \log\frac{x_{ki}}{g(x_i)}}
@@ -90,12 +90,16 @@ trans_norm <- R6Class(classname = "trans_norm",
 		#' }
 		#' Methods based on \code{decostand} function of vegan package:
 		#' \itemize{
-		#'   \item \code{"total"}: divide by margin total (default MARGIN = 1, i.e. rows - samples).
+		#'   \item \code{"total"}: divide by margin total (default MARGIN = 1, i.e. rows - samples in \code{data_table} of the object).
+		#'      The default MARGIN = 1 generates results commonly referred to as relative abundance.
 		#'   \item \code{"max"}: divide by margin maximum (default MARGIN = 2, i.e. columns - features).
+		#'   \item \code{"frequency"}: 	divide by margin total and multiply by the number of non-zero items (default MARGIN = 2).	
 		#'   \item \code{"normalize"}:  make margin sum of squares equal to one (default MARGIN = 1).
 		#'   \item \code{"range"}: standardize values into range 0...1 (default MARGIN = 2). If all values are constant, they will be transformed to 0.
 		#'   \item \code{"standardize"}: scale x to zero mean and unit variance (default MARGIN = 2).
 		#'   \item \code{"pa"}: scale x to presence/absence scale (0/1).
+		#'   \item \code{"chi.square"}: see the detailed "chi.square" documents in vegan package.
+		#'   \item \code{"hellinger"}: square root of \code{method = "total"}.
 		#'   \item \code{"log"}: logarithmic transformation.
 		#' }
 		#' Other methods for transformation:
@@ -138,10 +142,14 @@ trans_norm <- R6Class(classname = "trans_norm",
 				"total", "max", "frequency", "normalize", "range", "rank", "standardize", "pa", "chi.square", "hellinger", "log"))
 			
 			if(method %in% c("total", "max", "frequency", "normalize", "range", "rank", "standardize", "pa", "chi.square", "hellinger", "log")){
-				if(is.null(MARGIN)){
-					MARGIN <- switch(method, total = 1, max = 2, frequency = 2, normalize = 1, range = 2, rank = 1, standardize = 2, chi.square = 1, NULL)
+				if(method %in% c("total", "max", "frequency", "normalize", "range", "rank", "standardize", "chi.square")){
+					if(is.null(MARGIN)){
+						MARGIN <- switch(method, total = 1, max = 2, frequency = 2, normalize = 1, range = 2, rank = 1, standardize = 2, chi.square = 1)
+					}
+					res_table <- vegan::decostand(x = abund_table, method = method, MARGIN = MARGIN, logbase = logbase, ...)
+				}else{
+					res_table <- vegan::decostand(x = abund_table, method = method, logbase = logbase, ...)
 				}
-				res_table <- vegan::decostand(x = abund_table, method = method, MARGIN = MARGIN, logbase = logbase, ...)
 			}
 			if(method %in% c("rarefy", "srs")){
 				newotu <- as.data.frame(t(abund_table))
@@ -319,14 +327,14 @@ trans_norm <- R6Class(classname = "trans_norm",
 						# Handling of the NA, NaN, Inf
 						pr[is.nan(pr) | !is.finite(pr) | pr == 0] <- NA
 						# Counting the number of non-NA, NaN, Inf
-						incl.no <- colSums(!is.na(pr))		
+						included_count <- colSums(!is.na(pr))		
 						# Calculate the median of PR
 						pr.median <- matrixStats::colMedians(pr, na.rm=TRUE)
 						# Record the number of samples used for calculating the GMPR
-						comm.no[i] <- sum(incl.no >= intersect.no)
+						comm.no[i] <- sum(included_count >= intersect.no)
 						# Geometric mean of PR median
 						if (comm.no[i] > 1) {
-							exp(mean(log(pr.median[incl.no >= intersect.no])))
+							exp(mean(log(pr.median[included_count >= intersect.no])))
 						} else {
 							NA
 						}

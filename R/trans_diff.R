@@ -39,7 +39,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'     	  drawn from the Dirichlet distribution; Reference: <doi:10.1371/journal.pone.0067019> and <doi:10.1186/2049-2618-2-15>; 
 		#'     	  require \code{ALDEx2} package to be installed 
 		#'     	  (\href{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html}{https://bioconductor.org/packages/release/bioc/html/ALDEx2.html})}
-		#'     \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallace and generalized linear model (glm) test with \code{ALDEx2} package; 
+		#'     \item{\strong{'ALDEx2_kw'}}{runs Kruskal-Wallis and generalized linear model (glm) test with \code{ALDEx2} package; 
 		#'     	  see also the \code{test} parameter in \code{ALDEx2::aldex} function.}
 		#'     \item{\strong{'DESeq2'}}{Differential expression analysis based on the Negative Binomial (a.k.a. Gamma-Poisson) distribution based on the \code{DESeq2} package.}
 		#'     \item{\strong{'edgeR'}}{The \code{exactTest} method of \code{edgeR} package is implemented.}
@@ -519,7 +519,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 								res_lda_pair[[i]] <- NA
 								next
 							}else{
-								w <- mod1$scaling[,1]
+								w <- mod1$scaling[, 1]
 								if(is.null(names(w))){
 									names(w) <- rownames(mod1$scaling)
 								}
@@ -591,8 +591,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 						use_data <- new_abund[ , unlist(lapply(as.character(all_name[,i]), function(x) which(as.character(sampleinfo[, group]) %in% x)))]
 						use_data %<>% .[!grepl("__$", rownames(.)), ]
 						use_data <- use_data[apply(use_data, 1, sum) != 0, ]
-						g <- sum(as.character(sampleinfo[, group]) == as.character(all_name[1, i])) + 1
-						res <- private$calculate_metastat(inputdata = use_data, g = g)
+						group_count <- sum(as.character(sampleinfo[, group]) == as.character(all_name[1, i])) + 1
+						res <- private$calculate_metastat(inputdata = use_data, g = group_count)
 						add_name <- paste0(as.character(all_name[, i]), collapse = " - ") %>% rep(., nrow(res))
 						res <- cbind.data.frame(compare = add_name, res)
 						output <- rbind.data.frame(output, res)
@@ -1388,7 +1388,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'	  select the features according to the metric (method = "lefse" or "rf") from high to low.
 		#' @param clade_label_level default 4; the taxonomic level for marking the label with letters, root is the largest.
 		#' @param select_show_labels default NULL; character vector; The features to show in the plot with full label names, not the letters.
-		#' @param only_select_show default FALSE; whether only use the the select features in the parameter \code{select_show_labels}.
+		#' @param only_select_show default FALSE; whether only use the the selected features in the parameter \code{select_show_labels}.
 		#' @param sep default "|"; the seperate character in the taxonomic information.
 		#' @param branch_size default 0.2; numberic, size of branch.
 		#' @param alpha default 0.2; shading of the color.
@@ -1595,6 +1595,131 @@ trans_diff <- R6Class(classname = "trans_diff",
 			}
 			tree <- tree + theme(legend.position = "right", legend.title = element_blank())
 			tree
+		},
+		#' @description
+		#' Volcano plot.
+		#'
+		#' @param select_group default NULL; which group is select if multiple paired groups are found in 'Comparison' column of \code{res_diff} table.
+		#' 	 It should be either a number or one element of 'Comparison' column.
+		#' @param log2fc_cutoff default 1; cutoff value of log2FoldChange.
+		#' @param pvalue_cutoff default 0.05; cutoff value of adjusted P value.
+		#' @param color_values default c("#e74c3c", "#3498db", "gray80"); color palette for different types of points (i.e. "up", "down" and "none").
+		#' @param label_top_n default 10; number of features shown in the plot. 0 means no label. 
+		#' @param label_fullname default FALSE; whether show the full taxonomic lineage of each label.
+		#' 	 If the user considers that the full name is too long in the figure when \code{label_fullname = TRUE}, 
+		#' 	 the "Taxa" column in the \code{res_diff} table of the object should be modified to retain the required taxonomic information.
+		#' @return ggplot.
+		#' @examples
+		#' \dontrun{
+		#' t1$plot_volcano()
+		#' }
+		plot_volcano = function(select_group = NULL,
+								log2fc_cutoff = 1,
+								pvalue_cutoff = 0.05,
+								color_values = c("#e74c3c", "#3498db", "gray80"),
+								label_top_n = 10,
+								label_fullname = FALSE){
+			
+			input <- self$res_diff
+			
+			if("Comparison" %in% colnames(input)){
+				all_paired <- unique(input[, "Comparison"])
+				if(length(all_paired) > 1){
+					if(is.null(select_group)){
+						select_paired_name <- all_paired[1]
+						message("Select the first paired comparision: ", all_paired[1], " as the parameter select_group is NULL ...")
+					}else{
+						if(is.numeric(select_group)){
+							select_paired_name <- all_paired[select_group]
+						}else{
+							if(select_group %in% all_paired){
+								select_paired_name <- select_group
+							}else{
+								stop("Please provide a correct select_group parameter!")
+							}
+						}
+						message("Select the paired comparision: ", select_paired_name)
+					}
+					input %<>% .[.[, "Comparison"] == select_paired_name, ]
+				}
+			}
+			
+			if (! "log2FC" %in% colnames(input)) {
+				if("log2FoldChange" %in% colnames(input)){
+					input$log2FC <- input$log2FoldChange
+				}else{
+					if("logFC" %in% colnames(input)){
+						input$log2FC <- input$logFC
+					}else{
+						stop("The res_diff must have log2FC, logFC or log2FoldChange column!")
+					}
+				}
+			}
+			if (! "pvalue" %in% colnames(input)) {
+				if("P.adj" %in% colnames(input)){
+					input$pvalue <- input$P.adj
+					if(any(is.na(input$pvalue))){
+						remove_rows <- which(is.na(input$pvalue))
+						input %<>% .[!is.na(.$pvalue), ]
+						message("Remove ", length(remove_rows), " row(s) with NA in P value ...")
+					}
+				}else{
+					stop("The res_diff must have pvalue or P.adj column!")
+				}
+			}
+
+			# -log10(pvalue), avoid -Inf
+			input$neg_log10_p <- -log10(input$pvalue)
+			input$neg_log10_p[is.infinite(input$neg_log10_p)] <- max(input$neg_log10_p[is.finite(input$neg_log10_p)]) + 1
+
+			input$group <- ifelse(input$log2FC > log2fc_cutoff & input$pvalue < pvalue_cutoff, "up",
+				ifelse(input$log2FC < -log2fc_cutoff & input$pvalue < pvalue_cutoff, "down", "none"))
+			input$group %<>% factor(., levels = c("up", "down", "none"))
+
+			if ("Taxa" %in% colnames(input) && label_top_n > 0) {
+				input$tmp_name <- paste0("feature", seq_len(nrow(input)))
+				top_feature <- input %>%
+					.[.$group != "none", ] %>%
+					.[order(- .$neg_log10_p), ] %>%
+					head(label_top_n)
+				
+				if(label_fullname){
+					input$taxaname <- input$Taxa
+				}else{
+					input$taxaname <- as.character(gsub(".*\\|", "", input$Taxa))
+				}
+				input$label <- ifelse(input$tmp_name %in% top_feature$tmp_name, input$taxaname, "")
+			}
+
+			p <- ggplot(input, aes(x = log2FC, y = neg_log10_p, color = group)) +
+			geom_point(alpha = 0.8, size = 1.5) +
+			geom_vline(xintercept = c(-log2fc_cutoff, log2fc_cutoff), linetype = "dashed", color = "black", linewidth = 0.5) +
+			geom_hline(yintercept = -log10(pvalue_cutoff), linetype = "dashed", color = "black", linewidth = 0.5)
+			
+			if ("Taxa" %in% colnames(input) && label_top_n > 0) {
+				p <- p + ggrepel::geom_text_repel(aes(label = label),
+						max.overlaps = Inf, # show all labels
+						size = 3,
+						color = "black",
+						box.padding = 0.5)
+			}
+			
+			p <- p + scale_color_manual(values = color_values) +
+			theme_bw() +
+			theme(
+				plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+				legend.position = "right",
+				panel.grid = element_blank(),
+				axis.title = element_text(size = 12),
+				axis.text = element_text(size = 10)
+			) +
+			labs(
+				x = expression(log[2]~Fold~Change),
+				y = expression(-log[10]~P~value),
+				color = "Group"
+			)
+
+			p
 		}
 	),
 	private = list(

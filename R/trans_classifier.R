@@ -215,14 +215,14 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 			###################### ----------------
 			######################    BORUTA
 			boruta.list <- list()
-			boura.fs <- function(i){
+			boruta.fs <- function(i){
 				boruta.res <- Boruta::Boruta(x = data_x, y = data_y, 
 					maxRuns = boruta.maxRuns, pValue = boruta.pValue, ...)
 				boruta.stats <- data.frame(Boruta::attStats(boruta.res))
 				boruta.list[[i]] <- rownames(boruta.stats[boruta.stats$decision =='Confirmed', ])
 			}
 			message("Running Feature Selection (Boruta) based on the training data ...")
-			boruta.list <- parallel::mclapply(1:boruta.repetitions, boura.fs)
+			boruta.list <- parallel::mclapply(1:boruta.repetitions, boruta.fs)
 
 			boruta.final <- as.data.frame(table(unlist(boruta.list)))
 			#boruta.store.top <- as.character(boruta.store[which(boruta.store$Freq>10),1])
@@ -405,7 +405,8 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 		#' }
 		plot_feature_imp = function(rf_sig_show = NULL, show_sig_group = FALSE, ...){
 			if(is.null(self$res_feature_imp)){
-				stop("Please first run function cal_feature_imp !")
+				message("The res_feature_imp is not found! It is necessary for the visualization! Call the cal_feature_imp function automatically with default settings ... ")
+				self$cal_feature_imp()
 			}
 			tmp <- data.frame(Taxa = rownames(self$res_feature_imp), self$res_feature_imp, check.names = FALSE)
 			tmp$Taxa %<>% gsub("`", "", ., fixed = TRUE) %>% gsub("\\.(.__)", "\\|\\1", .)
@@ -658,9 +659,9 @@ trans_classifier <- R6::R6Class(classname = "trans_classifier",
 			plot_method = FALSE,
 			...
 			){
-			
 			if(is.null(self$res_ROC)){
-				stop("Please first run cal_ROC to get the data for ROC curve !")
+				message("The res_ROC is not found! It is necessary for the visualization! Call the cal_ROC function automatically with default settings ... ")
+				self$cal_ROC()
 			}
 			plot_type <- match.arg(plot_type, c("ROC", "PR"))
 			if(plot_type == "ROC"){

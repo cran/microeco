@@ -272,6 +272,11 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' @param point_size default 3; point size when "point" is in \code{plot_type} parameter.
 		#'   \code{point_size} can also be a variable name in \code{sample_table}, such as "pH".
 		#' @param point_alpha default .8; point transparency in plot when "point" is in \code{plot_type} parameter.
+		#' @param point_second default FALSE; whether plot the second group of points.
+		#'   Only available when input \code{point_size} is numeric value.
+		#' @param point_second_size default NULL; size value of the second type of point. Default means \code{point_size * 0.6}
+		#' @param point_second_alpha default NULL; point transparency of the second type of point.
+		#' @param point_second_color default NULL; a color value of the second type of point. If \code{NULL}, same with previous setting.
 		#' @param centroid_segment_alpha default 0.6; segment transparency in plot when "centroid" is in \code{plot_type} parameter.
 		#' @param centroid_segment_size default 1; segment size in plot when "centroid" is in \code{plot_type} parameter.
 		#' @param centroid_segment_linetype default 3; the line type related with centroid in plot when "centroid" is in \code{plot_type} parameter.
@@ -313,6 +318,10 @@ trans_beta <- R6Class(classname = "trans_beta",
 			add_sample_label = NULL,
 			point_size = 3,
 			point_alpha = 0.8,
+			point_second = FALSE,
+			point_second_size = NULL,
+			point_second_alpha = NULL,
+			point_second_color = NULL,
 			centroid_segment_alpha = 0.6,
 			centroid_segment_size = 1,
 			centroid_segment_linetype = 3,
@@ -331,10 +340,12 @@ trans_beta <- R6Class(classname = "trans_beta",
 			loading_text_prefix = FALSE,
 			loading_text_italic = FALSE
 			){
-			ordination_method <- self$ordination_method
-			if(is.null(ordination_method)){
-				stop("Please first run cal_ordination function !")
+			if(is.null(self$res_ordination)){
+				message("The res_ordination is not found! It is necessary for the visualization! Call the cal_ordination function automatically with default settings ... ")
+				self$cal_ordination()
 			}
+			ordination_method <- self$ordination_method
+
 			if(is.null(plot_color)){
 				if(any(c("ellipse", "chull", "centroid") %in% plot_type)){
 					stop("Plot ellipse or chull or centroid need groups! Please provide plot_color parameter!")
@@ -365,6 +376,15 @@ trans_beta <- R6Class(classname = "trans_beta",
 				p <- ggplot(combined, aes_meco(x = plot_x, y = plot_y, colour = plot_color, shape = plot_shape))
 				if("point" %in% plot_type){
 					p <- p + geom_point(alpha = point_alpha, size = point_size)
+					if(point_second){
+						if(is.null(point_second_size)) point_second_size <- point_size * 3 / 5
+						if(is.null(point_second_alpha)) point_second_alpha <- 1
+						if(is.null(point_second_color)){
+							p <- p + geom_point(alpha = point_second_alpha, size = point_second_size)
+						}else{
+							p <- p + geom_point(alpha = point_second_alpha, size = point_second_size, color = point_second_color)
+						}
+					}
 				}
 			}else{
 				check_table_variable(combined, point_size, "point_size", "res_ordination$scores")
@@ -699,10 +719,11 @@ trans_beta <- R6Class(classname = "trans_beta",
 		#' t1$cal_group_distance_diff()
 		#' }
 		cal_group_distance_diff = function(group = NULL, by_group = NULL, by_ID = NULL, ...){
-			res_group_distance <- self$res_group_distance
-			if(is.null(res_group_distance)){
-				stop("Please first run cal_group_distance function!")
+			if(is.null(self$res_group_distance)){
+				message("The res_group_distance is not found! Call the cal_group_distance function automatically with default settings ... ")
+				self$cal_group_distance()
 			}
+			res_group_distance <- self$res_group_distance
 			# use method in trans_alpha
 			temp1 <- suppressMessages(trans_alpha$new(dataset = NULL))
 			res_group_distance$Measure <- "group_distance"
@@ -746,7 +767,8 @@ trans_beta <- R6Class(classname = "trans_beta",
 		plot_group_distance = function(plot_group_order = NULL, ...){
 			if(is.null(self$res_group_distance_diff)){
 				if(is.null(self$res_group_distance)){
-					stop("Please first run cal_group_distance function!")
+					message("The res_group_distance is not found! Call the cal_group_distance function automatically with default settings ... ")
+					self$cal_group_distance()
 				}
 				group_distance <- self$res_group_distance
 				group <- self$group

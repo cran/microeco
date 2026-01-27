@@ -991,6 +991,8 @@ trans_network <- R6Class(classname = "trans_network",
 		#'   When this parameter is set to \code{FALSE}, the network will filter directly based on the node parameter. 
 		#'   Any nodes not included in the node parameter will be filtered out.
 		#' @param return_igraph default TRUE; whether return the network with igraph format. If FALSE, return \code{trans_network} object.
+		#' @param sample_name default NULL; Sample names. If sample names are provided, the network will be extracted based on the nodes in these samples, 
+		#'   and the corresponding data (e.g., otu_table) in the object will also be filtered when \code{return_igraph = FALSE}.
 		#' @return a new network
 		#' @examples
 		#' \donttest{
@@ -998,12 +1000,20 @@ trans_network <- R6Class(classname = "trans_network",
 		#'   rownames, rm_single = TRUE)
 		#' # return a sub network that contains all nodes of module M1
 		#' }
-		subset_network = function(node = NULL, edge = NULL, rm_single = TRUE, node_alledges = FALSE, return_igraph = TRUE){
+		subset_network = function(node = NULL, edge = NULL, rm_single = TRUE, node_alledges = FALSE, return_igraph = TRUE, sample_name = NULL){
 			private$check_igraph()
 			private$check_network()
 			network <- self$res_network
 			if(!is.null(node) & !is.null(edge)){
 				stop("Please provide either node or edge!")
+			}
+			if(!is.null(sample_name)){
+				if(any(!(sample_name %in% rownames(self$data_abund)))){
+					stop("Please provide correct sample names with sample_name parameter!")
+				}
+				message("Extract sub-network according to features in provided samples: ", paste0(sample_name, collapse = " "), " ...")
+				extract_abund <- self$data_abund %>% .[sample_name, ]
+				node <- apply(extract_abund, 2, sum) %>% .[. != 0] %>% names
 			}
 			if(node_alledges){
 				if(is.null(node)){
@@ -1043,6 +1053,10 @@ trans_network <- R6Class(classname = "trans_network",
 				subnet_obj$res_network <- sub_network
 				subnet_obj$res_edge_table <- NULL
 				subnet_obj$res_node_table <- NULL
+				if(!is.null(sample_name)){
+					subnet_obj$sample_table %<>% .[sample_name, , drop = FALSE]
+					subnet_obj$data_abund %<>% .[sample_name, , drop = FALSE]
+				}
 				subnet_obj
 			}
 		},
@@ -1161,7 +1175,8 @@ trans_network <- R6Class(classname = "trans_network",
 			method <- match.arg(method, c("chorddiag", "circlize"))
 			
 			if(is.null(self$res_sum_links_pos) & is.null(self$res_sum_links_neg)){
-				stop("Please first run cal_sum_links function!")
+				message("The res_sum_links_pos is not found! Call the cal_sum_links function automatically with default settings ... ")
+				self$cal_sum_links()
 			}
 			if(plot_pos == T){
 				message("Extract the positive link information ...")
@@ -1384,8 +1399,8 @@ trans_network <- R6Class(classname = "trans_network",
 			res_p[res_p != 0] <- 0
 			list(cor = x, p = res_p)
 		},
-		# convert long format to symmetrical matrix
-		# The first and second columns must be names
+		# Convert long format to symmetrical matrix
+		# First and second columns must be names
 		vec2mat = function(datatable, use_names, value_var, rep_value){
 			if(!inherits(datatable[, value_var], "numeric")){
 				datatable[, value_var] %<>% as.numeric
@@ -1450,7 +1465,7 @@ trans_network <- R6Class(classname = "trans_network",
 		nnsd = function(x){
 			abs(diff(x))
 		},
-		# modified from microbiomeSeq (http://www.github.com/umerijaz/microbiomeSeq) 
+		# modified from microbiomeSeq package
 		module_roles = function(comm_graph){
 			td <- igraph::degree(comm_graph) %>% data.frame(taxa = names(.), total_links = ., stringsAsFactors = FALSE)
 			wmd <- private$within_module_degree(comm_graph)
