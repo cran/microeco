@@ -124,7 +124,9 @@ t1$plot_taxa_roles(roles_color_background = FALSE)
 \donttest{
 t1$subset_network(node = t1$res_node_table \%>\% base::subset(module == "M1") \%>\% 
   rownames, rm_single = TRUE)
-# return a sub network that contains all nodes of module M1
+# return a sub-network that contains all nodes of module M1
+t1$subset_network(sample_name = "S1", return_igraph = FALSE)
+# return a sub-network that contains all nodes of sample S1
 }
 
 ## ------------------------------------------------
@@ -576,9 +578,18 @@ t1$get_node_table(node_roles = TRUE)
 \subsection{Method \code{get_edge_table()}}{
 Get the edge property table, including connected nodes, label and weight.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{trans_network$get_edge_table()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{trans_network$get_edge_table(weight_na = 1, label_na = "all")}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{weight_na}}{default 1; the value for weight in the table if no "weight" attribute is found in the network.}
+
+\item{\code{label_na}}{default "all"; the value for label in the table if no "label" attribute is found in the network.}
+}
+\if{html}{\out{</div>}}
+}
 \subsection{Returns}{
 \code{res_edge_table} in object.
 }
@@ -831,7 +842,8 @@ Subset of the network.
   rm_single = TRUE,
   node_alledges = FALSE,
   return_igraph = TRUE,
-  sample_name = NULL
+  sample_name = NULL,
+  sample_name_each = FALSE
 )}\if{html}{\out{</div>}}
 }
 
@@ -856,19 +868,27 @@ Any nodes not included in the node parameter will be filtered out.}
 \item{\code{return_igraph}}{default TRUE; whether return the network with igraph format. If FALSE, return \code{trans_network} object.}
 
 \item{\code{sample_name}}{default NULL; Sample names. If sample names are provided, the network will be extracted based on the nodes in these samples, 
-and the corresponding data (e.g., otu_table) in the object will also be filtered when \code{return_igraph = FALSE}.}
+and the corresponding data (e.g., otu_table) in the object will also be filtered when \code{return_igraph = FALSE}.
+The input can be one or more sample names.}
+
+\item{\code{sample_name_each}}{default FALSE; Whether to return a list containing sub-networks for each sample.
+This is an advanced usage of sample_name parameter and replaces manual input of sample names.
+This parameter takes the highest priority. Each sub-network for a sample in the returned list is in the format of a trans_network object,
+so it can be directly used for subsequent analysis with the `meconetcomp` package.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-a new network
+igraph object or trans_network object depending on the parameter return_igraph; list object containing each trans_network object when sample_name_each = TRUE.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\donttest{
 t1$subset_network(node = t1$res_node_table \%>\% base::subset(module == "M1") \%>\% 
   rownames, rm_single = TRUE)
-# return a sub network that contains all nodes of module M1
+# return a sub-network that contains all nodes of module M1
+t1$subset_network(sample_name = "S1", return_igraph = FALSE)
+# return a sub-network that contains all nodes of sample S1
 }
 }
 \if{html}{\out{</div>}}

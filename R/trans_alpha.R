@@ -68,7 +68,7 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 				}
 				check_table_variable(data_alpha, by_ID, "by_ID", "dataset$sample_table")
 				if(!is.null(order_x)){
-					if(length(order_x == 1)){
+					if(length(order_x) == 1){
 						data_alpha$Sample %<>% factor(., levels = unique(dataset$sample_table[, order_x]))
 					} else {
 						data_alpha$Sample %<>% factor(., levels = order_x)
@@ -160,12 +160,12 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			method <- match.arg(method, c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lm", "lme", "betareg", "glmm", "glmm_beta"))
 			group <- self$group
 			
-			if(method %in% c("scheirerRayHare", "lm", "lme", "betareg", "glmm", "glmm_beta") & is.null(formula)){
+			if(method %in% c("scheirerRayHare", "lm", "lme", "betareg", "glmm", "glmm_beta")){
 				if(is.null(formula)){
 					stop("The formula parameter is NULL! It is necessary for the method: ", method, " !")
 				}
 			}
-			if(!method %in% c("anova", "scheirerRayHare", "lm", "lme", "betareg", "glmm", "glmm_beta")){
+			if(! method %in% c("anova", "scheirerRayHare", "lm", "lme", "betareg", "glmm", "glmm_beta")){
 				if(is.null(group)){
 					stop("For the method: ", method, " , group is necessary! Please recreate the object and set the group parameter!")
 				}

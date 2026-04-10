@@ -306,7 +306,7 @@ trans_network <- R6Class(classname = "trans_network",
 						self$res_cor_p$p.adjust <- adp
 						message("Adjusted p value matrix is stored in res_cor_p$p.adjust ...")
 					}
-					if(COR_optimization == T){
+					if(COR_optimization == TRUE){
 						message("Start COR optimizing ...")
 						tc1 <- private$rmt(cortable, low_thres = COR_optimization_low_high[1], high_thres = COR_optimization_low_high[2], seq_by = COR_optimization_seq)
 						message("The optimized COR threshold: ", tc1, "...\n")
@@ -327,7 +327,7 @@ trans_network <- R6Class(classname = "trans_network",
 					network <- graph_from_adjacency_matrix(cor_matrix, mode = "undirected")
 					edges <- t(sapply(1:ecount(network), function(x) ends(network, x)))
 					E(network)$label <- unlist(lapply(seq_len(nrow(edges)), function(x) ifelse(cortable[edges[x, 1], edges[x, 2]] > 0, "+", "-")))
-					if(COR_weight == T){
+					if(COR_weight == TRUE){
 						E(network)$weight <- unlist(lapply(seq_len(nrow(edges)), function(x) abs(cortable[edges[x, 1], edges[x, 2]])))
 					}else{
 						E(network)$weight <- rep.int(1, ecount(network))
@@ -654,11 +654,18 @@ trans_network <- R6Class(classname = "trans_network",
 			private$check_igraph()
 			private$check_network()
 			private$check_node_name()
-
+			if(node_roles){
+				if(is.null(V(self$res_network)$module)){
+					self$cal_module()
+				}
+			}
 			network <- self$res_network
+			node_table_raw <- as_data_frame(network, what = "vertices")
+			node_table <- node_table_raw[, "name", drop = FALSE]
+
 			# Add abundance info
 			sum_abund <- self$data_relabund
-			node_table <- data.frame(name = V(network)$name) %>% `rownames<-`(.[, 1])
+
 			node_table$degree <- igraph::degree(network)[rownames(node_table)]
 			node_table$betweenness_centrality <- igraph::betweenness(network)[rownames(node_table)]
 			node_table$closeness_centrality <- igraph::closeness(network)[rownames(node_table)]
@@ -690,6 +697,12 @@ trans_network <- R6Class(classname = "trans_network",
 					node_table %<>% cbind.data.frame(., self$tax_table[rownames(.), , drop = FALSE])
 				}
 			}
+			# add other attributes
+			if(! all(colnames(node_table_raw) %in% colnames(node_table))){
+				add_names <- colnames(node_table_raw) %>% .[! . %in% colnames(node_table)]
+				node_table %<>% cbind.data.frame(., node_table_raw[rownames(.), add_names, drop = FALSE])
+			}
+			
 			self$res_node_table <- node_table
 			message('Result is stored in object$res_node_table ...')
 			invisible(self)
@@ -697,19 +710,24 @@ trans_network <- R6Class(classname = "trans_network",
 		#' @description
 		#' Get the edge property table, including connected nodes, label and weight.
 		#'
+		#' @param weight_na default 1; the value for weight in the table if no "weight" attribute is found in the network.
+		#' @param label_na default "all"; the value for label in the table if no "label" attribute is found in the network.
 		#' @return \code{res_edge_table} in object.
 		#' @examples
 		#' \donttest{
 		#' t1$get_edge_table()
 		#' }
-		get_edge_table = function(){
+		get_edge_table = function(weight_na = 1, label_na = "all"){
 			private$check_igraph()
 			private$check_network()
 			network <- self$res_network
 			res_edge_table <- igraph::as_data_frame(network, what = "edges")
 			colnames(res_edge_table)[1:2] <- c("node1", "node2")
 			if(! "weight" %in% colnames(res_edge_table)){
-				res_edge_table$weight <- NA
+				res_edge_table$weight <- weight_na
+			}
+			if(! "label" %in% colnames(res_edge_table)){
+				res_edge_table$label <- label_na
 			}
 			self$res_edge_table <- res_edge_table
 			message('Result is stored in object$res_edge_table ...')
@@ -993,71 +1011,86 @@ trans_network <- R6Class(classname = "trans_network",
 		#' @param return_igraph default TRUE; whether return the network with igraph format. If FALSE, return \code{trans_network} object.
 		#' @param sample_name default NULL; Sample names. If sample names are provided, the network will be extracted based on the nodes in these samples, 
 		#'   and the corresponding data (e.g., otu_table) in the object will also be filtered when \code{return_igraph = FALSE}.
-		#' @return a new network
+		#'   The input can be one or more sample names.
+		#' @param sample_name_each default FALSE; Whether to return a list containing sub-networks for each sample.
+		#'   This is an advanced usage of sample_name parameter and replaces manual input of sample names.
+		#'   This parameter takes the highest priority. Each sub-network for a sample in the returned list is in the format of a trans_network object,
+		#'   so it can be directly used for subsequent analysis with the `meconetcomp` package.
+		#' @return igraph object or trans_network object depending on the parameter return_igraph; list object containing each trans_network object when sample_name_each = TRUE.
 		#' @examples
 		#' \donttest{
 		#' t1$subset_network(node = t1$res_node_table %>% base::subset(module == "M1") %>% 
 		#'   rownames, rm_single = TRUE)
-		#' # return a sub network that contains all nodes of module M1
+		#' # return a sub-network that contains all nodes of module M1
+		#' t1$subset_network(sample_name = "S1", return_igraph = FALSE)
+		#' # return a sub-network that contains all nodes of sample S1
 		#' }
-		subset_network = function(node = NULL, edge = NULL, rm_single = TRUE, node_alledges = FALSE, return_igraph = TRUE, sample_name = NULL){
+		subset_network = function(node = NULL, edge = NULL, rm_single = TRUE, node_alledges = FALSE, return_igraph = TRUE, sample_name = NULL, sample_name_each = FALSE){
 			private$check_igraph()
 			private$check_network()
 			network <- self$res_network
 			if(!is.null(node) & !is.null(edge)){
 				stop("Please provide either node or edge!")
 			}
-			if(!is.null(sample_name)){
-				if(any(!(sample_name %in% rownames(self$data_abund)))){
-					stop("Please provide correct sample names with sample_name parameter!")
+			if(sample_name_each){
+				samples_network <- list()
+				for(i in rownames(self$data_abund)){
+					samples_network[[i]] <- self$subset_network(return_igraph = FALSE, sample_name = i)
 				}
-				message("Extract sub-network according to features in provided samples: ", paste0(sample_name, collapse = " "), " ...")
-				extract_abund <- self$data_abund %>% .[sample_name, ]
-				node <- apply(extract_abund, 2, sum) %>% .[. != 0] %>% names
-			}
-			if(node_alledges){
-				if(is.null(node)){
-					stop("When node_alledges = TRUE, node parameter must be provided!")
-				}
-				private$check_edgetable()
-				edge <- self$res_edge_table %>% {.[,1] %in% node | .[,2] %in% node} %>% which
-				node <- NULL
-			}
-			if(!is.null(node)){
-				private$check_node_name()
-				nodes_raw <- V(network)$name
-				delete_nodes <- nodes_raw %>% .[! . %in% node]
-				sub_network <- delete_vertices(network, delete_nodes)
-			}
-			if(!is.null(edge)){
-				if(identical(edge, "+") | identical(edge, "-")){
-					label_raw <- E(network)$label
-					sub_network <- delete_edges(network, which(label_raw != edge))
-				}else{
-					all_seqs <- 1:ecount(network)
-					edge_filter <- all_seqs[! all_seqs %in% edge]
-					sub_network <- delete_edges(network, edge_filter)
-				}
-			}
-			if(is.null(node) & is.null(edge)){
-				sub_network <- network
-			}
-			# whether remove the single node without edges
-			if(rm_single == T){
-				sub_network <- private$rm_unlinked_node(sub_network)
-			}
-			if(return_igraph){
-				sub_network
+				samples_network
 			}else{
-				subnet_obj <- clone(self)
-				subnet_obj$res_network <- sub_network
-				subnet_obj$res_edge_table <- NULL
-				subnet_obj$res_node_table <- NULL
 				if(!is.null(sample_name)){
-					subnet_obj$sample_table %<>% .[sample_name, , drop = FALSE]
-					subnet_obj$data_abund %<>% .[sample_name, , drop = FALSE]
+					if(any(!(sample_name %in% rownames(self$data_abund)))){
+						stop("Please provide correct sample names with sample_name parameter!")
+					}
+					message("Extract sub-network according to features in provided samples: ", paste0(sample_name, collapse = " "), " ...")
+					extract_abund <- self$data_abund %>% .[sample_name, ]
+					node <- apply(extract_abund, 2, sum) %>% .[. != 0] %>% names
 				}
-				subnet_obj
+				if(node_alledges){
+					if(is.null(node)){
+						stop("When node_alledges = TRUE, node parameter must be provided!")
+					}
+					private$check_edgetable()
+					edge <- self$res_edge_table %>% {.[,1] %in% node | .[,2] %in% node} %>% which
+					node <- NULL
+				}
+				if(!is.null(node)){
+					private$check_node_name()
+					nodes_raw <- V(network)$name
+					delete_nodes <- nodes_raw %>% .[! . %in% node]
+					sub_network <- delete_vertices(network, delete_nodes)
+				}
+				if(!is.null(edge)){
+					if(identical(edge, "+") | identical(edge, "-")){
+						label_raw <- E(network)$label
+						sub_network <- delete_edges(network, which(label_raw != edge))
+					}else{
+						all_seqs <- 1:ecount(network)
+						edge_filter <- all_seqs[! all_seqs %in% edge]
+						sub_network <- delete_edges(network, edge_filter)
+					}
+				}
+				if(is.null(node) & is.null(edge)){
+					sub_network <- network
+				}
+				# whether remove the single node without edges
+				if(rm_single == TRUE){
+					sub_network <- private$rm_unlinked_node(sub_network)
+				}
+				if(return_igraph){
+					sub_network
+				}else{
+					subnet_obj <- clone(self)
+					subnet_obj$res_network <- sub_network
+					subnet_obj$res_edge_table <- NULL
+					subnet_obj$res_node_table <- NULL
+					if(!is.null(sample_name)){
+						subnet_obj$sample_table %<>% .[sample_name, , drop = FALSE]
+						subnet_obj$data_abund %<>% .[sample_name, , drop = FALSE]
+					}
+					subnet_obj
+				}
 			}
 		},
 		#' @description
@@ -1178,7 +1211,7 @@ trans_network <- R6Class(classname = "trans_network",
 				message("The res_sum_links_pos is not found! Call the cal_sum_links function automatically with default settings ... ")
 				self$cal_sum_links()
 			}
-			if(plot_pos == T){
+			if(plot_pos == TRUE){
 				message("Extract the positive link information ...")
 				if(is.null(self$res_sum_links_pos)){
 					stop("res_sum_links_pos in object is NULL! No positive links can be used!")
@@ -1312,7 +1345,7 @@ trans_network <- R6Class(classname = "trans_network",
 			}
 			
 			abund_table <- self$data_abund
-			if(abundance == F){
+			if(abundance == FALSE){
 				abund_table[abund_table > 1] <- 1
 			}
 			tax_table <- self$tax_table
@@ -1572,7 +1605,7 @@ trans_network <- R6Class(classname = "trans_network",
 			label_text_size, label_text_color, label_text_italic, label_text_parse,
 			roles_color_values, module, x_lim, ...
 			){
-			if(module == T){
+			if(module == TRUE){
 				all_modules <- unique(as.character(node_roles$module))
 				node_roles$module <- factor(as.character(node_roles$module), levels = stringr::str_sort(all_modules, numeric = TRUE))
 			}
@@ -1589,7 +1622,7 @@ trans_network <- R6Class(classname = "trans_network",
 				p <- p + geom_rect(data=NULL, mapping = aes(xmin = x1, xmax = x2, ymin = y1, ymax = y2, fill = lab, alpha = .4))
 				p <- p + guides(fill = guide_legend(title = "Roles"), alpha = "none")
 				p <- p + scale_fill_manual(values = roles_color_values)
-				if(module == T){
+				if(module == TRUE){
 					p <- p + geom_point(data = node_roles, aes(x = p, y = z, shape = module), ...) + 
 						guides(shape = guide_legend(title = "Module"))
 				}else{
@@ -1598,7 +1631,7 @@ trans_network <- R6Class(classname = "trans_network",
 				p <- p + theme(strip.background = element_rect(fill = "white"))
 			}else{
 				node_roles$taxa_roles %<>% factor(., levels = rev(lab))
-				if(module == T){
+				if(module == TRUE){
 					p <- p + geom_point(data = node_roles, aes(x = p, y = z, color = taxa_roles, shape = module), ...) + 
 						guides(shape = guide_legend(title = "Module"))
 				}else{
@@ -1618,7 +1651,7 @@ trans_network <- R6Class(classname = "trans_network",
 					if(nrow(label_data) == 0){
 						message("No label need to be added!")
 					}else{
-						if(label_text_italic == T){
+						if(label_text_italic == TRUE){
 							label_data[, add_label_text] %<>% paste0("italic('", .,"')")
 							label_text_parse <- TRUE
 						}

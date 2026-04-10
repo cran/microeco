@@ -10,7 +10,7 @@
 #'  Scheirer Ray Hare test, 
 #'  R package \code{metagenomeSeq} Paulson et al. (2013) <doi:10.1038/nmeth.2658>, 
 #'  R package \code{ANCOMBC} <doi:10.1038/s41467-020-17041-7>, R package \code{ALDEx2} <doi:10.1371/journal.pone.0067019; 10.1186/2049-2618-2-15>, 
-#'  R package \code{MicrobiomeStat} <doi:10.1186/s13059-022-02655-5>, beta regression <doi:10.18637/jss.v034.i02>, R package \code{maaslin2},
+#'  R package \code{MicrobiomeStat} <doi:10.1186/s13059-022-02655-5>, beta regression <doi:10.18637/jss.v034.i02>, maaslin3 <doi:10.1038/s41592-025-02923-9>,
 #'  linear mixed-effects model and generalized linear mixed model.
 #'  
 #' @export
@@ -55,9 +55,9 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'     	  When the formula parameter is provided, it should start with '~' as it is directly used by the linda function.
 		#'     	  If the group parameter is used, the prefix '~' is not necessary as the function can automatically add it.
 		#'     	  The parameter \code{feature.dat.type = 'count'} has been fixed. Other parameters can be passed to the \code{linda} function.}
-		#'     \item{\strong{'maaslin2'}}{finding associations between metadata and potentially high-dimensional microbial multi-omics data 
-		#'     	  based on the Maaslin2 package <doi:10.1371/journal.pcbi.1009442>.
-		#'     	  Using this option can invoke the \code{trans_env$cal_cor} function with \code{method = "maaslin2"}.}
+		#'     \item{\strong{'maaslin'}}{finding associations between metadata and potentially high-dimensional microbial multi-omics data 
+		#'     	  based on the maaslin3 package <doi:10.1038/s41592-025-02923-9>.
+		#'     	  Using this option can invoke the \code{trans_env$cal_cor} function with \code{method = "maaslin"}.}
 		#'     \item{\strong{'betareg'}}{Beta Regression based on the \code{betareg} package <doi:10.18637/jss.v034.i02>. 
 		#'     	  Please see the \code{beta_pseudo} parameter for the use of pseudo value when there is 0 or 1 in the data}
 		#'     \item{\strong{'lme'}}{Linear Mixed Effect Model based on the \code{lmerTest} package.
@@ -87,7 +87,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' 	  If the provided taxonomic name is neither 'all' nor a colname in tax_table of input dataset (e.g., "ASV"), 
 		#' 	  the function will use the features in input \code{microtable$otu_table} automatically.
 		#' 	  Note that a specific level (e.g., "ASV") should be provided for \code{method}: 
-		#' 	  "metastat", "metagenomeSeq", "ALDEx2_t", "DESeq2", "edgeR", "ancombc2", "linda", "maaslin2".
+		#' 	  "metastat", "metagenomeSeq", "ALDEx2_t", "DESeq2", "edgeR", "ancombc2", "linda", "maaslin".
 		#' @param filter_thres default 0; the abundance threshold, such as 0.0005 when the input is relative abundance; only available when method != "metastat".
 		#' 	  The features with abundances lower than filter_thres will be filtered.
 		#' @param alpha default 0.05; significance threshold to select taxa when method is "lefse" or "rf"; 
@@ -137,11 +137,14 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' 	 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw";
 		#' 	 passed to \code{DESeq2::DESeq} function when method = "DESeq2";
 		#' 	 passed to \code{MicrobiomeStat::linda} function when method = "linda";
-		#' 	 passed to \code{trans_env$cal_cor} function when method = "maaslin2".
+		#' 	 passed to \code{trans_env$cal_cor} function when method = "maaslin".
 		#' @return res_diff and res_abund.\cr
 		#'   \strong{res_abund} includes mean abundance of each taxa (Mean), standard deviation (SD), standard error (SE) and sample number (N) in the group (Group).\cr
-		#'   \strong{res_diff} is the detailed differential test result depending on the method choice, may containing:\cr
-		#'     \strong{"Comparison"}: The groups for the comparision, maybe all groups or paired groups. If this column is not found, all groups are used;\cr
+		#'   \strong{res_diff} is detailed differential abundance test result depending on the method choice, may containing:\cr
+		#'     \strong{"Comparison"}: The groups for the comparision, maybe all groups or paired groups;\cr
+		#'     \strong{"Factors"}: Some methods (e.g., "lm" and "glmm") return a column named "Factors" instead of "Comparison". 
+		#'        In this column, the combinations of non-numeric variable names and group levels are interpreted relative to the reference group. 
+		#'        These methods also return an "Estimate" column (see the following document);\cr
 		#'     \strong{"Group"}: Which group has the maximum median or mean value across the test groups; 
 		#'        For non-parametric methods, median value; For t.test, mean value;\cr
 		#'     \strong{"Taxa"}: which taxa is used in this comparision;\cr
@@ -164,7 +167,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 		initialize = function(
 			dataset = NULL,
 			method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lm",
-				"ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "edgeR", "linda", "maaslin2", "betareg", "lme", "glmm", "glmm_beta")[1],
+				"ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "edgeR", "linda", "maaslin", "betareg", "lme", "glmm", "glmm_beta")[1],
 			group = NULL,
 			taxa_level = "all",
 			filter_thres = 0,
@@ -196,12 +199,15 @@ trans_diff <- R6Class(classname = "trans_diff",
 				self$method <- NULL
 				message("Input dataset is NULL. Please run the functions with customized data ...")
 			}else{
+				if(method %in% c("maaslin2", "maaslin3")){
+					method <- "maaslin"
+				}
 				method <- match.arg(method, c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox", "t.test", 
-					"anova", "scheirerRayHare", "lm", "ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "edgeR", "linda", "maaslin2", "betareg", "lme", "glmm", "glmm_beta"))
+					"anova", "scheirerRayHare", "lm", "ancombc2", "ALDEx2_t", "ALDEx2_kw", "DESeq2", "edgeR", "linda", "maaslin", "betareg", "lme", "glmm", "glmm_beta"))
 
 				tmp_dataset <- clone(dataset)
 				sampleinfo <- tmp_dataset$sample_table
-				if(is.null(group) & ! method %in% c("anova", "scheirerRayHare", "lm", "betareg", "lme", "glmm", "glmm_beta", "maaslin2", "ancombc2", "linda", "DESeq2")){
+				if(is.null(group) & ! method %in% c("anova", "scheirerRayHare", "lm", "betareg", "lme", "glmm", "glmm_beta", "maaslin", "ancombc2", "linda", "DESeq2")){
 					stop("The group parameter is necessary for differential test method: ", method, " !")
 				}
 				if(!is.null(group)){
@@ -245,7 +251,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 					}
 				}
 				
-				if(method %in% c("metastat", "metagenomeSeq", "DESeq2", "edgeR", "ALDEx2_t", "ALDEx2_kw", "ancombc2", "linda", "maaslin2")){
+				if(method %in% c("metastat", "metagenomeSeq", "DESeq2", "edgeR", "ALDEx2_t", "ALDEx2_kw", "ancombc2", "linda", "maaslin")){
 					if(taxa_level == "all"){
 						message("The taxa_level parameter cannot be 'all' for the current method! Automatically change it to 'ASV' ...")
 						taxa_level <- "ASV"
@@ -257,7 +263,11 @@ trans_diff <- R6Class(classname = "trans_diff",
 					if(! taxa_level %in% names(tmp_dataset$taxa_abund)){
 						if(! taxa_level %in% colnames(tmp_dataset$tax_table)){
 							message("Provided taxa_level: ", taxa_level, " not in tax_table of input data set; use features in otu_table ...")
-							tmp_dataset$add_rownames2taxonomy(use_name = taxa_level)
+							if("add_rownames2tax" %in% names(tmp_dataset)){
+								tmp_dataset$add_rownames2tax(use_name = taxa_level)
+							}else{
+								tmp_dataset$add_rownames2taxonomy(use_name = taxa_level)
+							}
 						}
 						suppressMessages(tmp_dataset$cal_abund(rel = TRUE))
 					}
@@ -802,7 +812,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 							W = taxon_data %>% .[, grepl("^W_", raw_colnames)] %>% unlist,
 							p = taxon_data %>% .[, grepl("^p_", raw_colnames)] %>% unlist,
 							P.adj = taxon_data %>% .[, grepl("^q_", raw_colnames)] %>% unlist,
-							diff = taxon_data %>% .[, grepl("^diff_", raw_colnames)] %>% unlist,
+							diff = taxon_data %>% .[, grepl("^diff_", raw_colnames) & !grepl("_robust_", raw_colnames)] %>% unlist,
+							diff_robust = taxon_data %>% .[, grepl("^diff_robust_", raw_colnames)] %>% unlist,
 							passed_ss = taxon_data %>% .[, grepl("^passed_ss_", raw_colnames)] %>% unlist
 							)
 						)
@@ -862,13 +873,13 @@ trans_diff <- R6Class(classname = "trans_diff",
 					}
 					colnames(output)[colnames(output) %in% c("pvalue", "padj")] <- c("P.unadj", "P.adj")
 				}
-				if(method == "maaslin2"){
+				if(method == "maaslin"){
 					tmp_trans_env <- trans_env$new(dataset = tmp_dataset, env_cols = 1:ncol(tmp_dataset$sample_table))
-					tmp_trans_env$cal_cor(use_data = taxa_level, method = method, filter_thres = filter_thres,
-						plot_heatmap = FALSE, plot_scatter = FALSE, ...)
+					tmp_trans_env$cal_cor(use_data = taxa_level, method = method, filter_thres = filter_thres, ...)
+					
 					output <- tmp_trans_env$res_cor
 					self$res_trans_env <- tmp_trans_env
-					message('Raw trans_env object for maaslin2 is stored in object$res_trans_env ...')
+					message('Raw trans_env object for maaslin is stored in object$res_trans_env ...')
 				}
 				
 				# use trans_alpha to get the abundance summary data
@@ -1026,12 +1037,12 @@ trans_diff <- R6Class(classname = "trans_diff",
 			if(nrow(diff_data) == 0){
 				stop("No significant taxa can be used to plot the abundance!")
 			}
-			if(simplify_names == T){
+			if(simplify_names == TRUE){
 				diff_data$Taxa %<>% gsub(".*\\|", "", .)
 				tmp_transalpha$data_alpha$Taxa %<>% gsub(".*\\|", "", .)
 				tmp_transalpha$data_stat$Taxa %<>% gsub(".*\\|", "", .)
 			}
-			if(keep_prefix == F){
+			if(keep_prefix == FALSE){
 				diff_data$Taxa %<>% gsub(".__", "", .)
 				tmp_transalpha$data_alpha$Taxa %<>% gsub(".__", "", .)
 				tmp_transalpha$data_stat$Taxa %<>% gsub(".__", "", .)
@@ -1207,18 +1218,18 @@ trans_diff <- R6Class(classname = "trans_diff",
 					}
 				}
 			}
-			if(keep_full_name == F){
+			if(keep_full_name == FALSE){
 				if(any(grepl("\\..__", use_data$Taxa))){
 					use_data$Taxa %<>% gsub(".*(.__.*?$)", "\\1", .)
 				}else{
 					use_data$Taxa %<>% gsub(".*\\|", "", .)
 				}
 			}
-			if(keep_prefix == F){
+			if(keep_prefix == FALSE){
 				use_data$Taxa %<>% gsub(".__", "", .)
 			}
 
-			if((! grepl("formula", method)) & (! method %in% c("maaslin2"))){
+			if((! grepl("formula", method)) & (! method %in% c("maaslin"))){
 				if(method == "lefse"){
 					colnames(use_data)[colnames(use_data) == "LDA"] <- "Value"
 					ylab_title <- "LDA score"
@@ -1452,7 +1463,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 					marker_table %<>% .[1:use_feature_num, ]
 				}
 			}
-			if(only_select_show == T){
+			if(only_select_show == TRUE){
 				marker_table %<>% .[.$Taxa %in% select_show_labels, ]
 			}
 			# color legend order settings
@@ -1599,8 +1610,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' @description
 		#' Volcano plot.
 		#'
-		#' @param select_group default NULL; which group is select if multiple paired groups are found in 'Comparison' column of \code{res_diff} table.
-		#' 	 It should be either a number or one element of 'Comparison' column.
+		#' @param select_group default NULL; which group is select if multiple paired groups are found in 'Comparison' or 'Factors' column of \code{res_diff} table.
+		#' 	 It should be either a number or one element of these columns.
 		#' @param log2fc_cutoff default 1; cutoff value of log2FoldChange.
 		#' @param pvalue_cutoff default 0.05; cutoff value of adjusted P value.
 		#' @param color_values default c("#e74c3c", "#3498db", "gray80"); color palette for different types of points (i.e. "up", "down" and "none").
@@ -1608,6 +1619,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' @param label_fullname default FALSE; whether show the full taxonomic lineage of each label.
 		#' 	 If the user considers that the full name is too long in the figure when \code{label_fullname = TRUE}, 
 		#' 	 the "Taxa" column in the \code{res_diff} table of the object should be modified to retain the required taxonomic information.
+		#' @param xtitle default \code{expression(log[2]~Fold~Change)}; the title of x axis.
+		#' @param ytitle default \code{expression(-log[10]~P~value)}; the title of y axis.
 		#' @return ggplot.
 		#' @examples
 		#' \dontrun{
@@ -1618,9 +1631,39 @@ trans_diff <- R6Class(classname = "trans_diff",
 								pvalue_cutoff = 0.05,
 								color_values = c("#e74c3c", "#3498db", "gray80"),
 								label_top_n = 10,
-								label_fullname = FALSE){
+								label_fullname = FALSE,
+								xtitle = expression(log[2]~Fold~Change),
+								ytitle = expression(-log[10]~P~value)){
 			
 			input <- self$res_diff
+
+			if(any(c("log2FC", "lfc", "logFC", "log2FoldChange") %in% colnames(input))){
+				if(! "log2FC" %in% colnames(input)) {
+					if("lfc" %in% colnames(input)){
+						input$log2FC <- input$lfc
+					}
+					if("log2FoldChange" %in% colnames(input)){
+						input$log2FC <- input$log2FoldChange
+					}
+					if("logFC" %in% colnames(input)){
+						input$log2FC <- input$logFC
+					}
+				}
+			}else{
+				if("Estimate" %in% colnames(input)){
+					input$log2FC <- input$Estimate
+				}else{
+					stop("The res_diff must have a column like log2FC, lfc, logFC, log2FoldChange or Estimate!")
+				}
+			}
+			input %<>% .[!is.na(.$log2FC), ]
+
+			if("Factors" %in% colnames(input) & ! ("Comparison" %in% colnames(input))){
+				# filter the (Intercept) item
+				message("Filte the rows with (Intercept) in the Factors column ...")
+				input %<>% .[.[, "Factors"] != "(Intercept)", ]
+				input$Comparison <- input$Factors
+			}
 			
 			if("Comparison" %in% colnames(input)){
 				all_paired <- unique(input[, "Comparison"])
@@ -1644,30 +1687,23 @@ trans_diff <- R6Class(classname = "trans_diff",
 				}
 			}
 			
-			if (! "log2FC" %in% colnames(input)) {
-				if("log2FoldChange" %in% colnames(input)){
-					input$log2FC <- input$log2FoldChange
-				}else{
-					if("logFC" %in% colnames(input)){
-						input$log2FC <- input$logFC
-					}else{
-						stop("The res_diff must have log2FC, logFC or log2FoldChange column!")
-					}
-				}
-			}
 			if (! "pvalue" %in% colnames(input)) {
 				if("P.adj" %in% colnames(input)){
 					input$pvalue <- input$P.adj
-					if(any(is.na(input$pvalue))){
-						remove_rows <- which(is.na(input$pvalue))
-						input %<>% .[!is.na(.$pvalue), ]
-						message("Remove ", length(remove_rows), " row(s) with NA in P value ...")
-					}
 				}else{
-					stop("The res_diff must have pvalue or P.adj column!")
+					if("P.unadj" %in% colnames(input)){
+						input$pvalue <- input$P.unadj
+					}else{
+						stop("The res_diff must have pvalue, P.adj or P.unadj column!")
+					}
 				}
 			}
-
+			if(any(is.na(input$pvalue))){
+				remove_rows <- which(is.na(input$pvalue))
+				input %<>% .[!is.na(.$pvalue), ]
+				message("Remove ", length(remove_rows), " row(s) with NA in P value ...")
+			}
+			
 			# -log10(pvalue), avoid -Inf
 			input$neg_log10_p <- -log10(input$pvalue)
 			input$neg_log10_p[is.infinite(input$neg_log10_p)] <- max(input$neg_log10_p[is.finite(input$neg_log10_p)]) + 1
@@ -1714,8 +1750,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 				axis.text = element_text(size = 10)
 			) +
 			labs(
-				x = expression(log[2]~Fold~Change),
-				y = expression(-log[10]~P~value),
+				x = xtitle,
+				y = ytitle,
 				color = "Group"
 			)
 

@@ -305,7 +305,11 @@ trans_env <- R6Class(classname = "trans_env",
 					cat("The taxa_level is OTU; Use otu_table as abundance table input ...\n")
 					# add OTU as one column to make the operations concordant
 					if(! taxa_level %in% colnames(self$dataset$tax_table)){
-						self$dataset$add_rownames2taxonomy(use_name = "OTU")
+						if("add_rownames2tax" %in% names(self$dataset)){
+							self$dataset$add_rownames2tax(use_name = taxa_level)
+						}else{
+							self$dataset$add_rownames2taxonomy(use_name = taxa_level)
+						}
 					}
 				}else{
 					check_tax_level(taxa_level, self$dataset)
@@ -317,7 +321,7 @@ trans_env <- R6Class(classname = "trans_env",
 				}
 				use_data <- as.data.frame(t(use_abund))
 			}
-			if(feature_sel == T){
+			if(feature_sel == TRUE){
 				message('Start forward selection ...')
 				if(method == "dbRDA"){
 					mod0 <- dbrda(use_data ~ 1, env_data, ...)
@@ -331,13 +335,25 @@ trans_env <- R6Class(classname = "trans_env",
 					mod0 <- cca(use_data ~ 1, env_data, ...)
 					mod1 <- cca(use_data ~ ., env_data, ...)					
 				}
-				forward_res <- ordiR2step(mod0, scope = formula(mod1), direction="forward", perm.max = 999)
+				
+				mod0$call$data <- env_data
+				forward_res <- vegan::ordiR2step(mod0, scope = formula(mod1), direction="forward", perm.max = 999)
+				forward_res$call$data <- quote(env_data)
+				
 				res_sign <- gsub("+ ", "", rownames(data.frame(forward_res$anova)), fixed = TRUE)
 				if(length(res_sign) == 0){
 					stop("Non variables obtained after selection according to model. Check method and data!")
 				}
 				res_sign <- res_sign[1:(length(res_sign) - 1)]
-				env_data <- env_data[, c(res_sign), drop = FALSE]
+				if(! all(res_sign %in% colnames(env_data))){
+					res_sign %<>% gsub("^`|`$", "", .)
+					if(! all(res_sign %in% colnames(env_data))){
+						warning("One or more selected variables (", paste0(res_sign[! res_sign %in% colnames(env_data)], collapse = "; "), 
+							") do not match the original variable names! Please report this to the maintainer!")
+					}
+				}
+				message("Selected variables: ", paste0(res_sign, collapse = "; "))
+				env_data <- env_data[, res_sign, drop = FALSE]
 			}
 			self$ordination_method <- method
 			self$taxa_level <- taxa_level
@@ -427,6 +443,10 @@ trans_env <- R6Class(classname = "trans_env",
 			colnames(df_sites)[1:2] <- c("x", "y")
 			
 			multiplier <- vegan:::ordiArrowMul(scrs$biplot)
+			if(is.infinite(multiplier)){
+					message("ordiArrowMul function returns infinite value for a multiplier to scale arrows. Use original values ...")
+				multiplier <- 1
+			}
 			df_arrows <- scrs$biplot * multiplier
 			colnames(df_arrows) <- c("x", "y")
 			df_arrows <- as.data.frame(df_arrows)
@@ -440,6 +460,10 @@ trans_env <- R6Class(classname = "trans_env",
 				df_species <- scrs$species
 				colnames(df_species)[1:2] <- c("x", "y")
 				multiplier_spe <- vegan:::ordiArrowMul(scrs$biplot_spe)
+				if(is.infinite(multiplier_spe)){
+					message("ordiArrowMul function returns infinite value for a multiplier to scale arrows. Use original values ...")
+					multiplier_spe <- 1
+				}
 				df_arrows_spe <- scrs$biplot_spe * multiplier_spe
 				colnames(df_arrows_spe) <- c("x", "y")
 				df_arrows_spe <- dropallfactors(cbind.data.frame(
@@ -461,7 +485,7 @@ trans_env <- R6Class(classname = "trans_env",
 				df_species <- NULL
 				df_arrows_spe <- NULL
 			}
-			if(adjust_arrow_length == T){
+			if(adjust_arrow_length == TRUE){
 				df_arrows[, 1:2] <- private$stand_fun(arr = df_arrows[, 1:2], ref = df_sites, min_perc = min_perc_env, max_perc = max_perc_env)
 				if(self$ordination_method != "dbRDA"){
 					df_arrows_spe[, 1:2] <- private$stand_fun(arr = df_arrows_spe[, 1:2], ref = df_sites, min_perc = min_perc_tax, max_perc = max_perc_tax)
@@ -680,7 +704,7 @@ trans_env <- R6Class(classname = "trans_env",
 					data = combined_centroid_xy, 
 					aes_meco(x = "x", xend = "cx", y = "y", yend = "cy", colour = plot_color),
 					alpha = centroid_segment_alpha, 
-					size = centroid_segment_size, 
+					linewidth = centroid_segment_size, 
 					linetype = centroid_segment_linetype
 				)
 			}
@@ -734,7 +758,7 @@ trans_env <- R6Class(classname = "trans_env",
 				if(! taxa_text_prefix){
 					df_arrows_spe1[, self$taxa_level] %<>% gsub(".*__", "", .)
 				}
-				if(taxa_text_italic == T){
+				if(taxa_text_italic == TRUE){
 					df_arrows_spe1[, self$taxa_level] %<>% paste0("italic('", .,"')")
 				}
 				if(is.null(taxa_nudge_x) & is.null(taxa_nudge_y)){
@@ -864,16 +888,17 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param use_data default "Genus"; "Genus", "all" or "other"; 
 		#'    "Genus" or other taxonomic names (e.g., "Phylum", "ASV"): invoke taxonomic abundance table in \code{taxa_abund} list of the \code{microtable} object; 
 		#'    "all": merge all the taxonomic abundance tables in \code{taxa_abund} list into one; "other": provide additional taxa names by assigning \code{other_taxa} parameter.
-		#' @param method default "pearson"; "pearson", "spearman", "kendall" or "maaslin2"; correlation method.
+		#' @param method default "pearson"; "pearson", "spearman", "kendall" or "maaslin"; correlation method.
 		#' 	  "pearson", "spearman" or "kendall" all refer to the correlation analysis based on the \code{cor.test} function in R.
-		#' 	  "maaslin2" is the method in \code{Maaslin2} package for finding associations between metadata and potentially high-dimensional microbial multi-omics data.
+		#' 	  "maaslin" is the method in \code{maaslin3} package for finding associations between metadata and potentially high-dimensional microbial multi-omics data.
 		#' @param partial default FALSE; whether perform partial correlation based on the \code{ppcor} package. 
 		#' 	  Available when \code{method} is "pearson", "spearman" or "kendall".
 		#' @param partial_fix default NULL; selected environmental variable names used as third group of variables in all the partial correlations. 
 		#' 	  If NULL; all the variables (except the one for correlation) in the environmental data will be used as the third group of variables.
 		#' 	  Otherwise, the function will control for the provided variables (one or more) in all the partial correlations, 
 		#' 	  and the variables in \code{partial_fix} will not be employed anymore in the correlation analysis.
-		#' @param add_abund_table default NULL; additional data table to be used. Row names must be sample names.
+		#' @param add_abund_table default NULL; additional abundance table to be used. Row names must be sample names.
+		#' 	  When it is provided, the \code{use_data} parameter will no longer take effect; in other words, the abundance provided here has a higher priority.
 		#' @param filter_thres default 0; the abundance threshold, such as 0.0005 when the input is relative abundance.
 		#' 	  The features with abundances lower than filter_thres will be filtered. This parameter cannot be applied when add_abund_table parameter is provided.
 		#' @param filter_unknown default TRUE; Whether filter out the unknown taxa ending with "__".
@@ -891,10 +916,12 @@ trans_env <- R6Class(classname = "trans_env",
 		#' @param group_use default NULL; numeric or character vector to select one column in sample_table for selecting samples; together with group_select.
 		#' @param group_select default NULL; the group name used; remain samples within the group.
 		#' @param taxa_name_full default TRUE; Whether use the complete taxonomic name of taxa.
-		#' @param tmp_input_maaslin2 default "tmp_input"; the temporary folder used to save the input files for Maaslin2.
-		#' @param tmp_output_maaslin2 default "tmp_output"; the temporary folder used to save the output files of Maaslin2.
+		#' @param complete_cases default TRUE; Whether use \code{complete.cases} function to remove rows with missing values.
+		#' @param maaslin_output_folder default "tmp_output"; the temporary folder used to save the output files of maaslin.
 		#' @param cor_method deprecated. Please use \code{method} argument instead.
-		#' @param ... parameters passed to \code{Maaslin2} function of \code{Maaslin2} package.
+		#' @param tmp_output_maaslin deprecated. Please use \code{maaslin_output_folder} argument instead.
+		#' @param tmp_input_maaslin deprecated. This parameter is no longer needed.
+		#' @param ... parameters passed to \code{maaslin3} function of \code{maaslin3} package.
 		#' @return \code{res_cor} stored in the object.
 		#' @examples
 		#' \donttest{
@@ -904,7 +931,7 @@ trans_env <- R6Class(classname = "trans_env",
 		#' }
 		cal_cor = function(
 			use_data = c("Genus", "all", "other")[1],
-			method = c("pearson", "spearman", "kendall", "maaslin2")[1],
+			method = c("pearson", "spearman", "kendall", "maaslin")[1],
 			partial = FALSE,
 			partial_fix = NULL,
 			add_abund_table = NULL,
@@ -918,9 +945,11 @@ trans_env <- R6Class(classname = "trans_env",
 			group_use = NULL,
 			group_select = NULL,
 			taxa_name_full = TRUE,
-			tmp_input_maaslin2 = "tmp_input",
-			tmp_output_maaslin2 = "tmp_output",
+			complete_cases = FALSE,
+			maaslin_output_folder = "tmp_output",
 			cor_method = deprecated(),
+			tmp_output_maaslin = deprecated(),
+			tmp_input_maaslin = deprecated(),
 			...
 			){
 			if(is.null(self$data_env)){
@@ -932,10 +961,17 @@ trans_env <- R6Class(classname = "trans_env",
 				lifecycle::deprecate_warn("1.14.1", "cal_cor(cor_method)", "cal_cor(method)")
 				method <- cor_method
 			}
-			method <- match.arg(method, c("pearson", "spearman", "kendall", "maaslin2"))
+			if(lifecycle::is_present(tmp_output_maaslin)) {
+				lifecycle::deprecate_warn("2.1.0", "cal_cor(tmp_output_maaslin)", "cal_cor(maaslin_output_folder)")
+				maaslin_output_folder <- tmp_output_maaslin
+			}
+			if(method %in% c("maaslin2", "maaslin3")){
+				method <- "maaslin"
+			}
+			method <- match.arg(method, c("pearson", "spearman", "kendall", "maaslin"))
 			p_adjust_type <- match.arg(p_adjust_type, c("All", "Taxa", "Env"))
 			
-			if(method != "maaslin2"){
+			if(method != "maaslin"){
 				env_data <- private$check_numeric(env_data)
 			}
 			if(!is.null(add_abund_table)){
@@ -993,26 +1029,16 @@ trans_env <- R6Class(classname = "trans_env",
 			}
 			env_data %<>% .[rownames(.) %in% rownames(abund_table), , drop = FALSE]
 			abund_table %<>% .[rownames(env_data), , drop = FALSE]
-			if(method == "maaslin2"){
-				save_env_data <- data.frame(ID = rownames(env_data), env_data)
-				save_abund_table <- data.frame(ID = rownames(abund_table), abund_table)
-				if(!dir.exists(tmp_input_maaslin2)){
-					dir.create(tmp_input_maaslin2)
-				}
-				path_metadata <- file.path(tmp_input_maaslin2, "tmp_metadata.tsv")
-				path_abundance <- file.path(tmp_input_maaslin2, "tmp_abundance.tsv")
-				write.table(save_env_data, path_metadata, row.names = FALSE)
-				write.table(save_abund_table, path_abundance, row.names = FALSE)
-				if(!dir.exists(tmp_output_maaslin2)){
-					dir.create(tmp_output_maaslin2)
-				}
-				fit_data <- Maaslin2::Maaslin2(save_abund_table, save_env_data, output = tmp_output_maaslin2, ...)
-				res <- fit_data$results
-				res <- data.frame(by_group = "All", res)
+			if(method == "maaslin"){
+				fit_data <- maaslin3::maaslin3(abund_table, env_data, output = maaslin_output_folder, ...)
+				res_path <- file.path(maaslin_output_folder, "all_results.tsv")
+				res <- read.delim(res_path)
+				
+				colnames(res)[colnames(res) == "model"] <- "by_group"
 				colnames(res)[colnames(res) == "feature"] <- "Taxa"
 				colnames(res)[colnames(res) == "metadata"] <- "Env"
-				colnames(res)[colnames(res) == "pval"] <- "Pvalue"
-				colnames(res)[colnames(res) == "qval"] <- "AdjPvalue"
+				colnames(res)[colnames(res) == "pval_joint"] <- "Pvalue"
+				colnames(res)[colnames(res) == "qval_joint"] <- "AdjPvalue"
 			}else{
 				if(is.null(by_group)){
 					groups <- rep("All", nrow(env_data))
@@ -1070,8 +1096,10 @@ trans_env <- R6Class(classname = "trans_env",
 				}
 			}
 			res$Significance <- generate_p_siglabel(res$AdjPvalue)
-			res <- res[complete.cases(res), ]
-			if(taxa_name_full == F){
+			if(complete_cases){
+				res <- res[complete.cases(res), ]
+			}
+			if(taxa_name_full == FALSE){
 				res$Taxa %<>% gsub(".*__(.*?)$", "\\1", .)
 			}
 			self$res_cor <- res
@@ -1164,8 +1192,8 @@ trans_env <- R6Class(classname = "trans_env",
 			}
 			cluster_ggplot <- match.arg(cluster_ggplot, c("none", "row", "col", "both"))
 			use_data <- self$res_cor
-			if(self$cal_cor_method == "maaslin2"){
-				message("Show the coef values of Maaslin2 method in the heatmap ...")
+			if(self$cal_cor_method == "maaslin"){
+				message("Show the coef values of Maaslin method in the heatmap ...")
 				cell_value <- "coef"
 				message("Use name column of object$res_cor as the variables ...")
 				xvalue <- "name"
@@ -1182,20 +1210,20 @@ trans_env <- R6Class(classname = "trans_env",
 			if(!is.null(filter_feature)){
 				use_feature <- lapply(as.character(unique(use_data$Taxa)), function(x){
 					tmp <- use_data %>% .[.$Taxa == x, "Significance"] %>% {all(. %in% filter_feature)}
-					if(tmp == F){ x }
+					if(tmp == FALSE){ x }
 				}) %>% unlist
 				use_data %<>% .[.$Taxa %in% use_feature, ]
 			}
 			if(!is.null(filter_env)){
 				use_envvars <- lapply(as.character(unique(use_data$Env)), function(x){
 					tmp <- use_data %>% .[.$Env == x, "Significance"] %>% {all(. %in% filter_env)}
-					if(tmp == F){ x }
+					if(tmp == FALSE){ x }
 				}) %>% unlist
 				use_data %<>% .[.$Env %in% use_envvars, ]
 			}
-			if(keep_full_name == F){
+			if(keep_full_name == FALSE){
 				if(any(grepl("\\..__", use_data$Taxa))){
-					# solve maaslin2 |
+					# solve maaslin |
 					use_data$Taxa %<>% gsub(".*(.__.*?$)", "\\1", .)
 				}else{
 					# actually | may be more general as some data does not have __
@@ -1204,7 +1232,7 @@ trans_env <- R6Class(classname = "trans_env",
 					}
 				}
 			}
-			if(keep_prefix == F){
+			if(keep_prefix == FALSE){
 				if(any(grepl("__", use_data$Taxa))){
 					use_data$Taxa %<>% gsub(".*__", "", .)
 				}
@@ -1276,7 +1304,7 @@ trans_env <- R6Class(classname = "trans_env",
 			}
 			
 			if(is.null(legend_title)){
-				legend_fill <- ifelse(self$cal_cor_method == "maaslin2", paste0("maaslin2\ncoef"), 
+				legend_fill <- ifelse(self$cal_cor_method == "maaslin", paste0("maaslin\ncoef"), 
 					paste0(toupper(substring(self$cal_cor_method, 1, 1)), substring(self$cal_cor_method, 2)))
 			}else{
 				legend_fill <- legend_title
@@ -1590,7 +1618,7 @@ trans_env <- R6Class(classname = "trans_env",
 					next
 				}
 				env_dist <- vegdist(scale(env[, i, drop = FALSE]), "euclid")
-				if(partial_mantel == T){
+				if(partial_mantel == TRUE){
 					zdis <- vegdist(scale(env[, -i, drop = FALSE]), "euclid")
 					man1 <- mantel.partial(veg, env_dist, zdis, method = method, ...)
 				}else{
@@ -1600,7 +1628,7 @@ trans_env <- R6Class(classname = "trans_env",
 				corr_res <- c(corr_res, man1$statistic)
 				p_res <- c(p_res, man1$signif)
 			}
-			if(partial_mantel == T){
+			if(partial_mantel == TRUE){
 				mantel_type <- rep("partial mantel test", length(p_res))
 			}else{
 				mantel_type <- rep("mantel test", length(p_res))

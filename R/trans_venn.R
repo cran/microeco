@@ -151,7 +151,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 			switch_num <- colnumber - 1
 			summary_table <- self$data_summary
 
-			if(colnumber > 5 & petal_plot == F){
+			if(colnumber > 5 & petal_plot == FALSE){
 				message("The number of elements is larger than 5! Automatically change petal_plot = TRUE! An alternative way of visualization is to use plot_bar function ...")
 				petal_plot <- TRUE
 			}
@@ -164,7 +164,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 					data.frame(x = c(4.8, 9.2, 8.8, 1.65, 0.72), y = c(10.6, 7.7, 0.3, 0.2, 7.05))
 				)
 			}
-			if(colnumber %in% 2:5 & petal_plot == F){
+			if(colnumber %in% 2:5 & petal_plot == FALSE){
 				plot_data <- data.frame(summary_table, private$pos_fun(switch_num))
 			}
 			if(colnumber == 2) {
@@ -173,7 +173,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 					ylim(2.5, 9) + 
 					private$main_theme()
 				
-				if(fill_color == T){
+				if(fill_color == TRUE){
 					p <- p + 
 						geom_polygon(data = private$plotcircle(center = c(4, 6)), aes(x = x, y = y), fill=color_circle[1], alpha = alpha) +
 						geom_polygon(data = private$plotcircle(center = c(6, 6)), aes(x = x, y = y), fill=color_circle[2], alpha = alpha)
@@ -191,7 +191,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 					ylim(1, 9) + 
 					private$main_theme()
 				
-				if(fill_color == T){
+				if(fill_color == TRUE){
 					p <- p + 
 					 geom_polygon(data = private$plotcircle(center = c(4, 6)), aes(x = x, y = y), fill = color_circle[1], alpha = alpha) +
 					 geom_polygon(data = private$plotcircle(center = c(6, 6)), aes(x = x, y = y), fill = color_circle[2], alpha = alpha) +
@@ -218,7 +218,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 				map_data_3 <- private$plotellipse(center = c(5.3, 4.4), rotate = 35)
 				map_data_4 <- private$plotellipse(center = c(6.5, 3.6), rotate = 35)
 			
-				if(fill_color == T){
+				if(fill_color == TRUE){
 					p <- p + 
 						geom_polygon(data = map_data_1, aes(x = x, y = y), fill = color_circle[1], alpha = alpha) +
 						geom_polygon(data = map_data_2, aes(x = x, y = y), fill = color_circle[2], alpha = alpha) +
@@ -232,7 +232,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 						annotate("path", x = map_data_4$x, y = map_data_4$y, color = color_circle[4], size = linesize)
 				}
 			}
-			if(colnumber == 5 & petal_plot == F) {
+			if(colnumber == 5 & petal_plot == FALSE) {
 				p <- ggplot(data.frame(), aes(x = c(5, 5), y = 0)) + 
 					xlim(0, 10.4) + 
 					ylim(-0.5, 10.8) + 
@@ -244,7 +244,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 				map_data_4 <- private$plotellipse(center = c(4.48, 3.15), radius = c(1.55, 3.92), rotate = 210)
 				map_data_5 <- private$plotellipse(center = c(3.7, 4.8), radius = c(1.7, 3.6), rotate = 293.5)
 			
-				if(fill_color == T){
+				if(fill_color == TRUE){
 					p <- p + 
 						geom_polygon(data = map_data_1, aes(x = x, y = y), fill=color_circle[1], alpha = alpha)+
 						geom_polygon(data = map_data_2, aes(x = x, y = y), fill=color_circle[2], alpha = alpha)+
@@ -260,7 +260,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 						annotate("path", x = map_data_5$x, y = map_data_5$y, color = color_circle[5], size = linesize)
 				}
 			}
-			if(colnumber %in% 2:5 & petal_plot == F){
+			if(colnumber %in% 2:5 & petal_plot == FALSE){
 				p <- p + annotate("text", x = text_name_position$x, y = text_name_position$y, label = res_names, size = text_name_size)
 				if(!is.null(ratio)){
 					p <- p + annotate("text", 
@@ -278,7 +278,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 							)
 				}
 			}
-			if(colnumber > 4 & petal_plot == T) {
+			if(colnumber > 4 & petal_plot == TRUE) {
 				nPetals <- colnumber
 				plot_data <- summary_table[c(1:nPetals, nrow(summary_table)), ]
 				if(length(petal_color) == 1){
@@ -537,7 +537,7 @@ trans_venn <- R6Class(classname = "trans_venn",
 			tt[is.na(tt)] <- 0
 			tt %<>% 'rownames<-'(.[, 1]) %>% .[, -1, drop = FALSE]
 			colnames(tt) <- colnames(venn_table)
-			if(use_frequency == T){
+			if(use_frequency == TRUE){
 				tt[tt != 0] <- 1
 			}
 			microtable$new(sample_table = sampledata, otu_table = tt, tax_table = taxdata, auto_tidy = TRUE)

@@ -12,7 +12,7 @@ This class is a wrapper for a series of differential abundance test and indicato
  Scheirer Ray Hare test, 
  R package \code{metagenomeSeq} Paulson et al. (2013) <doi:10.1038/nmeth.2658>, 
  R package \code{ANCOMBC} <doi:10.1038/s41467-020-17041-7>, R package \code{ALDEx2} <doi:10.1371/journal.pone.0067019; 10.1186/2049-2618-2-15>, 
- R package \code{MicrobiomeStat} <doi:10.1186/s13059-022-02655-5>, beta regression <doi:10.18637/jss.v034.i02>, R package \code{maaslin2},
+ R package \code{MicrobiomeStat} <doi:10.1186/s13059-022-02655-5>, beta regression <doi:10.18637/jss.v034.i02>, maaslin3 <doi:10.1038/s41592-025-02923-9>,
  linear mixed-effects model and generalized linear mixed model.
 }
 \examples{
@@ -89,7 +89,7 @@ t1$plot_volcano()
   dataset = NULL,
   method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox",
     "t.test", "anova", "scheirerRayHare", "lm", "ancombc2", "ALDEx2_t", "ALDEx2_kw",
-    "DESeq2", "edgeR", "linda", "maaslin2", "betareg", "lme", "glmm", "glmm_beta")[1],
+    "DESeq2", "edgeR", "linda", "maaslin", "betareg", "lme", "glmm", "glmm_beta")[1],
   group = NULL,
   taxa_level = "all",
   filter_thres = 0,
@@ -158,9 +158,9 @@ t1$plot_volcano()
         When the formula parameter is provided, it should start with '~' as it is directly used by the linda function.
         If the group parameter is used, the prefix '~' is not necessary as the function can automatically add it.
         The parameter \code{feature.dat.type = 'count'} has been fixed. Other parameters can be passed to the \code{linda} function.}
-  \item{\strong{'maaslin2'}}{finding associations between metadata and potentially high-dimensional microbial multi-omics data 
-        based on the Maaslin2 package <doi:10.1371/journal.pcbi.1009442>.
-        Using this option can invoke the \code{trans_env$cal_cor} function with \code{method = "maaslin2"}.}
+  \item{\strong{'maaslin'}}{finding associations between metadata and potentially high-dimensional microbial multi-omics data 
+        based on the maaslin3 package <doi:10.1038/s41592-025-02923-9>.
+        Using this option can invoke the \code{trans_env$cal_cor} function with \code{method = "maaslin"}.}
   \item{\strong{'betareg'}}{Beta Regression based on the \code{betareg} package <doi:10.18637/jss.v034.i02>. 
         Please see the \code{beta_pseudo} parameter for the use of pseudo value when there is 0 or 1 in the data}
   \item{\strong{'lme'}}{Linear Mixed Effect Model based on the \code{lmerTest} package.
@@ -192,7 +192,7 @@ For testing at a specific rank, provide taxonomic rank name, such as "Genus".
 If the provided taxonomic name is neither 'all' nor a colname in tax_table of input dataset (e.g., "ASV"), 
 the function will use the features in input \code{microtable$otu_table} automatically.
 Note that a specific level (e.g., "ASV") should be provided for \code{method}: 
-"metastat", "metagenomeSeq", "ALDEx2_t", "DESeq2", "edgeR", "ancombc2", "linda", "maaslin2".}
+"metastat", "metagenomeSeq", "ALDEx2_t", "DESeq2", "edgeR", "ancombc2", "linda", "maaslin".}
 
 \item{\code{filter_thres}}{default 0; the abundance threshold, such as 0.0005 when the input is relative abundance; only available when method != "metastat".
 The features with abundances lower than filter_thres will be filtered.}
@@ -262,15 +262,18 @@ passed to \code{ANCOMBC::ancombc2} function when method is "ancombc2" (except ta
 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw";
 passed to \code{DESeq2::DESeq} function when method = "DESeq2";
 passed to \code{MicrobiomeStat::linda} function when method = "linda";
-passed to \code{trans_env$cal_cor} function when method = "maaslin2".}
+passed to \code{trans_env$cal_cor} function when method = "maaslin".}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
 res_diff and res_abund.\cr
   \strong{res_abund} includes mean abundance of each taxa (Mean), standard deviation (SD), standard error (SE) and sample number (N) in the group (Group).\cr
-  \strong{res_diff} is the detailed differential test result depending on the method choice, may containing:\cr
-    \strong{"Comparison"}: The groups for the comparision, maybe all groups or paired groups. If this column is not found, all groups are used;\cr
+  \strong{res_diff} is detailed differential abundance test result depending on the method choice, may containing:\cr
+    \strong{"Comparison"}: The groups for the comparision, maybe all groups or paired groups;\cr
+    \strong{"Factors"}: Some methods (e.g., "lm" and "glmm") return a column named "Factors" instead of "Comparison". 
+       In this column, the combinations of non-numeric variable names and group levels are interpreted relative to the reference group. 
+       These methods also return an "Estimate" column (see the following document);\cr
     \strong{"Group"}: Which group has the maximum median or mean value across the test groups; 
        For non-parametric methods, median value; For t.test, mean value;\cr
     \strong{"Taxa"}: which taxa is used in this comparision;\cr
@@ -593,15 +596,17 @@ Volcano plot.
   pvalue_cutoff = 0.05,
   color_values = c("#e74c3c", "#3498db", "gray80"),
   label_top_n = 10,
-  label_fullname = FALSE
+  label_fullname = FALSE,
+  xtitle = expression(log[2] ~ Fold ~ Change),
+  ytitle = expression(-log[10] ~ P ~ value)
 )}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{select_group}}{default NULL; which group is select if multiple paired groups are found in 'Comparison' column of \code{res_diff} table.
-It should be either a number or one element of 'Comparison' column.}
+\item{\code{select_group}}{default NULL; which group is select if multiple paired groups are found in 'Comparison' or 'Factors' column of \code{res_diff} table.
+It should be either a number or one element of these columns.}
 
 \item{\code{log2fc_cutoff}}{default 1; cutoff value of log2FoldChange.}
 
@@ -614,6 +619,10 @@ It should be either a number or one element of 'Comparison' column.}
 \item{\code{label_fullname}}{default FALSE; whether show the full taxonomic lineage of each label.
 If the user considers that the full name is too long in the figure when \code{label_fullname = TRUE}, 
 the "Taxa" column in the \code{res_diff} table of the object should be modified to retain the required taxonomic information.}
+
+\item{\code{xtitle}}{default \code{expression(log[2]~Fold~Change)}; the title of x axis.}
+
+\item{\code{ytitle}}{default \code{expression(-log[10]~P~value)}; the title of y axis.}
 }
 \if{html}{\out{</div>}}
 }
