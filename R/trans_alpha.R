@@ -160,6 +160,9 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 			method <- match.arg(method, c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lm", "lme", "betareg", "glmm", "glmm_beta"))
 			group <- self$group
 			
+			if(! is.null(formula)){
+				formula <- trim_formula(formula)
+			}
 			if(method %in% c("scheirerRayHare", "lm", "lme", "betareg", "glmm", "glmm_beta")){
 				if(is.null(formula)){
 					stop("The formula parameter is NULL! It is necessary for the method: ", method, " !")
@@ -576,10 +579,10 @@ trans_alpha <- R6Class(classname = "trans_alpha",
 					p <- ggplot(tmp_data, aes(x = Estimate, y = Factors, color = Factors)) +
 						theme_bw() +
 						geom_point(size = point_size, alpha = point_alpha) + 
-						geom_errorbar(aes(xmin = Estimate - Std.Error, xmax = Estimate + Std.Error), width = errorbar_width, size = errorbar_size) +
+						geom_errorbar(aes(xmin = Estimate - Std.Error, xmax = Estimate + Std.Error), width = errorbar_width, linewidth = errorbar_size) +
 						scale_color_manual(values = use_color_values) + 
 						geom_text(aes(x = sig_pos, y = Factors, label = Significance), data = tmp_data, inherit.aes = FALSE, size = add_sig_text_size) +
-						geom_vline(xintercept = 0, linetype = line_type, size = line_size, color = line_color, alpha = line_alpha) + 
+						geom_vline(xintercept = 0, linetype = line_type, linewidth = line_size, color = line_color, alpha = line_alpha) + 
 						theme(panel.grid = element_blank(), legend.position = "none") +
 						ylab("") +
 						xlab("Coefficient")

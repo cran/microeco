@@ -184,7 +184,7 @@ t1$plot_volcano()
 }}
 
 \item{\code{group}}{default NULL; sample group used for the comparision; a colname of input \code{microtable$sample_table};
-It is necessary when method is not "anova" or method is "anova" but formula is not provided.
+It is necessary for some methods that formula is not applicable (e.g., wilcox, lefse, one-way anova).
 Once group is provided, the return res_abund will have mean and sd values for group.}
 
 \item{\code{taxa_level}}{default "all"; 'all' represents using abundance data of all taxonomic ranks; 
@@ -201,7 +201,9 @@ The features with abundances lower than filter_thres will be filtered.}
 or used to generate significance letters when method is 'anova' or 'KW_dunn' like the alpha parameter in \code{cal_diff} of \code{trans_alpha} class.}
 
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for other available options; 
-"none" means disable p value adjustment; So when \code{p_adjust_method = "none"}, P.adj is same with P.unadj.}
+"none" means disable p value adjustment; So when \code{p_adjust_method = "none"}, P.adj is same with P.unadj.
+This parameter is valid only when the method is one of "KW", "wilcox", "t.test", "lefse", "rf", "metagenomeSeq", or "edgeR". 
+Other methods are either unsuitable or have built-in approaches that render this parameter unnecessary.}
 
 \item{\code{transformation}}{default NULL; feature abundance transformation method in the class \code{\link{trans_norm}},
 such as 'AST' for the arc sine square root transformation.
