@@ -258,7 +258,8 @@ As the beta distribution function limits 0 < response value < 1, a pseudo value 
 The data that equal to 1 will be replaced by \code{1/(1 + beta_pseudo)}.}
 
 \item{\code{...}}{parameters passed to \code{cal_diff} function of \code{trans_alpha} class when method is one of 
-"KW", "KW_dunn", "wilcox", "t.test", "anova", "betareg", "lme", "glmm" or "glmm_beta";
+ "KW", "KW_dunn", "wilcox", "t.test", "anova", "betareg", "lme", "glmm" or "glmm_beta".
+ For example, it is necessary to use the \code{formula} parameter when the method is 'lme', 'betareg', 'glmm', 'glmm_beta', or 'anova' (for multi-way analysis);
 passed to \code{randomForest::randomForest} function when method = "rf";
 passed to \code{ANCOMBC::ancombc2} function when method is "ancombc2" (except tax_level, global and fix_formula parameters);
 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw";
@@ -536,7 +537,8 @@ If the number of provided group_order is less than the number of groups in \code
 
 \item{\code{use_taxa_num}}{default 200; integer; The taxa number used in the background tree plot; select the taxa according to the mean abundance .}
 
-\item{\code{filter_taxa}}{default NULL; The mean relative abundance used to filter the taxa with low abundance.}
+\item{\code{filter_taxa}}{default NULL; The mean abundance used to filter the taxa with low abundance. 
+Usually, it is relative abundance, depending on the data type of the \code{abund_table} stored in the object.}
 
 \item{\code{use_feature_num}}{default NULL; integer; The feature number used in the plot; 
 select the features according to the metric (method = "lefse" or "rf") from high to low.}

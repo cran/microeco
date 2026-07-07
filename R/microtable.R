@@ -13,7 +13,7 @@
 #' @export
 microtable <- R6Class(classname = "microtable",
 	public = list(
-		#' @param otu_table data.frame class; Feature abundance table; row names must be feature (e.g. OTUs/ASVs/species/genes) names; column names are sample names.
+		#' @param otu_table default NULL; data.frame class; Feature abundance table; row names must be feature (e.g. OTUs/ASVs/species/genes) names; column names are sample names.
 		#' @param sample_table default NULL; data.frame class; Sample information table (optional); row names should be sample names; columns are sample metadata; 
 		#' 	 If not provided, the function can generate a table automatically according to the sample names in the input \code{otu_table}.
 		#' @param tax_table default NULL; data.frame class; Taxonomic information table (optional); row names are feature names; column names are taxonomic ranks.
@@ -47,19 +47,24 @@ microtable <- R6Class(classname = "microtable",
 		#'   tax_table = taxonomy_table_16S, phylo_tree = phylo_tree_16S)
 		#' # trim each data in the object
 		#' m1$tidy_dataset()
-		initialize = function(otu_table, sample_table = NULL, tax_table = NULL, phylo_tree = NULL, rep_fasta = NULL, auto_tidy = FALSE)
+		initialize = function(otu_table = NULL, sample_table = NULL, tax_table = NULL, phylo_tree = NULL, rep_fasta = NULL, auto_tidy = FALSE)
 			{
-			if(missing(otu_table)){
-				stop("otu_table must be provided!")
+			if(is.null(otu_table)){
+				message("No otu_table provided ...")
+			}else{
+				private$check_df(otu_table, "otu_table")
+				private$check_tbldf(otu_table, "otu_table")
+				otu_table <- private$check_abund_table(otu_table)
+				self$otu_table <- otu_table
 			}
-			private$check_df(otu_table, "otu_table")
-			private$check_tbldf(otu_table, "otu_table")
-			otu_table <- private$check_abund_table(otu_table)
-			self$otu_table <- otu_table
 			if(is.null(sample_table)){
-				message("No sample_table provided, automatically use colnames in otu_table to create one ...")
-				self$sample_table <- data.frame(SampleID = colnames(otu_table), Group = colnames(otu_table)) %>% 
-					`row.names<-`(.$SampleID)
+				if(is.null(otu_table)){
+					message("No sample_table provided ...")
+				}else{
+					message("No sample_table provided, automatically use column names in otu_table to create one ...")
+					self$sample_table <- data.frame(SampleID = colnames(otu_table), Group = colnames(otu_table)) %>% 
+						`row.names<-`(.$SampleID)
+				}
 			}else{
 				private$check_df(sample_table, "sample_table")
 				private$check_tbldf(sample_table, "sample_table")
@@ -172,20 +177,22 @@ microtable <- R6Class(classname = "microtable",
 				}else{
 					abund_names <- c()
 				}
-				if(freq != 0){
-					if(freq < 1){
+				# Use a temporary variable inside the loop
+				freq_use <- freq
+				if(freq_use != 0){
+					if(freq_use < 1){
 						message("freq smaller than 1; first convert it to an integer ...")
-						freq <- round(ncol(input_data) * freq)
-						message("Use converted freq integer: ", freq, " for the following filtering ...")
+						freq_use <- round(ncol(input_data) * freq_use)
+						message("Use converted freq integer: ", freq_use, " for the following filtering ...")
 					}
 					taxa_occur_num <- apply(input_data, 1, function(x){sum(x != 0)})
 					if(include_lowest){
-						freq_names <- taxa_occur_num[taxa_occur_num < freq] %>% names
+						freq_names <- taxa_occur_num[taxa_occur_num < freq_use] %>% names
 					}else{
-						freq_names <- taxa_occur_num[taxa_occur_num <= freq] %>% names
+						freq_names <- taxa_occur_num[taxa_occur_num <= freq_use] %>% names
 					}
 					if(length(freq_names) == nrow(input_data)){
-						stop("No feature remained! Please check the freq parameter!")
+						stop("No feature remained! Please check the input freq parameter!")
 					}
 					message(length(freq_names), " features filtered based on the occurrence for ", i, " ...")
 				}else{
@@ -247,9 +254,11 @@ microtable <- R6Class(classname = "microtable",
 		#' @examples
 		#' m1$tidy_dataset(main_data = TRUE)
 		tidy_dataset = function(main_data = FALSE){
-			self <- private$tidy_samples(self)
-			# check again the abundance for the case that sample filtering leads to 0 abundance of some features
-			self$otu_table <- private$check_abund_table(self$otu_table)
+			if(!is.null(self$otu_table)){
+				self <- private$tidy_samples(self)
+				# check again the abundance for the case that sample filtering leads to 0 abundance of some features
+				self$otu_table <- private$check_abund_table(self$otu_table)
+			}
 			taxa_list <- list(rownames(self$otu_table), rownames(self$tax_table), self$phylo_tree$tip.label) %>% 
 				.[!unlist(lapply(., is.null))]
 			taxa_names <- Reduce(intersect, taxa_list)
@@ -260,7 +269,9 @@ microtable <- R6Class(classname = "microtable",
 					stop("No same feature name found among otu_table, tax_table and phylo_tree! Please check feature names in those objects!")
 				}
 			}
-			self$otu_table %<>% .[taxa_names, , drop = FALSE]
+			if(!is.null(self$otu_table)){
+				self$otu_table %<>% .[taxa_names, , drop = FALSE]
+			}
 			if(!is.null(self$tax_table)){
 				self$tax_table %<>% .[taxa_names, , drop = FALSE]
 			}
@@ -279,7 +290,9 @@ microtable <- R6Class(classname = "microtable",
 				self$rep_fasta %<>% .[taxa_names]
 			}
 			# check again whether a sample has 0 abundance after feature filtering
-			self <- private$tidy_samples(self)
+			if(!is.null(self$otu_table)){
+				self <- private$tidy_samples(self)
+			}
 			if(!main_data){
 				sample_names <- rownames(self$sample_table)
 				if(!is.null(self$taxa_abund)){
@@ -650,13 +663,15 @@ microtable <- R6Class(classname = "microtable",
 		#' 	  Only available when \code{rm_un = TRUE}. The default "__$" means removing the names end with '__'.
 		#' @param sep default ","; the field separator string. Same with \code{sep} parameter in \code{\link{write.table}} function.
 		#' 	  default \code{','} correspond to the file name suffix 'csv'. The option \code{'\t'} correspond to the file name suffix 'tsv'. For other options, suffix are all 'txt'.
+		#' @param digits default 10; Number of decimal places to retain. The primary reason for setting this parameter is that if a number has too many decimal places, 
+		#' 	  tools like Excel will automatically convert it to text, which can hinder subsequent operations.
 		#' @param ... parameters passed to \code{\link{write.table}}.
 		#' @examples
 		#' \dontrun{
 		#' m1$save_abund(dirpath = "taxa_abund")
 		#' m1$save_abund(merge_all = TRUE, rm_un = TRUE, sep = "\t")
 		#' }
-		save_abund = function(dirpath = "taxa_abund", merge_all = FALSE, rm_un = FALSE, rm_pattern = "__$", sep = ",", ...){
+		save_abund = function(dirpath = "taxa_abund", merge_all = FALSE, rm_un = FALSE, rm_pattern = "__$", sep = ",", digits = 10, ...){
 			if(!dir.exists(dirpath)){
 				dir.create(dirpath)
 			}
@@ -666,6 +681,7 @@ microtable <- R6Class(classname = "microtable",
 				for(i in names(self$taxa_abund)){
 					res %<>% rbind(., self$taxa_abund[[i]])
 				}
+				res <- round(res, digits)
 				res <- data.frame(Taxa = rownames(res), res)
 				if(rm_un){
 					res %<>% .[!grepl(rm_pattern, .$Taxa), ]
@@ -676,6 +692,7 @@ microtable <- R6Class(classname = "microtable",
 			}else{
 				for(i in names(self$taxa_abund)){
 					tmp <- self$taxa_abund[[i]]
+					tmp <- round(tmp, digits)
 					if(rm_un){
 						tmp %<>% .[!grepl(rm_pattern, rownames(.)), ]
 					}
@@ -829,16 +846,15 @@ microtable <- R6Class(classname = "microtable",
 				}else{
 					binary_use <- binary
 				}
-				if(i == "aitchison"){
-					if(any(eco_table == 0)){
-						eco_table <- eco_table + 1
-					}
+				eco_table_use <- eco_table
+				if(i == "aitchison" && any(eco_table_use == 0)){
+					eco_table_use <- eco_table_use + 1
 				}
-				res[[i]] <- as.matrix(vegan::vegdist(eco_table, method = i, binary = binary_use, ...))
+				res[[i]] <- as.matrix(vegan::vegdist(eco_table_use, method = i, binary = binary_use, ...))
 			}
 			if(unifrac){
 				if(is.null(self$phylo_tree)){
-					stop("No phylogenetic tree provided, please change the parameter unifrac to FALSE")
+					stop("No phylogenetic tree provided, UniFrac metrics cannot be calculated!")
 				}
 				phylo_tree <- self$phylo_tree
 				unifrac1 <- GUniFrac::GUniFrac(eco_table, phylo_tree, alpha = c(0, 0.5, 1))
@@ -869,8 +885,8 @@ microtable <- R6Class(classname = "microtable",
 		#' Print the microtable object.
 		print = function(){
 			cat("microtable-class object:\n")
-			cat(paste("sample_table have", nrow(self$sample_table), "rows and", ncol(self$sample_table), "columns\n"))
-			cat(paste("otu_table have", nrow(self$otu_table), "rows and", ncol(self$otu_table), "columns\n"))
+			if(!is.null(self$sample_table)) cat(paste("sample_table have", nrow(self$sample_table), "rows and", ncol(self$sample_table), "columns\n"))
+			if(!is.null(self$otu_table)) cat(paste("otu_table have", nrow(self$otu_table), "rows and", ncol(self$otu_table), "columns\n"))
 			if(!is.null(self$tax_table)) cat(paste("tax_table have", nrow(self$tax_table), "rows and", ncol(self$tax_table), "columns\n"))
 			if(!is.null(self$phylo_tree)) cat(paste("phylo_tree have", length(self$phylo_tree$tip.label), "tips\n"))
 			if(!is.null(self$rep_fasta)) cat(paste("rep_fasta have", length(self$rep_fasta), "sequences\n"))

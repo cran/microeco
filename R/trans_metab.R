@@ -2,7 +2,7 @@
 #' Create \code{trans_metab} object for metabolite analysis.
 #'
 #' @description
-#' This class is a wrapper for a series of metabolite analysis, including origin inference.
+#' This class is a wrapper for a series of metabolite analysis, including origin inference and pathway enrichment.
 #'
 #' @export
 trans_metab <- R6Class(classname = "trans_metab",
@@ -38,7 +38,7 @@ trans_metab <- R6Class(classname = "trans_metab",
 					if(inherits(metab, "microtable")){
 						if(is.null(metab$tax_table)){
 							metab_tax_table <- data.frame(metab_name = rownames(metab$otu_table))
-							rownames(metab_tax_table) <- rownames(metab)
+							rownames(metab_tax_table) <- rownames(metab$otu_table)
 							metab$tax_table <- metab_tax_table
 						}
 					}else{
@@ -123,7 +123,8 @@ trans_metab <- R6Class(classname = "trans_metab",
 		#' @param database_path default "./metorigindb_split_202602"; directory path of the downloaded database. 
 		#'	  Please download the pre-collated metorigindb database (RData format) from zenodo (https://zenodo.org/records/18618912) and extract the compressed archive.
 		#' @param match_col default "names"; How to match to the data of metorigindb. Default "names" means using the input names of metabolites.
-		#'    If the table has other columns like "HMDB_ID" or "KEGG_ID", the user can provide more items, like c("names", "HMDB_ID").
+		#'    If the tax_table has other columns like "HMDB_ID" or "KEGG_ID", the user can provide more items, like c("names", "HMDB_ID").
+		#'    The program will automatically identify the corresponding columns from the input data based on keywords such as HMDB or KEGG, and then match them with the database.
 		#' @param match_names_distance default 0; distance threshold used if the \code{res_match_table} is found in the object, 
 		#'    which is calculated from the \code{cal_match} function. Available for the "names" option in \code{match_col} parameter.
 		#' @param bac_level default "Genus"; which bacteria level is used to parse the taxa in the \code{data_microb} of object.

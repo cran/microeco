@@ -133,7 +133,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#'   As the beta distribution function limits 0 < response value < 1, a pseudo value will be added for the data that equal to 0.
 		#'   The data that equal to 1 will be replaced by \code{1/(1 + beta_pseudo)}.
 		#' @param ... parameters passed to \code{cal_diff} function of \code{trans_alpha} class when method is one of 
-		#' 	 "KW", "KW_dunn", "wilcox", "t.test", "anova", "betareg", "lme", "glmm" or "glmm_beta";
+		#' 	  "KW", "KW_dunn", "wilcox", "t.test", "anova", "betareg", "lme", "glmm" or "glmm_beta".
+		#' 	  For example, it is necessary to use the \code{formula} parameter when the method is 'lme', 'betareg', 'glmm', 'glmm_beta', or 'anova' (for multi-way analysis);
 		#' 	 passed to \code{randomForest::randomForest} function when method = "rf";
 		#' 	 passed to \code{ANCOMBC::ancombc2} function when method is "ancombc2" (except tax_level, global and fix_formula parameters);
 		#' 	 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw";
@@ -1401,7 +1402,8 @@ trans_diff <- R6Class(classname = "trans_diff",
 		#' 	  If provided, this parameter can overwrite the levels in the group of sample_table. 
 		#' 	  If the number of provided group_order is less than the number of groups in \code{res_diff$Group}, the function will select the groups of group_order automatically.
 		#' @param use_taxa_num default 200; integer; The taxa number used in the background tree plot; select the taxa according to the mean abundance .
-		#' @param filter_taxa default NULL; The mean relative abundance used to filter the taxa with low abundance.
+		#' @param filter_taxa default NULL; The mean abundance used to filter the taxa with low abundance. 
+		#'	  Usually, it is relative abundance, depending on the data type of the \code{abund_table} stored in the object.
 		#' @param use_feature_num default NULL; integer; The feature number used in the plot; 
 		#'	  select the features according to the metric (method = "lefse" or "rf") from high to low.
 		#' @param clade_label_level default 4; the taxonomic level for marking the label with letters, root is the largest.
@@ -1556,7 +1558,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 				node = .data$id,
 				offset = private$get_offset(.data$level)-0.4,
 				offset.text = 0,
-				angle = purrr::map_dbl(.data$id, private$get_angle, tree = tree),
+				angle = purrr::map_dbl(.data$id, ~ private$get_angle(tree = tree, node = .x)),
 				label = .data$label,
 				fontsize = clade_label_size + log(.data$level + clade_label_size_add, base = clade_label_size_log),
 				barsize = 0,
@@ -1773,7 +1775,7 @@ trans_diff <- R6Class(classname = "trans_diff",
 			d1$Group <- group
 			colnames(d1)[1] <- "Value"
 			formu <- reformulate("Group", "Value")
-			if(any(table(as.character(group))) < min_num_nonpara){
+			if(any(table(as.character(group)) < min_num_nonpara)){
 				list(p_value = NA, med = NA)
 			}else{
 				if(! is.null(method)){
@@ -1856,7 +1858,16 @@ trans_diff <- R6Class(classname = "trans_diff",
 				}
 			}
 			if(!is.null(filter_taxa)){
-				abund_table %<>% .[apply(., 1, mean) > (self$lefse_norm * filter_taxa), ]
+				if(is.null(self$lefse_norm)){
+					abund_table %<>% .[apply(., 1, mean) > filter_taxa, ]
+				}else{
+					if(self$lefse_norm > 0){
+						abund_table %<>% .[apply(., 1, mean) > (self$lefse_norm * filter_taxa), ]
+					}else{
+						abund_table %<>% .[apply(., 1, mean) > filter_taxa, ]
+					}
+				}
+				message(nrow(abund_table), " features are remained after using filter_taxa ...")
 			}
 			abund_table %<>% .[sort(rownames(.)), ]
 			tree_table <- data.frame(taxa = row.names(abund_table), abd = rowMeans(abund_table), stringsAsFactors = FALSE) %>%
@@ -1933,14 +1944,14 @@ trans_diff <- R6Class(classname = "trans_diff",
 			annotation %<>% .[label %in% tree$data$label, ]
 			annotation
 		},
-		get_angle = function(tree, node){
+		get_angle = function(node, tree){
 			if (length(node) != 1) {
 				stop("The length of `node` must be 1")
 			}
 			tree_data <- tree$data
 			sp <- tidytree::offspring(tree_data, node)$node
 			sp2 <- c(sp, node)
-			sp.df <- tree_data[match(sp2, tree_data$node),]
+			sp.df <- tree_data[match(sp2, tree_data$node), ]
 			mean(range(sp.df$angle))
 		},
 		get_offset = function(x){(x*0.2+0.2)^2},

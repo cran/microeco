@@ -201,7 +201,7 @@ class(m1$beta_diversity)
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{microtable$new(
-  otu_table,
+  otu_table = NULL,
   sample_table = NULL,
   tax_table = NULL,
   phylo_tree = NULL,
@@ -213,7 +213,7 @@ class(m1$beta_diversity)
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{otu_table}}{data.frame class; Feature abundance table; row names must be feature (e.g. OTUs/ASVs/species/genes) names; column names are sample names.}
+\item{\code{otu_table}}{default NULL; data.frame class; Feature abundance table; row names must be feature (e.g. OTUs/ASVs/species/genes) names; column names are sample names.}
 
 \item{\code{sample_table}}{default NULL; data.frame class; Sample information table (optional); row names should be sample names; columns are sample metadata; 
 If not provided, the function can generate a table automatically according to the sample names in the input \code{otu_table}.}
@@ -723,6 +723,7 @@ Save taxonomic abundance as local file.
   rm_un = FALSE,
   rm_pattern = "__$",
   sep = ",",
+  digits = 10,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -741,6 +742,9 @@ Only available when \code{rm_un = TRUE}. The default "__$" means removing the na
 
 \item{\code{sep}}{default ","; the field separator string. Same with \code{sep} parameter in \code{\link{write.table}} function.
 default \code{','} correspond to the file name suffix 'csv'. The option \code{'\t'} correspond to the file name suffix 'tsv'. For other options, suffix are all 'txt'.}
+
+\item{\code{digits}}{default 10; Number of decimal places to retain. The primary reason for setting this parameter is that if a number has too many decimal places, 
+tools like Excel will automatically convert it to text, which can hinder subsequent operations.}
 
 \item{\code{...}}{parameters passed to \code{\link{write.table}}.}
 }
