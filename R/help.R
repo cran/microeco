@@ -13,6 +13,7 @@
 #' \code{\link{trans_norm}}\cr
 #' \code{\link{trans_abund}}\cr
 #' \code{\link{trans_venn}}\cr
+#' \code{\link{trans_rarefy}}\cr
 #' \code{\link{trans_alpha}}\cr
 #' \code{\link{trans_beta}}\cr
 #' \code{\link{trans_diff}}\cr
@@ -24,6 +25,7 @@
 #' \code{\link{trans_metab}}\cr
 #' \code{\link{trans_phylo}}\cr
 #' \code{\link{trans_niche}}\cr
+#' \code{\link{trans_mst}}\cr
 #' 
 #' To report bugs or discuss questions, please use Github Issues (\href{https://github.com/ChiLiubio/microeco/issues}{https://github.com/ChiLiubio/microeco/issues}).
 #' Before creating a new issue, 

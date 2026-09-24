@@ -89,7 +89,8 @@ t1$plot_volcano()
   dataset = NULL,
   method = c("lefse", "rf", "metastat", "metagenomeSeq", "KW", "KW_dunn", "wilcox",
     "t.test", "anova", "scheirerRayHare", "lm", "ancombc2", "ALDEx2_t", "ALDEx2_kw",
-    "DESeq2", "edgeR", "linda", "maaslin", "betareg", "lme", "glmm", "glmm_beta")[1],
+    "DESeq2", "edgeR", "linda", "maaslin", "betareg", "lme", "glmm", "glmm_beta",
+    "VIP")[1],
   group = NULL,
   taxa_level = "all",
   filter_thres = 0,
@@ -107,7 +108,7 @@ t1$plot_volcano()
   rf_imp_type = 2,
   group_choose_paired = NULL,
   metagenomeSeq_count = 1,
-  ALDEx2_sig = c("wi.eBH", "kw.eBH"),
+  ALDEx2_sig = c("we.eBH", "kw.eBH"),
   by_group = NULL,
   by_ID = NULL,
   beta_pseudo = .Machine$double.eps,
@@ -168,19 +169,31 @@ t1$plot_volcano()
         The significance of 'Estimate' in each term of fixed factors comes from the model.}
   \item{\strong{'glmm'}}{Generalized linear mixed model (GLMM) based on the \code{glmmTMB} package <doi:10.32614/RJ-2017-066>.
         The \code{formula} and \code{family} parameters are needed. 
-        Please refer to glmmTMB package to select the family function, e.g. \code{family = glmmTMB::lognormal(link = "log")}.
+        Please refer to glmmTMB package to select the family function, and make sure that the family matches the data distribution.
+        For relative abundance data that contain zeros, families requiring strictly positive values such as
+        \code{glmmTMB::lognormal()} or \code{glmmTMB::Gamma()} fail with "y values must be > 0";
+        use \code{glmmTMB::tweedie(link = "log")} or \code{glmmTMB::nbinom2(link = "log")} instead,
+        or choose the 'glmm_beta' method that handles zeros internally.
         The usage of formula is similar with that in 'lme' method.
         For more available parameters, please see \code{glmmTMB::glmmTMB} function and use parameter passing.
         In the result, Conditional R2 and Marginal R2 represent the variance explained by both fixed and random effects and the variance explained by 
         fixed effects, respectively. For more details on R2 calculation, please refer to the article <doi: 10.1098/rsif.2017.0213>.
         The significance of fixed factors are tested by Chi-square test from function \code{car::Anova}.
         The significance of 'Estimate' in each term of fixed factors comes from the model.}
-  \item{\strong{'glmm_beta'}}{Generalized linear mixed model with a family function of beta distribution, 
-        developed for the relative abundance (ranging from 0 to 1) of taxa specifically. 
+  \item{\strong{'glmm_beta'}}{Generalized linear mixed model with a family function of beta distribution,
+        developed for the relative abundance (ranging from 0 to 1) of taxa specifically.
         This is an extension of the GLMM model in \code{'glmm'} option.
-        The only difference is in \code{glmm_beta} the family function is fixed with the beta distribution function, 
+        The only difference is in \code{glmm_beta} the family function is fixed with the beta distribution function,
         i.e. \code{family = glmmTMB::beta_family(link = "logit")}.
         Please see the \code{beta_pseudo} parameter for the use of pseudo value when there is 0 or 1 in the data}
+  \item{\strong{'VIP'}}{Variable Importance in the Projection (VIP) from OPLS-DA (for 2 groups) or PLS-DA (for > 2 groups)
+        based on the \code{ropls} package <doi:10.1186/s12859-019-3310-7>.
+        This method is designed for metabolomics data analysis.
+        The VIP score is used to evaluate the contribution of each feature to the group separation.
+        Features with VIP > 1 are generally considered as important discriminants.
+        The significance is automatically calculated using Wilcoxon rank sum test (for 2 groups) or
+        Kruskal-Wallis test (for > 2 groups).
+        Require \code{ropls} package to be installed.}
 }}
 
 \item{\code{group}}{default NULL; sample group used for the comparision; a colname of input \code{microtable$sample_table};
@@ -202,12 +215,14 @@ or used to generate significance letters when method is 'anova' or 'KW_dunn' lik
 
 \item{\code{p_adjust_method}}{default "fdr"; p.adjust method; see method parameter of \code{p.adjust} function for other available options; 
 "none" means disable p value adjustment; So when \code{p_adjust_method = "none"}, P.adj is same with P.unadj.
-This parameter is valid only when the method is one of "KW", "wilcox", "t.test", "lefse", "rf", "metagenomeSeq", or "edgeR". 
-Other methods are either unsuitable or have built-in approaches that render this parameter unnecessary.}
+This parameter is valid only when the method is one of "KW", "KW_dunn", "wilcox", "t.test", "lefse", "rf", "metagenomeSeq", or "edgeR". 
+Other methods are either unsuitable or have built-in approaches that render this parameter unnecessary.
+Note that for "KW_dunn" the default "fdr" is automatically replaced by "holm" as required by FSA::dunnTest.}
 
 \item{\code{transformation}}{default NULL; feature abundance transformation method in the class \code{\link{trans_norm}},
 such as 'AST' for the arc sine square root transformation.
-Only available when \code{method} is one of "KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "betareg" and "lme".}
+Only available when \code{method} is one of "KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare", "lm", 
+"betareg", "lme", "glmm" and "glmm_beta".}
 
 \item{\code{remove_unknown}}{default TRUE; whether remove unknown features that donot have clear classification information.}
 
@@ -237,7 +252,8 @@ Available when method is "metastat", "metagenomeSeq", "ALDEx2_t" or "edgeR".}
 
 \item{\code{metagenomeSeq_count}}{default 1; Filter features to have at least 'counts' counts.; see the count parameter in MRcoefs function of \code{metagenomeSeq} package.}
 
-\item{\code{ALDEx2_sig}}{default c("wi.eBH", "kw.eBH"); which column of the final result is used as the significance asterisk assignment;
+\item{\code{ALDEx2_sig}}{default c("we.eBH", "kw.eBH"); which column of the final result is used as the significance asterisk assignment;
+The default matches the test type: "we.eBH" (Welch t test) for "ALDEx2_t" and "kw.eBH" (Kruskal-Wallis test) for "ALDEx2_kw".
 applied to method = "ALDEx2_t" or "ALDEx2_kw"; the first element is provided to "ALDEx2_t"; the second is provided to "ALDEx2_kw";
 for "ALDEx2_t", the available choice is "wi.eBH" (Expected Benjamini-Hochberg corrected P value of Wilcoxon test)
 and "we.eBH" (Expected BH corrected P value of Welch's t test); for "ALDEx2_kw"; for "ALDEx2_t",
@@ -246,7 +262,9 @@ the available choice is "kw.eBH" (Expected BH corrected P value of Kruskal-Walla
 \item{\code{by_group}}{default NULL; a column of sample_table used to perform the differential test 
 among groups (\code{group} parameter) for each group (\code{by_group} parameter). So \code{by_group} has a higher level than \code{group} parameter.
 Same with the \code{by_group} parameter in \code{trans_alpha} class. 
-Only available when method is one of \code{c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare")}.}
+Only available when method is one of \code{c("KW", "KW_dunn", "wilcox", "t.test", "anova", "scheirerRayHare")}.
+Note that \code{by_group} must be at a higher level than \code{group}, i.e. each level of \code{by_group}
+should contain at least two levels of \code{group}; otherwise no comparison can be performed.}
 
 \item{\code{by_ID}}{default NULL; a column of sample_table used to perform paired t test or paired wilcox test for the paired data,
 such as the data of plant compartments for different plant species (ID). 
@@ -263,9 +281,14 @@ The data that equal to 1 will be replaced by \code{1/(1 + beta_pseudo)}.}
 passed to \code{randomForest::randomForest} function when method = "rf";
 passed to \code{ANCOMBC::ancombc2} function when method is "ancombc2" (except tax_level, global and fix_formula parameters);
 passed to \code{ALDEx2::aldex} function when method = "ALDEx2_t" or "ALDEx2_kw";
+Note that ALDEx2::aldex() ignores extra arguments in its "kw" branch and hard-codes paired.test = FALSE
+in its "t" branch, so the paired test through the by_ID parameter is not available for these two methods.
 passed to \code{DESeq2::DESeq} function when method = "DESeq2";
 passed to \code{MicrobiomeStat::linda} function when method = "linda";
-passed to \code{trans_env$cal_cor} function when method = "maaslin".}
+passed to \code{trans_env$cal_cor} function when method = "maaslin".
+For maaslin, sample-ID-like columns of sample_table are excluded automatically, and character categorical
+variables with more than 2 levels are converted to factors as required by \code{maaslin3::maaslin3}.
+You can preset the factor levels in sample_table beforehand to control the reference level.}
 }
 \if{html}{\out{</div>}}
 }

@@ -21,6 +21,11 @@ t1 <- trans_classifier$new(
 		dataset = dataset, 
 		x.predictors = "Genus",
 		y.response = "Group")
+# use multiple taxonomic levels as the predictors
+t1 <- trans_classifier$new(
+		dataset = dataset, 
+		x.predictors = c("Genus", "Species"),
+		y.response = "Group")
 }
 
 ## ------------------------------------------------
@@ -157,6 +162,7 @@ t1$plot_caretList_resamples()
 \item \href{#method-trans_classifier-cal_caretList}{\code{trans_classifier$cal_caretList()}}
 \item \href{#method-trans_classifier-cal_caretList_resamples}{\code{trans_classifier$cal_caretList_resamples()}}
 \item \href{#method-trans_classifier-plot_caretList_resamples}{\code{trans_classifier$plot_caretList_resamples()}}
+\item \href{#method-trans_classifier-print}{\code{trans_classifier$print()}}
 \item \href{#method-trans_classifier-clone}{\code{trans_classifier$clone()}}
 }
 }
@@ -179,19 +185,24 @@ Create a trans_classifier object.
 \describe{
 \item{\code{dataset}}{an object of \code{\link{microtable}} class.}
 
-\item{\code{x.predictors}}{default "Genus"; character string or data.frame; a character string represents selecting the corresponding data from \code{microtable$taxa_abund}; 
+\item{\code{x.predictors}}{default "Genus"; character vector or data.frame; a character vector represents selecting the corresponding data from \code{microtable$taxa_abund}; 
 data.frame denotes other customized input. See the following available options:
 \describe{
   \item{\strong{'Genus'}}{use Genus level table in \code{microtable$taxa_abund}, or other specific taxonomic rank, e.g., 'Phylum'.
-     If an input level (e.g., ASV) is not found in the names of taxa_abund list, the function will use \code{otu_table} to calculate relative abundance of features.}
-  \item{\strong{'all'}}{use all the levels stored in \code{microtable$taxa_abund}.}
+     At most one input level (e.g., ASV) is allowed to be absent in the names of taxa_abund list; 
+     in that case the function will use \code{otu_table} to calculate relative abundance of features.}
+  \item{\strong{'all'}}{use all the levels stored in \code{microtable$taxa_abund}. Only available when it is the sole input.}
+  \item{\strong{multiple levels}}{use several levels at the same time, e.g., \code{c("Genus", "Species")}; 
+    the corresponding tables in \code{microtable$taxa_abund} are combined by rows as the predictors.}
   \item{\strong{other input}}{must be a data.frame object. It should have the same format with the tables in microtable$taxa_abund, i.e. rows are features; 
     columns are samples with same names in sample_table.}
 }}
 
 \item{\code{y.response}}{default NULL; the response variable in \code{sample_table} of input \code{microtable} object.}
 
-\item{\code{n.cores}}{default 1; the CPU thread used.}
+\item{\code{n.cores}}{default 1; the number of CPU threads used in the model training and the feature selection. 
+The parallel backend of the foreach package is registered only temporarily during the computation and the 
+original backend is restored afterwards, so that the global parallel setting is not permanently changed.}
 }
 \if{html}{\out{</div>}}
 }
@@ -205,6 +216,11 @@ data(dataset)
 t1 <- trans_classifier$new(
 		dataset = dataset, 
 		x.predictors = "Genus",
+		y.response = "Group")
+# use multiple taxonomic levels as the predictors
+t1 <- trans_classifier$new(
+		dataset = dataset, 
+		x.predictors = c("Genus", "Species"),
 		y.response = "Group")
 }
 }
@@ -249,6 +265,11 @@ t1$cal_split(prop.train = 3/4)
 \subsection{Method \code{cal_preProcess()}}{
 Pre-process (centering, scaling etc.) of features based on the caret::preProcess function. 
 	 See \href{https://topepo.github.io/caret/pre-processing.html}{https://topepo.github.io/caret/pre-processing.html} for more details.
+	 Some methods of \code{preProcess}, such as 'nzv', 'zv', 'pca' and 'ica', change the number of features. 
+	 In that case the \code{data_train} and \code{data_test} are rebuilt with the new features and the 
+	 corresponding information is printed, so that the feature names always match the data. 
+	 The existing \code{data_preProcess} is reused when this function is called more than once; please assign 
+	 \code{NULL} to \code{object$data_preProcess} if a new preprocess model is needed.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_preProcess(...)}\if{html}{\out{</div>}}
 }
@@ -283,11 +304,16 @@ t1$cal_preProcess(method = c("center", "scale", "nzv"))
 \subsection{Method \code{cal_feature_sel()}}{
 Perform feature selection.
 	 See \href{https://topepo.github.io/caret/feature-selection-overview.html}{https://topepo.github.io/caret/feature-selection-overview.html} for more details.
+	 An error is raised when no feature is selected, as the following model training can not be performed 
+	 in that case. Please consider increasing \code{boruta.repetitions}, decreasing \code{boruta.pValue} or 
+	 using another \code{x.predictors}.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_feature_sel(
   boruta.maxRuns = 300,
   boruta.pValue = 0.01,
   boruta.repetitions = 4,
+  boruta.min.repetitions = 2,
+  seed = NULL,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -295,11 +321,18 @@ Perform feature selection.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{boruta.maxRuns}}{default 300; maximal number of importance source runs; passed to the \code{maxRuns} parameter in \code{Boruta} function of Boruta package.}
+\item{\code{boruta.maxRuns}}{default 300; maximal number of importance source runs; passed to the \code{maxRuns} parameter in \code{Boruta} function of Boruta package.
+Note that the Boruta function requires a value greater than 10.}
 
 \item{\code{boruta.pValue}}{default 0.01; p value passed to the pValue parameter in \code{Boruta} function of Boruta package.}
 
 \item{\code{boruta.repetitions}}{default 4; repetition runs for the feature selection.}
+
+\item{\code{boruta.min.repetitions}}{default 2; a feature is selected only when it is confirmed as important in at least 
+this number of the \code{boruta.repetitions} independent runs. It must not be greater than \code{boruta.repetitions}.}
+
+\item{\code{seed}}{default NULL; the random seed used to make the repeated Boruta runs reproducible. When it is NULL, 
+the random seeds are generated automatically and the result may change between the runs.}
 
 \item{\code{...}}{parameters pass to \code{Boruta} function of Boruta package.}
 }
@@ -328,7 +361,7 @@ Control parameters for the following training. Please see \code{trainControl} fu
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$set_trainControl(
   method = "repeatedcv",
   classProbs = TRUE,
-  savePredictions = TRUE,
+  savePredictions = "final",
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -342,7 +375,11 @@ see method parameter in \code{trainControl} function of \code{caret} package for
 \item{\code{classProbs}}{default TRUE; should class probabilities be computed for classification models?;
 see classProbs parameter in \code{caret::trainControl} function.}
 
-\item{\code{savePredictions}}{default TRUE; see \code{savePredictions} parameter in \code{caret::trainControl} function.}
+\item{\code{savePredictions}}{default 'final'; see \code{savePredictions} parameter in \code{caret::trainControl} function.
+'final' means that only the predictions of the final model with the best tuning parameters are saved, which is 
+required by the \code{cal_ROC} function when \code{input = "train"}. TRUE (or "all") saves the predictions of 
+all the tuning parameter combinations and is not recommended, as the repeated predictions of the same sample 
+are not independent observations and would distort the ROC analysis.}
 
 \item{\code{...}}{parameters pass to \code{trainControl} function of caret package.}
 }
@@ -367,6 +404,9 @@ t1$set_trainControl(method = 'repeatedcv')
 \if{latex}{\out{\hypertarget{method-trans_classifier-cal_train}{}}}
 \subsection{Method \code{cal_train()}}{
 Run the model training. Please see \href{https://topepo.github.io/caret/available-models.html}{https://topepo.github.io/caret/available-models.html} for available models.
+	 The mtry and ntree optimization is performed for the "rf" method in both the classification and the 
+	 regression. The mean Accuracy of the resamples is used to select the best ntree for the classification and 
+	 the mean RMSE for the regression. The selected mtry and ntree are stored in \code{object$train_params}.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_train(method = "rf", max.mtry = 2, ntree = 500, ...)}\if{html}{\out{</div>}}
 }
@@ -420,13 +460,17 @@ Get feature importance from the training model.
 only available for \code{method = "rf"} in \code{cal_train} function.}
 
 \item{\code{...}}{parameters pass to \code{varImp} function of caret package. 
-If \code{rf_feature_sig} is TURE and \code{train_method} is "rf", the parameters will be passed to \code{rfPermute} function of rfPermute package.}
+If \code{rf_feature_sig} is TRUE and \code{train_method} is "rf", the parameters will be passed to \code{rfPermute} function of rfPermute package.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
 \code{res_feature_imp} in the object. One row for each predictor variable. The column(s) are different importance measures.
-  For the method 'rf', it is MeanDecreaseGini (classification) or IncNodePurity (regression) when \code{rf_feature_sig = FALSE}.
+  When \code{rf_feature_sig = FALSE}, the importance is calculated with the \code{varImp} function of caret package and 
+  the column is usually 'Overall' for both the classification and the regression. When \code{rf_feature_sig = TRUE}, 
+  the importance values generated by the \code{rfPermute} package are used, such as 'MeanDecreaseAccuracy' and 
+  'MeanDecreaseGini' for the classification, and the corresponding p values are stored in the columns with the 
+  '.pval' suffix.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -500,8 +544,10 @@ If positive_class is NULL, use the first group in data as the positive class aut
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-\code{res_predict}, \code{res_confusion_fit} and \code{res_confusion_stats} stored in the object.
+\code{res_predict} and the performance data stored in the object.
 	  The \code{res_predict} is the predicted result for \code{data_test}.
+	  For the classification, \code{res_confusion_fit} and \code{res_confusion_stats} are stored in the object.
+	  For the regression, \code{res_regression_stats} with RMSE, Rsquared and MAE is stored in the object.
 	  Several evaluation metrics in \code{res_confusion_fit} are defined as follows:
 	 \deqn{Accuracy = \frac{TP + TN}{TP + TN + FP + FN}}
   \deqn{Sensitivity = Recall = TPR = \frac{TP}{TP + FN}}
@@ -539,7 +585,8 @@ Plot the cross-tabulation of observed and predicted classes with associated stat
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$plot_confusionMatrix(
   plot_confusion = TRUE,
-  plot_statistics = TRUE
+  plot_statistics = TRUE,
+  as_ggplot = FALSE
 )}\if{html}{\out{</div>}}
 }
 
@@ -549,11 +596,17 @@ Plot the cross-tabulation of observed and predicted classes with associated stat
 \item{\code{plot_confusion}}{default TRUE; whether plot the confusion matrix.}
 
 \item{\code{plot_statistics}}{default TRUE; whether plot the statistics.}
+
+\item{\code{as_ggplot}}{default FALSE; whether return a \code{ggplot} object instead of the \code{gtable} object 
+assembled by the gridExtra package. As the statistics table is plotted with the \code{tableGrob} function, 
+only the confusion matrix is returned when \code{as_ggplot = TRUE}; the statistics table is available in 
+\code{object$res_confusion_stats}.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-\code{ggplot} object.
+\code{gtable} object assembled by the gridExtra package when \code{as_ggplot = FALSE} (default), 
+  or \code{ggplot} object when \code{as_ggplot = TRUE}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
@@ -571,6 +624,10 @@ t1$plot_confusionMatrix()
 \if{latex}{\out{\hypertarget{method-trans_classifier-cal_ROC}{}}}
 \subsection{Method \code{cal_ROC()}}{
 Get ROC (Receiver Operator Characteristic) curve data and the performance data.
+	 When \code{input = "train"}, the predictions are obtained from \code{object$res_train$pred}, which requires 
+	 \code{savePredictions} in \code{set_trainControl} to be 'final' (default). When the predictions of several 
+	 tuning parameter combinations are saved (e.g. \code{savePredictions = TRUE}), only the first prediction of 
+	 each sample is used, as the repeated predictions of a sample are not independent observations.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{trans_classifier$cal_ROC(input = "pred")}\if{html}{\out{</div>}}
 }
@@ -741,6 +798,16 @@ t1$plot_caretList_resamples()
 }
 \if{html}{\out{</div>}}
 
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_classifier-print"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_classifier-print}{}}}
+\subsection{Method \code{print()}}{
+Print the trans_classifier object.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_classifier$print()}\if{html}{\out{</div>}}
 }
 
 }

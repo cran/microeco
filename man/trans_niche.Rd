@@ -16,9 +16,41 @@ and TPD (Trait Probability Density) based on Carmona et al. (2016) <doi:10.1016/
 ## Method `trans_niche$new`
 ## ------------------------------------------------
 
-\donttest{
+\dontrun{
 data(dataset)
 t1 <- trans_niche$new(dataset = dataset)
+}
+
+## ------------------------------------------------
+## Method `trans_niche$cal_niche_breadth`
+## ------------------------------------------------
+
+\dontrun{
+t1$cal_niche_breadth()
+}
+
+## ------------------------------------------------
+## Method `trans_niche$cal_niche_overlap`
+## ------------------------------------------------
+
+\dontrun{
+t1$cal_niche_overlap()
+}
+
+## ------------------------------------------------
+## Method `trans_niche$plot_niche_breadth`
+## ------------------------------------------------
+
+\dontrun{
+t1$plot_niche_breadth()
+}
+
+## ------------------------------------------------
+## Method `trans_niche$plot_niche_overlap`
+## ------------------------------------------------
+
+\dontrun{
+t1$plot_niche_overlap()
 }
 }
 \section{Methods}{
@@ -27,6 +59,8 @@ t1 <- trans_niche$new(dataset = dataset)
 \item \href{#method-trans_niche-new}{\code{trans_niche$new()}}
 \item \href{#method-trans_niche-cal_niche_breadth}{\code{trans_niche$cal_niche_breadth()}}
 \item \href{#method-trans_niche-cal_niche_overlap}{\code{trans_niche$cal_niche_overlap()}}
+\item \href{#method-trans_niche-plot_niche_breadth}{\code{trans_niche$plot_niche_breadth()}}
+\item \href{#method-trans_niche-plot_niche_overlap}{\code{trans_niche$plot_niche_overlap()}}
 \item \href{#method-trans_niche-print}{\code{trans_niche$print()}}
 \item \href{#method-trans_niche-clone}{\code{trans_niche$clone()}}
 }
@@ -40,7 +74,9 @@ t1 <- trans_niche$new(dataset = dataset)
   dataset = NULL,
   filter_thres = 0,
   env_cols = NULL,
-  add_data = NULL
+  add_data = NULL,
+  taxa_level = NULL,
+  taxa_name = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -60,6 +96,11 @@ Passed to \code{\link{trans_env}} for processing (NA check and auto-fill).}
 \item{\code{add_data}}{default NULL; a data.frame of environmental variables with sample names as row names.
 If provided, it takes priority over \code{env_cols}.
 Passed to \code{\link{trans_env}} for processing (NA check and auto-fill).}
+
+\item{\code{taxa_level}}{default NULL; a taxonomic rank in \code{tax_table} used for filtering taxa at object creation.}
+
+\item{\code{taxa_name}}{default NULL; a character vector of taxa names at \code{taxa_level} used for filtering.
+Must be provided together with \code{taxa_level}. Useful when feature number is large.}
 }
 \if{html}{\out{</div>}}
 }
@@ -69,7 +110,7 @@ Passed to \code{\link{trans_env}} for processing (NA check and auto-fill).}
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{\donttest{
+\preformatted{\dontrun{
 data(dataset)
 t1 <- trans_niche$new(dataset = dataset)
 }
@@ -121,6 +162,16 @@ Options:
 \code{res_niche_breadth} stored in the object. For OMI/hypervolume/TPD methods,
   intermediate objects are also stored in \code{res_omi}, \code{res_hypervolume}, or \code{res_TPD}.
 }
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$cal_niche_breadth()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-trans_niche-cal_niche_overlap"></a>}}
@@ -165,6 +216,143 @@ Options:
   For TPD method with \code{symmetric = FALSE}, the matrix is asymmetric where
   overlap[i,j] represents the proportion of taxon i's niche overlapped by taxon j.
 }
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$cal_niche_overlap()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_niche-plot_niche_breadth"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_niche-plot_niche_breadth}{}}}
+\subsection{Method \code{plot_niche_breadth()}}{
+Plot the niche breadth result as a horizontal bar plot.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_niche$plot_niche_breadth(
+  measure = NULL,
+  ntaxa = 20,
+  add_prefix = TRUE,
+  taxa_level = "Genus",
+  sep = " : ",
+  color = RColorBrewer::brewer.pal(8, "Dark2")[2],
+  barwidth = 0.7,
+  ytext_size = 11
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{measure}}{default NULL; a column name in \code{res_niche_breadth} used as the bar length or an integer to select the column name.
+If NULL, the first numeric column except \code{Taxa} is used automatically.}
+
+\item{\code{ntaxa}}{default 20; number of top taxa to show, ordered by \code{measure} from high to low.}
+
+\item{\code{add_prefix}}{default TRUE; whether prepend the taxonomic name to the y-axis taxa labels.}
+
+\item{\code{taxa_level}}{default "Genus"; the taxonomic level used when \code{add_prefix} is \code{TRUE}}
+
+\item{\code{sep}}{default " : "; separator between genus name and taxa name.}
+
+\item{\code{color}}{default RColorBrewer::brewer.pal(8, "Dark2")[2]; bar fill color.}
+
+\item{\code{barwidth}}{default 0.7; bar width passed to \code{geom_bar}.}
+
+\item{\code{ytext_size}}{default 11; y-axis text size.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+ggplot2 plot.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$plot_niche_breadth()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-trans_niche-plot_niche_overlap"></a>}}
+\if{latex}{\out{\hypertarget{method-trans_niche-plot_niche_overlap}{}}}
+\subsection{Method \code{plot_niche_overlap()}}{
+Plot the niche overlap matrix as a heatmap.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{trans_niche$plot_niche_overlap(
+  taxa_level = NULL,
+  taxa_name = NULL,
+  color_low = "white",
+  color_high = RColorBrewer::brewer.pal(8, "Dark2")[2],
+  plot_breaks = NULL,
+  withmargin = TRUE,
+  margincolor = "white",
+  xtext_size = 9,
+  ytext_size = 9,
+  add_anno = FALSE,
+  add_anno_level = "Phylum",
+  anno_color = "grey60",
+  anno_text_size = 9,
+  anno_line_size = 0.5
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{taxa_level}}{default NULL; a taxonomic rank in \code{tax_table} used for filtering taxa.}
+
+\item{\code{taxa_name}}{default NULL; a character vector of taxa names at \code{taxa_level} used for filtering.
+Must be provided together with \code{taxa_level}.}
+
+\item{\code{color_low}}{default "white"; color for low overlap values.}
+
+\item{\code{color_high}}{default RColorBrewer::brewer.pal(8, "Dark2")[2]; color for high overlap values.}
+
+\item{\code{plot_breaks}}{default NULL; breaks for the color scale.}
+
+\item{\code{withmargin}}{default TRUE; whether draw tile margins.}
+
+\item{\code{margincolor}}{default "white"; margin color when \code{withmargin = TRUE}.}
+
+\item{\code{xtext_size}}{default 9; x-axis text size.}
+
+\item{\code{ytext_size}}{default 9; y-axis text size.}
+
+\item{\code{add_anno}}{default FALSE; whether add taxonomic group annotation lines and labels to x and y axes.
+When it is TRUE, the feature names will not be shown.}
+
+\item{\code{add_anno_level}}{default "Phylum"; the taxonomic rank used for axis annotation.}
+
+\item{\code{anno_color}}{default "grey60"; color of the annotation lines and labels.}
+
+\item{\code{anno_text_size}}{default 9; text size of the annotation labels.}
+
+\item{\code{anno_line_size}}{default 0.5; line width of the annotation lines.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+ggplot2 plot.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+t1$plot_niche_overlap()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-trans_niche-print"></a>}}

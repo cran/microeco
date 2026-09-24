@@ -20,19 +20,49 @@ trans_niche <- R6Class(classname = "trans_niche",
                 #' @param add_data default NULL; a data.frame of environmental variables with sample names as row names.
                 #'   If provided, it takes priority over \code{env_cols}.
                 #'   Passed to \code{\link{trans_env}} for processing (NA check and auto-fill).
+                #' @param taxa_level default NULL; a taxonomic rank in \code{tax_table} used for filtering taxa at object creation.
+                #' @param taxa_name default NULL; a character vector of taxa names at \code{taxa_level} used for filtering.
+                #'   Must be provided together with \code{taxa_level}. Useful when feature number is large.
                 #' @return \code{data_rel_abund}, \code{n_samples}, \code{n_taxa}, \code{dataset}, \code{sample_table}
                 #'   and optionally \code{data_env} stored in the object.
                 #' @examples
-                #' \donttest{
+                #' \dontrun{
                 #' data(dataset)
                 #' t1 <- trans_niche$new(dataset = dataset)
                 #' }
-                initialize = function(dataset = NULL, filter_thres = 0, env_cols = NULL, add_data = NULL) {
+                initialize = function(dataset = NULL, filter_thres = 0, env_cols = NULL, add_data = NULL, taxa_level = NULL, taxa_name = NULL) {
                         microeco:::check_microtable(dataset)
                         use_dataset <- microeco::clone(dataset)
                         
                         if(filter_thres > 0){
                                 use_dataset$filter_taxa(rel_abund = filter_thres)
+                        }
+                        # filter taxa by taxonomic level if requested
+                        if(!is.null(taxa_level) || !is.null(taxa_name)){
+                                if(!is.null(taxa_level) && is.null(taxa_name)){
+                                        stop("You provide taxa_level but no taxa_name! Please provide both or neither.")
+                                }
+                                if(is.null(taxa_level) && !is.null(taxa_name)){
+                                        stop("You provide taxa_name but no taxa_level! Please provide both or neither.")
+                                }
+                                if(is.null(use_dataset$tax_table)){
+                                        stop("No tax_table found in the dataset! Cannot filter by taxa_level.")
+                                }
+                                if(! taxa_level %in% colnames(use_dataset$tax_table)){
+                                        stop("The taxa_level '", taxa_level, "' is not found in tax_table!")
+                                }
+                                all_taxa <- rownames(use_dataset$otu_table)
+                                tax_vals <- private$strip_prefix(use_dataset$tax_table[all_taxa, taxa_level, drop = TRUE])
+                                selected_vals <- private$strip_prefix(taxa_name)
+                                keep_taxa <- all_taxa[tax_vals %in% selected_vals]
+                                if(length(keep_taxa) == 0){
+                                        stop("No taxa retained after filtering by taxa_level and taxa_name!")
+                                }
+                                use_dataset$otu_table <- use_dataset$otu_table[keep_taxa, , drop = FALSE]
+                                if(!is.null(use_dataset$tax_table)){
+                                        use_dataset$tax_table <- use_dataset$tax_table[keep_taxa, , drop = FALSE]
+                                }
+                                message("Filtered to ", length(keep_taxa), " taxa by taxa_level and taxa_name ...")
                         }
                         # otu_table: rows = taxa, cols = samples
                         otu_mat <- as.matrix(use_dataset$otu_table)
@@ -81,6 +111,10 @@ trans_niche <- R6Class(classname = "trans_niche",
                 #'   }
                 #' @return \code{res_niche_breadth} stored in the object. For OMI/hypervolume/TPD methods,
                 #'   intermediate objects are also stored in \code{res_omi}, \code{res_hypervolume}, or \code{res_TPD}.
+                #' @examples
+                #' \dontrun{
+                #' t1$cal_niche_breadth()
+                #' }
                 cal_niche_breadth = function(method = c("levins", "OMI", "hypervolume", "TPD")[1], ...) {
                         method <- match.arg(method, c("levins", "OMI", "hypervolume", "TPD"))
                         if(method == "levins"){
@@ -132,6 +166,10 @@ trans_niche <- R6Class(classname = "trans_niche",
                 #' @return \code{res_niche_overlap} stored in the object, a matrix of dimension Taxa x Taxa.
                 #'   For TPD method with \code{symmetric = FALSE}, the matrix is asymmetric where
                 #'   overlap[i,j] represents the proportion of taxon i's niche overlapped by taxon j.
+                #' @examples
+                #' \dontrun{
+                #' t1$cal_niche_overlap()
+                #' }
                 cal_niche_overlap = function(method = c("pianka", "OMI", "hypervolume", "TPD")[1], ...) {
                         method <- match.arg(method, c("pianka", "OMI", "hypervolume", "TPD"))
                         if(method == "pianka"){
@@ -156,6 +194,244 @@ trans_niche <- R6Class(classname = "trans_niche",
                                 private$cal_niche_overlap_TPD(...)
                         }
                         invisible(self)
+                },
+                #' @description
+                #' Plot the niche breadth result as a horizontal bar plot.
+                #'
+                #' @param measure default NULL; a column name in \code{res_niche_breadth} used as the bar length or an integer to select the column name.
+                #'   If NULL, the first numeric column except \code{Taxa} is used automatically.
+                #' @param ntaxa default 20; number of top taxa to show, ordered by \code{measure} from high to low.
+                #' @param add_prefix default TRUE; whether prepend the taxonomic name to the y-axis taxa labels.
+                #' @param taxa_level default "Genus"; the taxonomic level used when \code{add_prefix} is \code{TRUE}
+                #' @param sep default " : "; separator between genus name and taxa name.
+                #' @param color default RColorBrewer::brewer.pal(8, "Dark2")[2]; bar fill color.
+                #' @param barwidth default 0.7; bar width passed to \code{geom_bar}.
+                #' @param ytext_size default 11; y-axis text size.
+                #' @return ggplot2 plot.
+                #' @examples
+                #' \dontrun{
+                #' t1$plot_niche_breadth()
+                #' }
+                plot_niche_breadth = function(
+                        measure = NULL,
+                        ntaxa = 20,
+                        add_prefix = TRUE,
+						taxa_level = "Genus",
+                        sep = " : ",
+                        color = RColorBrewer::brewer.pal(8, "Dark2")[2],
+                        barwidth = 0.7,
+                        ytext_size = 11
+                        ){
+                        if(is.null(self$res_niche_breadth)){
+                                stop("Please first use cal_niche_breadth() to calculate niche breadth !")
+                        }
+                        breadth_df <- self$res_niche_breadth
+                        num_cols <- colnames(breadth_df)[unlist(lapply(breadth_df, is.numeric))]
+                        num_cols <- setdiff(num_cols, "Taxa")
+                        if(length(num_cols) == 0){
+                                stop("No numeric columns found in res_niche_breadth!")
+                        }
+                        if(is.null(measure)){
+							measure <- num_cols[1]
+                        }else{
+							if(! is.numeric(measure)){
+								if(! measure %in% colnames(breadth_df)){
+									stop("The measure '", measure, "' is not found in res_niche_breadth!")
+								}
+							}else{
+								if(is.wholenumber(measure)){
+									if(measure > length(num_cols)){
+										message("Input measure is larger than the length of available names! Use the last one ...")
+										measure <- length(num_cols)
+									}
+									measure <- num_cols[measure]
+								}else{
+									stop("Input measure should be integer when it is numeric class!")
+								}
+							}
+                        }
+                        # select top taxa
+                        ordered_idx <- order(breadth_df[[measure]], decreasing = TRUE, na.last = TRUE)
+                        use_n <- min(ntaxa, length(ordered_idx))
+                        selected_idx <- ordered_idx[seq_len(use_n)]
+                        plot_data <- breadth_df[selected_idx, c("Taxa", measure), drop = FALSE]
+                        plot_data$Taxa <- as.character(plot_data$Taxa)
+                        # create y-axis labels
+                        if(add_prefix){
+                                plot_data$Taxa_label <- private$get_taxa_label(plot_data$Taxa, taxa_level, sep = sep)
+                        }else{
+                                plot_data$Taxa_label <- plot_data$Taxa
+                        }
+                        # highest value at top
+                        plot_data$Taxa_label <- factor(plot_data$Taxa_label, levels = rev(plot_data$Taxa_label))
+                        p <- ggplot(plot_data, aes_meco(x = measure, y = "Taxa_label")) +
+                                geom_bar(stat = "identity", fill = color, width = barwidth) +
+                                xlab(measure) + ylab("") +
+                                theme_bw() +
+                                theme(panel.grid = element_blank(), panel.border = element_blank(),
+                                        axis.line.x = element_line(color = "grey60", linetype = "solid", lineend = "square"),
+                                        axis.text.y = element_text(size = ytext_size))
+
+                        p
+                },
+                #' @description
+                #' Plot the niche overlap matrix as a heatmap.
+                #'
+                #' @param taxa_level default NULL; a taxonomic rank in \code{tax_table} used for filtering taxa.
+                #' @param taxa_name default NULL; a character vector of taxa names at \code{taxa_level} used for filtering.
+                #'   Must be provided together with \code{taxa_level}.
+                #' @param color_low default "white"; color for low overlap values.
+                #' @param color_high default RColorBrewer::brewer.pal(8, "Dark2")[2]; color for high overlap values.
+                #' @param plot_breaks default NULL; breaks for the color scale.
+                #' @param withmargin default TRUE; whether draw tile margins.
+                #' @param margincolor default "white"; margin color when \code{withmargin = TRUE}.
+                #' @param xtext_size default 9; x-axis text size.
+                #' @param ytext_size default 9; y-axis text size.
+                #' @param add_anno default FALSE; whether add taxonomic group annotation lines and labels to x and y axes.
+                #'   When it is TRUE, the feature names will not be shown.
+                #' @param add_anno_level default "Phylum"; the taxonomic rank used for axis annotation.
+                #' @param anno_color default "grey60"; color of the annotation lines and labels.
+                #' @param anno_text_size default 9; text size of the annotation labels.
+                #' @param anno_line_size default 0.5; line width of the annotation lines.
+                #' @return ggplot2 plot.
+                #' @examples
+                #' \dontrun{
+                #' t1$plot_niche_overlap()
+                #' }
+                plot_niche_overlap = function(
+                        taxa_level = NULL,
+                        taxa_name = NULL,
+                        color_low = "white",
+                        color_high = RColorBrewer::brewer.pal(8, "Dark2")[2],
+                        plot_breaks = NULL,
+                        withmargin = TRUE,
+                        margincolor = "white",
+                        xtext_size = 9,
+                        ytext_size = 9,
+                        add_anno = FALSE,
+                        add_anno_level = "Phylum",
+                        anno_color = "grey60",
+                        anno_text_size = 9,
+                        anno_line_size = 0.5
+                        ){
+                        if(is.null(self$res_niche_overlap)){
+                                stop("Please first use cal_niche_overlap() to calculate niche overlap !")
+                        }
+                        overlap_mat <- self$res_niche_overlap
+                        if(!is.matrix(overlap_mat) && !is.data.frame(overlap_mat)){
+                                stop("res_niche_overlap is not a matrix!")
+                        }
+                        all_taxa <- rownames(overlap_mat)
+                        if(is.null(all_taxa) || length(all_taxa) == 0){
+                                stop("No taxa names found in res_niche_overlap!")
+                        }
+                        # filtering by taxonomic level
+                        all_taxa <- private$filter_taxa_by_level(all_taxa, taxa_level, taxa_name)
+                        overlap_mat <- overlap_mat[all_taxa, all_taxa, drop = FALSE]
+                        # order taxa by taxonomy
+                        ordered_taxa <- private$order_taxa_by_taxonomy(all_taxa)
+                        overlap_mat <- overlap_mat[ordered_taxa, ordered_taxa, drop = FALSE]
+                        # convert to long format
+                        plot_data <- reshape2::melt(overlap_mat)
+                        colnames(plot_data) <- c("Taxa1", "Taxa2", "Overlap")
+                        plot_data$Taxa1 <- factor(plot_data$Taxa1, levels = ordered_taxa)
+                        plot_data$Taxa2 <- factor(plot_data$Taxa2, levels = ordered_taxa)
+                        p <- ggplot(plot_data, aes_meco(x = "Taxa1", y = "Taxa2", fill = "Overlap"))
+                        if(withmargin){
+                                p <- p + geom_tile(colour = margincolor, linewidth = 0.5)
+                        }else{
+                                p <- p + geom_tile()
+                        }
+                        if(is.null(plot_breaks)){
+                                p <- p + scale_fill_gradient(low = color_low, high = color_high, na.value = "grey90")
+                        }else{
+                                p <- p + scale_fill_gradient(low = color_low, high = color_high, na.value = "grey90", breaks = plot_breaks)
+                        }
+                        p <- p + xlab("") + ylab("") + theme_bw()
+                        if(! add_anno){
+                                p <- p + theme(
+                                        panel.grid = element_blank(),
+                                        panel.border = element_blank(),
+                                        axis.text.x = element_text(angle = 40, colour = "black", vjust = 1, hjust = 1, size = xtext_size),
+                                        axis.text.y = element_text(size = ytext_size)
+                                )
+                        }else{
+                                p <- p + theme(
+                                        panel.grid = element_blank(),
+                                        panel.border = element_blank(),
+                                        axis.text.x = element_blank(),
+                                        axis.ticks.x = element_blank(),
+                                        axis.text.y = element_blank(),
+                                        axis.ticks.y = element_blank()
+                                )
+                        }
+                        # add taxonomic group annotations to axes
+                        if(add_anno){
+                                if(is.null(self$dataset$tax_table)){
+                                        stop("No tax_table found in the dataset! Cannot add axis annotation.")
+                                }
+                                if(! add_anno_level %in% colnames(self$dataset$tax_table)){
+                                        stop("The add_anno_level '", add_anno_level, "' is not found in tax_table!")
+                                }
+                                anno_groups <- private$get_anno_groups(ordered_taxa, add_anno_level)
+                                if(nrow(anno_groups) > 0){
+                                        n_groups <- nrow(anno_groups)
+                                        is_odd <- seq_len(n_groups) %% 2 == 1
+                                        y_line <- ifelse(is_odd, -0.5, -1.5)
+                                        df_anno_x <- data.frame(
+                                                start = anno_groups$start,
+                                                end = anno_groups$end,
+                                                center = anno_groups$center,
+                                                y_line = y_line,
+                                                label = anno_groups$label,
+                                                stringsAsFactors = FALSE
+                                        )
+                                        x_line <- ifelse(is_odd, -0.5, -1.5)
+                                        df_anno_y <- data.frame(
+                                                start = anno_groups$start,
+                                                end = anno_groups$end,
+                                                center = anno_groups$center,
+                                                x_line = x_line,
+                                                label = anno_groups$label,
+                                                stringsAsFactors = FALSE
+                                        )
+                                        p <- p +
+                                                geom_segment(
+                                                        data = df_anno_x,
+                                                        aes(x = start, xend = end, y = y_line, yend = y_line),
+                                                        color = anno_color,
+                                                        linewidth = anno_line_size,
+                                                        inherit.aes = FALSE
+                                                ) +
+                                                geom_segment(
+                                                        data = df_anno_y,
+                                                        aes(x = x_line, xend = x_line, y = start, yend = end),
+                                                        color = anno_color,
+                                                        linewidth = anno_line_size,
+                                                        inherit.aes = FALSE
+                                                ) +
+                                                geom_text(
+                                                        data = df_anno_x,
+                                                        aes(x = center, y = y_line, label = label),
+                                                        size = anno_text_size / ggplot2::.pt,
+                                                        color = anno_color,
+                                                        vjust = 1.5,
+                                                        inherit.aes = FALSE
+                                                ) +
+                                                geom_text(
+                                                        data = df_anno_y,
+                                                        aes(x = x_line, y = center, label = label),
+                                                        size = anno_text_size / ggplot2::.pt,
+                                                        color = anno_color,
+                                                        hjust = 1,
+                                                        inherit.aes = FALSE
+                                                )
+                                        p <- p +
+                                                coord_cartesian(clip = "off") +
+                                                theme(plot.margin = margin(b = 60, l = 60, t = 5, r = 5))
+                                }
+                        }
+                        p
                 },
                 #' @description
                 #' Print the trans_niche object.
@@ -664,6 +940,73 @@ trans_niche <- R6Class(classname = "trans_niche",
                         if(n_species < n_all){
                                 message("Note: ", n_all - n_species, " taxa were skipped (no occurrence data for TPD); their overlap values are NA.")
                         }
+                },
+                # ----- plotting helpers -----
+                strip_prefix = function(x){
+                        gsub("^.*__", "", as.character(x))
+                },
+                filter_taxa_by_level = function(taxa_names, taxa_level = NULL, taxa_name = NULL){
+                        if(is.null(taxa_level) && is.null(taxa_name)){
+                                return(taxa_names)
+                        }
+                        if(!is.null(taxa_level) && is.null(taxa_name)){
+                                stop("You provide taxa_level but no taxa_name! Please provide both or neither.")
+                        }
+                        if(is.null(taxa_level) && !is.null(taxa_name)){
+                                stop("You provide taxa_name but no taxa_level! Please provide both or neither.")
+                        }
+                        if(is.null(self$dataset$tax_table)){
+                                stop("No tax_table found in the dataset! Cannot filter by taxa_level.")
+                        }
+                        if(! taxa_level %in% colnames(self$dataset$tax_table)){
+                                stop("The taxa_level '", taxa_level, "' is not found in tax_table!")
+                        }
+                        tax_vals <- private$strip_prefix(self$dataset$tax_table[taxa_names, taxa_level, drop = TRUE])
+                        selected_vals <- private$strip_prefix(taxa_name)
+                        keep_taxa <- taxa_names[tax_vals %in% selected_vals]
+                        if(length(keep_taxa) == 0){
+                                stop("No taxa retained after filtering by taxa_level and taxa_name!")
+                        }
+                        keep_taxa
+                },
+                get_taxa_label = function(taxa_names, taxa_level, sep = " : "){
+                        if(is.null(self$dataset$tax_table) || ! taxa_level %in% colnames(self$dataset$tax_table)){
+                                return(taxa_names)
+                        }
+                        taxa_raw <- self$dataset$tax_table[taxa_names, taxa_level]
+                        taxa <- private$strip_prefix(taxa_raw)
+                        label <- ifelse(is.na(taxa) | taxa == "", taxa_names, paste0(taxa, sep, taxa_names))
+                        label
+                },
+                order_taxa_by_taxonomy = function(taxa_names){
+                        if(is.null(self$dataset$tax_table)){
+                                return(taxa_names)
+                        }
+                        ranks <- intersect(c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus"), colnames(self$dataset$tax_table))
+                        if(length(ranks) == 0){
+                                return(taxa_names)
+                        }
+                        tax_sub <- self$dataset$tax_table[taxa_names, ranks, drop = FALSE]
+                        ord <- do.call(order, c(tax_sub, list(na.last = TRUE)))
+                        rownames(tax_sub)[ord]
+                },
+                get_anno_groups = function(ordered_taxa, anno_level){
+                        if(is.null(self$dataset$tax_table) || ! anno_level %in% colnames(self$dataset$tax_table)){
+                                stop("No tax_table found or anno_level is not in tax_table!")
+                        }
+                        anno_raw <- self$dataset$tax_table[ordered_taxa, anno_level, drop = TRUE]
+                        anno_vals <- private$strip_prefix(anno_raw)
+                        anno_vals[is.na(anno_vals) | anno_vals == ""] <- ""
+                        rle_res <- rle(anno_vals)
+                        ends <- cumsum(rle_res$lengths)
+                        starts <- ends - rle_res$lengths + 1
+                        data.frame(
+                                label = rle_res$values,
+                                start = starts - 0.5,
+                                end = ends + 0.5,
+                                center = (starts + ends) / 2,
+                                stringsAsFactors = FALSE
+                        )[rle_res$values != "", , drop = FALSE]
                 }
         ),
         lock_objects = FALSE,
